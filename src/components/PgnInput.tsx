@@ -4,6 +4,9 @@ import type { ConvertOptions } from '../lib/convert'
 interface PgnInputProps {
   onConvert: (text: string, options: ConvertOptions) => void
   error: string | null
+  /** Whole section open/closed (collapsed automatically after a conversion). */
+  open: boolean
+  onOpenChange: (open: boolean) => void
   /** Open the time-control override fields (set when auto-detection fails). */
   overridesOpen: boolean
   onOverridesOpenChange: (open: boolean) => void
@@ -14,6 +17,8 @@ type OverrideMode = 'auto' | 'none' | 'delay' | 'increment'
 export default function PgnInput({
   onConvert,
   error,
+  open,
+  onOpenChange,
   overridesOpen,
   onOverridesOpenChange,
 }: PgnInputProps) {
@@ -53,14 +58,21 @@ export default function PgnInput({
 
   return (
     <section className="rounded-xl border border-rule bg-card shadow-sm">
-      <div className="border-b border-rule px-6 py-4">
-        <h2 className="font-display text-lg font-semibold">Your game</h2>
-        <p className="mt-0.5 text-sm text-ink-mute">
-          Paste the PGN from your ChessNoteR, or upload the .pgn file it created.
-        </p>
-      </div>
+      <details
+        open={open}
+        onToggle={(e) => {
+          if (e.target === e.currentTarget) onOpenChange(e.currentTarget.open)
+        }}
+        className="group"
+      >
+        <summary className="cursor-pointer select-none px-6 py-4 group-open:border-b group-open:border-rule">
+          <span className="font-display text-lg font-semibold">Your game</span>
+          <span className="mt-0.5 block text-sm text-ink-mute">
+            Paste the PGN from your ChessNoteR, or upload the .pgn file it created.
+          </span>
+        </summary>
 
-      <div className="grid gap-6 p-6 md:grid-cols-[minmax(0,1fr)_16rem]">
+        <div className="grid gap-6 p-6 md:grid-cols-[minmax(0,1fr)_16rem]">
         <label className="block">
           <span className="sr-only">PGN text</span>
           <textarea
@@ -186,6 +198,7 @@ export default function PgnInput({
           <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>
         </div>
       )}
+      </details>
     </section>
   )
 }

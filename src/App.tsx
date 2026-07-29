@@ -23,6 +23,7 @@ export default function App() {
   const [headers, setHeaders] = useState<Array<{ name: string; value: string }>>([])
   const [ply, setPly] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const [inputOpen, setInputOpen] = useState(true)
   const [overridesOpen, setOverridesOpen] = useState(false)
   const resultsRef = useRef<HTMLDivElement>(null)
 
@@ -34,6 +35,7 @@ export default function App() {
       setHeaders(result.headers)
       setPly(0)
       setError(null)
+      setInputOpen(false)
       requestAnimationFrame(() => {
         resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       })
@@ -126,6 +128,8 @@ export default function App() {
         <PgnInput
           onConvert={handleConvert}
           error={error}
+          open={inputOpen}
+          onOpenChange={setInputOpen}
           overridesOpen={overridesOpen}
           onOverridesOpenChange={setOverridesOpen}
         />
@@ -175,6 +179,8 @@ export default function App() {
                 moves={game.result.moves}
                 ply={ply}
                 onPlyChange={setPly}
+                whiteName={whiteName}
+                blackName={blackName}
               />
               <MoveTable
                 moves={game.result.moves}

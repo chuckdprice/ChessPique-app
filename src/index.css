@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Lora", Georgia, "Times New Roman", serif;
+  --font-score: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Tournament-hall palette: vinyl-board green + score-sheet buff */
+  --color-felt: #1e5943;
+  --color-felt-deep: #153f30;
+  --color-felt-bright: #2c7a5c;
+  --color-buff: #efe8d6;
+  --color-buff-soft: #f6f1e4;
+  --color-paper: #f7f6f1;
+  --color-card: #fffefb;
+  --color-ink: #23221e;
+  --color-ink-mute: #6d675c;
+  --color-rule: #e3ded2;
+  --color-white-series: #8f8468;
+  --color-black-series: #26241f;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+body {
+  @apply bg-paper text-ink antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-felt-bright);
+  outline-offset: 2px;
+}

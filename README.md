@@ -31,6 +31,16 @@ implementation):
 If the PGN has no usable `TimeControl` tag, the app asks for the starting time and
 delay/increment via the "Time control override" fields.
 
+## Running it locally
+
+```bash
+./start.sh
+```
+
+That installs dependencies on first run, starts the dev server, and opens the app in
+your browser. Use `./start.sh --prod` to build and serve the production bundle instead,
+and Ctrl+C to stop either one.
+
 ## Development
 
 ```bash

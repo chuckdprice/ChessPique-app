@@ -9,8 +9,8 @@ import ClassBadge from './ClassBadge'
 
 export interface PlayerPlate {
   name: string
-  /** e.g. "(719 / ~1600 Lichess Rapid)" */
-  rating: string | null
+  /** Overall game accuracy, ready to print — e.g. "(87.3%)". */
+  accuracy: string | null
   clock: number
 }
 
@@ -31,31 +31,28 @@ function squareCorner(square: string, orientation: 'white' | 'black') {
   return { left: (col + 1) * 12.5, top: row * 12.5 }
 }
 
-/** Name + rating on the left, remaining clock right-aligned to the board edge. */
+/** Name + accuracy on the left, remaining clock right-aligned to the board edge. */
 export function PlayerPlateRow({
   plate,
   color,
-  ratingTooltip,
+  accuracyTooltip,
 }: {
   plate: PlayerPlate
   color: 'w' | 'b'
-  ratingTooltip: string
+  accuracyTooltip: string
 }) {
   return (
     <div className="flex h-full items-center gap-2">
-      <span aria-hidden="true" className="self-center text-base leading-none text-ink">
-        {color === 'w' ? '♔' : '♚'}
-      </span>
       <span className="truncate text-sm font-medium">
         {plate.name}
         <span className="sr-only">{color === 'w' ? ' (White)' : ' (Black)'}</span>
       </span>
-      {plate.rating && (
+      {plate.accuracy && (
         <span
           className="shrink-0 cursor-help font-score text-[11px] text-ink-mute"
-          title={ratingTooltip}
+          title={accuracyTooltip}
         >
-          {plate.rating}
+          {plate.accuracy}
         </span>
       )}
       <span

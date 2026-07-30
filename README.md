@@ -8,10 +8,10 @@ ChessNoteR writes elapsed-move-time comments like `{[%emt 0:01:23]}` and occasio
 clock readings like `{56:00}`. This app converts them into one `{[%clk h:mm:ss]}` comment
 per move, normalizes the `TimeControl` tag (for example `G70/d10` → `4200d10`), and lets you:
 
-The app is a three-step flow shown as chevron tabs across the top — **PGN Upload → PGN Tags →
+The app is a three-step flow shown as chevron tabs across the top — **PGN Up/Download → PGN Tags →
 Game Analysis** — sized so a 1440×900 desktop window needs no scrolling on any step.
 
-- **PGN Upload**: paste a PGN or upload/drop the `.pgn` file (uploads convert immediately).
+- **PGN Up/Download**: paste a PGN or upload/drop the `.pgn` file (uploads convert immediately).
   The source PGN sits on the left and the converted `%clk` PGN on the right, with buttons to
   download it or copy it straight to the clipboard.
 - **PGN Tags**: edit every PGN tag; changes flow live into the converted PGN, the download,
@@ -22,12 +22,15 @@ On the analysis page you can:
 
 - Step through the game with the navigation buttons (which name the previous and next moves),
   the move list, or ← → keys, and flip the board to either player's perspective
-- See each player's remaining clock beside their name, and their rating alongside the
-  estimated "played like" rating
+- See each player's remaining clock and overall accuracy beside their name (their rating and
+  the estimated "played like" rating live in the Move Classification tab)
+- Follow the material balance in the strip beside the board: captured pieces stack outward from
+  the centre on the side of the player who took them, with the lead marked at the far end
 - Turn the engine on to get arrows for its top lines — shaded from best to worst — with the
   move actually played highlighted in gold
 - Review the game with Stockfish 18: an eval bar beside the board, per-move classification
-  (Best → Blunder) in the move list and on the board, and three analysis tabs — Evaluation,
+  (Best, Inaccuracy → Blunder; Good and Excellent stay unmarked) in the move list, on the board
+  and as dots on the evaluation graph, and three analysis tabs — Evaluation,
   Move Classification, and Move Times
 - Turn on the live engine panel for a continuously updating evaluation of the current
   position, with configurable search time, number of lines, and memory
@@ -49,8 +52,9 @@ position, typically ~0.6 s) to produce:
   how much win probability it gave up: ≤2% *Excellent*, ≤5% *Good*, ≤10% *Inaccuracy*,
   ≤20% *Mistake*, above that *Blunder*.
 - **Accuracy** per move and per player, split by game phase (opening / middlegame / endgame).
-- **"Played like" rating**, shown after each player's own rating:
-  `Price, Chuck (719 / ~1600)`. See below for how it is calibrated and how much to trust it.
+- **"Played like" rating**, shown in the Move Classification tab under each player's own rating:
+  `719 Price, Chuck (87.3%)` over `played like ~1600 Lichess Rapid`. See below for how it is
+  calibrated and how much to trust it.
 
 ### How the "played like" rating is calibrated — and its limits
 

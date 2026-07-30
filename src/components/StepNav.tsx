@@ -10,7 +10,7 @@ interface StepNavProps {
 }
 
 const STEPS: Array<{ id: Page; label: string }> = [
-  { id: 'upload', label: 'PGN Upload' },
+  { id: 'upload', label: 'PGN Up/Download' },
   { id: 'tags', label: 'PGN Tags' },
   { id: 'analysis', label: 'Game Analysis' },
 ]

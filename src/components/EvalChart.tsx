@@ -8,9 +8,10 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import type { GameAnalysis, PhaseAccuracy } from '../lib/engine/analysis'
+import type { Classification, GameAnalysis, PhaseAccuracy } from '../lib/engine/analysis'
 import { formatScore } from '../lib/engine/uci'
 import type { Move } from '../lib/convert'
+import { classColor } from './ClassBadge'
 
 interface EvalChartProps {
   analysis: GameAnalysis
@@ -27,6 +28,31 @@ interface EvalRow {
   ev: number
   label: string
   scoreText: string
+  /** Classification of the move that reached this position, if it earns a dot. */
+  dotClass: Classification | null
+}
+
+/** Classifications marked on the line — the ones worth finding at a glance. */
+const DOTTED: Classification[] = ['best', 'inaccuracy', 'mistake', 'blunder']
+
+/**
+ * Recharts calls this for every point; only flagged moves get a dot, the rest
+ * render an empty group.
+ */
+function ClassDot(props: { cx?: number; cy?: number; index?: number; payload?: EvalRow }) {
+  const { cx, cy, index, payload } = props
+  if (cx == null || cy == null || !payload?.dotClass) return <g key={`dot-${index}`} />
+  return (
+    <circle
+      key={`dot-${index}`}
+      cx={cx}
+      cy={cy}
+      r={3.2}
+      fill={classColor(payload.dotClass)}
+      stroke="var(--card)"
+      strokeWidth={1}
+    />
+  )
 }
 
 function moveLabel(moves: Move[], ply: number): string {
@@ -55,7 +81,7 @@ function EvalTooltip({
 
 function AccuracyCell({ value }: { value: number | null }) {
   return (
-    <td className="px-3 py-1.5 text-center font-score text-sm font-semibold text-class-best">
+    <td className="px-2 py-0.5 text-center font-score text-xs font-semibold text-class-best">
       {value == null ? '—' : `${value.toFixed(1)}%`}
     </td>
   )
@@ -72,17 +98,21 @@ export default function EvalChart({
   const rows: EvalRow[] = analysis.evals.map((score, i) => {
     const pawns =
       score.mate != null ? (score.mate > 0 ? 10 : -10) : Math.max(-10, Math.min(10, (score.cp ?? 0) / 100))
+    // Row i is the position after move i, so the dot lands on the move that
+    // produced it; the starting position has no move behind it.
+    const classification = i > 0 ? (analysis.moves[i - 1]?.classification ?? null) : null
     return {
       ply: i,
       ev: pawns,
       label: moveLabel(moves, i),
       scoreText: formatScore(score),
+      dotClass: classification && DOTTED.includes(classification) ? classification : null,
     }
   })
 
   const accuracyRow = (name: string, acc: PhaseAccuracy, overall: number) => (
     <tr className="border-t border-rule/60">
-      <td className="max-w-40 truncate px-3 py-1.5 text-sm">{name}</td>
+      <td className="max-w-40 truncate px-2 py-0.5 text-xs">{name}</td>
       <AccuracyCell value={acc.opening} />
       <AccuracyCell value={acc.middlegame} />
       <AccuracyCell value={acc.endgame} />
@@ -92,7 +122,8 @@ export default function EvalChart({
 
   return (
     <div>
-      <ResponsiveContainer width="100%" height={150}>
+      {/* Kept short so the chart and the phase table both clear the fold. */}
+      <ResponsiveContainer width="100%" height={104}>
         <AreaChart
           data={rows}
           margin={{ top: 8, right: 12, bottom: 4, left: 0 }}
@@ -159,6 +190,7 @@ export default function EvalChart({
             fill="var(--eval-fill)"
             fillOpacity={0.55}
             isAnimationActive={false}
+            dot={<ClassDot />}
           />
           <ReferenceLine x={ply} stroke="var(--accent-bright)" strokeWidth={1.5} />
         </AreaChart>
@@ -166,12 +198,12 @@ export default function EvalChart({
       <div className="mt-1 overflow-x-auto">
         <table className="w-full min-w-96">
           <thead>
-            <tr className="text-xs uppercase tracking-wide text-ink-mute">
-              <th className="px-3 py-1 text-left font-medium"> </th>
-              <th className="px-3 py-1 text-center font-medium">Opening</th>
-              <th className="px-3 py-1 text-center font-medium">Middle</th>
-              <th className="px-3 py-1 text-center font-medium">End</th>
-              <th className="px-3 py-1 text-center font-medium">Game</th>
+            <tr className="text-[10px] uppercase tracking-wide text-ink-mute">
+              <th className="px-2 py-0.5 text-left font-medium"> </th>
+              <th className="px-2 py-0.5 text-center font-medium">Opening</th>
+              <th className="px-2 py-0.5 text-center font-medium">Middle</th>
+              <th className="px-2 py-0.5 text-center font-medium">End</th>
+              <th className="px-2 py-0.5 text-center font-medium">Game</th>
             </tr>
           </thead>
           <tbody>

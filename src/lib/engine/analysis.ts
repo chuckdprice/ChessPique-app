@@ -47,12 +47,12 @@ export const CLASSIFICATION_SYMBOL: Record<Classification, string> = {
 
 /**
  * Whether a classification earns a marker in the move list and on the board.
- * "Good" is deliberately silent: it is the unremarkable case, and marking it
- * added noise without telling the reader anything. The Move Classification tab
- * still counts and labels it.
+ * "Good" and "Excellent" are deliberately silent: between them they cover most
+ * of a game, and marking them added noise without telling the reader anything.
+ * The Move Classification tab still counts and labels both.
  */
 export function hasMoveMarker(classification: Classification): boolean {
-  return classification !== 'good'
+  return classification !== 'good' && classification !== 'excellent'
 }
 
 /** Win-percent-loss thresholds (mover's perspective). */

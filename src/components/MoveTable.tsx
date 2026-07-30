@@ -133,10 +133,7 @@ export default function MoveTable({
       aria-label="Moves"
       className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-rule bg-card shadow-sm"
     >
-      <div className="shrink-0 border-b border-rule px-4 py-2">
-        <h2 className="font-display text-sm font-semibold">Moves</h2>
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 py-1">
+      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-1 pt-2">
         <table className="w-full border-collapse">
           <colgroup>
             <col className="w-8" />

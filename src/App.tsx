@@ -187,19 +187,8 @@ export default function App() {
   const whiteName = (game && findHeader(headers, 'White')) || 'White'
   const blackName = (game && findHeader(headers, 'Black')) || 'Black'
 
-  // "(Elo / ~played-like Lichess Rapid)"; played-like fills in after analysis.
-  const ratingLabel = (elo: string | undefined, playedLike: number | undefined) => {
-    const playedLikeText =
-      playedLike != null ? `~${playedLike} Lichess Rapid` : analysisProgress ? '…' : null
-    if (!elo && playedLikeText == null) return null
-    return `(${elo ?? '—'} / ${playedLikeText ?? '—'})`
-  }
-  const whiteRating = game
-    ? ratingLabel(findHeader(headers, 'WhiteElo'), analysis?.white.playedLike)
-    : null
-  const blackRating = game
-    ? ratingLabel(findHeader(headers, 'BlackElo'), analysis?.black.playedLike)
-    : null
+  const whiteElo = (game && findHeader(headers, 'WhiteElo')) || null
+  const blackElo = (game && findHeader(headers, 'BlackElo')) || null
 
   const evalScore: Score | null = analysis ? (analysis.evals[ply] ?? null) : liveScore
 
@@ -249,8 +238,12 @@ export default function App() {
       ? Math.round((analysisProgress.done / analysisProgress.total) * 100)
       : null
 
-  const ratingTooltip =
-    `Rating from the PGN tag / estimated "played like" rating for this game.\n\n` +
+  const accuracyTooltip =
+    `Overall accuracy for the game: the average of each move's accuracy, which comes from the ` +
+    `win-% that move gave up (lichess formula). 100% means every move held the position's value.`
+
+  const playedLikeTooltip =
+    `Estimated "played like" rating for this game.\n\n` +
     `Estimated from average win-% lost per move in undecided positions, calibrated against ` +
     `rated Lichess rapid games, so it sits on the Lichess rapid scale — which runs higher ` +
     `than USCF or FIDE OTB ratings.\n\n` +
@@ -338,9 +331,10 @@ export default function App() {
             chartRows={chartRows}
             whiteName={whiteName}
             blackName={blackName}
-            whiteRating={whiteRating}
-            blackRating={blackRating}
-            ratingTooltip={ratingTooltip}
+            whiteElo={whiteElo}
+            blackElo={blackElo}
+            accuracyTooltip={accuracyTooltip}
+            playedLikeTooltip={playedLikeTooltip}
             evalScore={evalScore}
             engineOn={engineOn}
             onEngineOnChange={setEngineOn}

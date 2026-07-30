@@ -51,6 +51,55 @@ export function clockAtPly(
   return startSeconds
 }
 
+/** Piece kinds a side can lose, ordered as they stack outward from the centre. */
+export type CapturedKind = 'p' | 'n' | 'b' | 'r' | 'q'
+
+const CAPTURED_ORDER: CapturedKind[] = ['p', 'n', 'b', 'r', 'q']
+const START_COUNT: Record<CapturedKind, number> = { p: 8, n: 2, b: 2, r: 2, q: 1 }
+const PIECE_VALUE: Record<CapturedKind, number> = { p: 1, n: 3, b: 3, r: 5, q: 9 }
+
+export interface CapturedMaterial {
+  /** Missing white pieces (captured by Black), pawns first. */
+  white: CapturedKind[]
+  /** Missing black pieces (captured by White), pawns first. */
+  black: CapturedKind[]
+  /** Material difference in pawns from what is on the board; > 0 = White ahead. */
+  diff: number
+}
+
+/**
+ * What each side has lost, and by how much material one side leads.
+ *
+ * The captured lists come from what is missing against the starting army, so a
+ * promotion can hide a lost pawn (the count is clamped at zero). The difference
+ * is measured from the pieces actually on the board instead, which stays right
+ * through promotions.
+ */
+export function capturedMaterial(fen: string): CapturedMaterial {
+  const board = fen.split(' ')[0]
+  const present: Record<string, number> = {}
+  for (const ch of board) {
+    if (/[pnbrqPNBRQ]/.test(ch)) present[ch] = (present[ch] ?? 0) + 1
+  }
+
+  const missing = (kind: CapturedKind, color: 'w' | 'b'): CapturedKind[] => {
+    const ch = color === 'w' ? kind.toUpperCase() : kind
+    const gone = Math.max(0, START_COUNT[kind] - (present[ch] ?? 0))
+    return Array<CapturedKind>(gone).fill(kind)
+  }
+  const material = (color: 'w' | 'b') =>
+    CAPTURED_ORDER.reduce((total, kind) => {
+      const ch = color === 'w' ? kind.toUpperCase() : kind
+      return total + (present[ch] ?? 0) * PIECE_VALUE[kind]
+    }, 0)
+
+  return {
+    white: CAPTURED_ORDER.flatMap((kind) => missing(kind, 'w')),
+    black: CAPTURED_ORDER.flatMap((kind) => missing(kind, 'b')),
+    diff: material('w') - material('b'),
+  }
+}
+
 export interface ChartRow {
   moveNumber: number
   whiteSan: string | null

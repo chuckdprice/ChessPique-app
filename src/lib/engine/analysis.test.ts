@@ -17,6 +17,7 @@ import {
   scoreCp,
   winPct,
 } from './analysis'
+import type { Classification } from './analysis'
 
 describe('winPct', () => {
   it('is 50 for an equal position', () => {
@@ -65,16 +66,18 @@ describe('classify', () => {
 })
 
 describe('hasMoveMarker', () => {
-  it('stays silent for Good and marks every other classification', () => {
-    expect(hasMoveMarker('good')).toBe(false)
-    for (const c of CLASSIFICATIONS.filter((x) => x !== 'good')) {
+  const silent: Classification[] = ['good', 'excellent']
+
+  it('stays silent for Good and Excellent and marks every other classification', () => {
+    for (const c of silent) expect(hasMoveMarker(c)).toBe(false)
+    for (const c of CLASSIFICATIONS.filter((x) => !silent.includes(x))) {
       expect(hasMoveMarker(c)).toBe(true)
     }
   })
 
-  it('still gives Good a symbol for the classification table', () => {
-    // The table lists every class; only the move list and board suppress Good.
-    expect(CLASSIFICATION_SYMBOL.good).toBeTruthy()
+  it('still gives the silent classes a symbol for the classification table', () => {
+    // The table lists every class; only the move list and board suppress them.
+    for (const c of silent) expect(CLASSIFICATION_SYMBOL[c]).toBeTruthy()
   })
 })
 

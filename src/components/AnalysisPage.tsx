@@ -10,6 +10,7 @@ import AnalysisProgress from './AnalysisProgress'
 import AnalysisTabs from './AnalysisTabs'
 import BoardViewer, { BoardNav, PlayerPlateRow } from './BoardViewer'
 import type { PlayerPlate } from './BoardViewer'
+import CapturedStrip from './CapturedStrip'
 import EnginePanel from './EnginePanel'
 import EvalBar from './EvalBar'
 import MoveTable from './MoveTable'
@@ -26,9 +27,11 @@ interface AnalysisPageProps {
   chartRows: ChartRow[]
   whiteName: string
   blackName: string
-  whiteRating: string | null
-  blackRating: string | null
-  ratingTooltip: string
+  /** Rating from the PGN tag, shown in the Move Classification tab. */
+  whiteElo: string | null
+  blackElo: string | null
+  accuracyTooltip: string
+  playedLikeTooltip: string
   evalScore: Score | null
   engineOn: boolean
   onEngineOnChange: (on: boolean) => void
@@ -57,9 +60,10 @@ export default function AnalysisPage({
   chartRows,
   whiteName,
   blackName,
-  whiteRating,
-  blackRating,
-  ratingTooltip,
+  whiteElo,
+  blackElo,
+  accuracyTooltip,
+  playedLikeTooltip,
   evalScore,
   engineOn,
   onEngineOnChange,
@@ -73,14 +77,18 @@ export default function AnalysisPage({
   const lastPly = replay.fens.length - 1
   const startSeconds = result.timeControl.startSeconds
 
+  // Accuracy needs the whole review, so it stays a placeholder until then.
+  const accuracyLabel = (accuracy: number | undefined) =>
+    accuracy != null ? `(${accuracy.toFixed(1)}%)` : analysisProgress ? '(…)' : null
+
   const whitePlate: PlayerPlate = {
     name: whiteName,
-    rating: whiteRating,
+    accuracy: accuracyLabel(analysis?.white.accuracy),
     clock: clockAtPly(moves, ply, 'w', startSeconds),
   }
   const blackPlate: PlayerPlate = {
     name: blackName,
-    rating: blackRating,
+    accuracy: accuracyLabel(analysis?.black.accuracy),
     clock: clockAtPly(moves, ply, 'b', startSeconds),
   }
   const topPlate = orientation === 'white' ? blackPlate : whitePlate
@@ -97,7 +105,7 @@ export default function AnalysisPage({
       <div
         className="grid min-h-0 flex-1 gap-x-3 gap-y-1"
         style={{
-          gridTemplateColumns: 'auto var(--board-size) minmax(15rem, 1fr)',
+          gridTemplateColumns: 'auto var(--board-size) auto minmax(15rem, 1fr)',
           // The plate rows are fixed rather than auto: the right column spans
           // rows 1-3, and an auto row would stretch to fit its content instead
           // of ending level with the player names.
@@ -106,7 +114,7 @@ export default function AnalysisPage({
       >
         {/* Column 2, row 1 — plate above the board */}
         <div className="min-w-0" style={{ gridColumn: 2, gridRow: 1 }}>
-          <PlayerPlateRow plate={topPlate} color={topColor} ratingTooltip={ratingTooltip} />
+          <PlayerPlateRow plate={topPlate} color={topColor} accuracyTooltip={accuracyTooltip} />
         </div>
 
         {/* Column 1, row 2 — eval bar beside the board */}
@@ -125,11 +133,16 @@ export default function AnalysisPage({
           />
         </div>
 
-        {/* Column 3, rows 1-3 — so the engine pane's top lines up with the top
+        {/* Column 3, row 2 — captured material, centred on the board */}
+        <div style={{ gridColumn: 3, gridRow: 2 }}>
+          <CapturedStrip fen={replay.fens[ply]} orientation={orientation} />
+        </div>
+
+        {/* Column 4, rows 1-3 — so the engine pane's top lines up with the top
             player's name and the move list's bottom with the bottom player's. */}
         <div
           className="flex min-h-0 flex-col gap-2 overflow-hidden"
-          style={{ gridColumn: 3, gridRow: '1 / span 3' }}
+          style={{ gridColumn: 4, gridRow: '1 / span 3' }}
         >
           <EnginePanel
             fen={replay.fens[ply]}
@@ -154,7 +167,7 @@ export default function AnalysisPage({
           <PlayerPlateRow
             plate={bottomPlate}
             color={bottomColor}
-            ratingTooltip={ratingTooltip}
+            accuracyTooltip={accuracyTooltip}
           />
         </div>
 
@@ -183,6 +196,9 @@ export default function AnalysisPage({
             startSeconds={startSeconds}
             whiteName={whiteName}
             blackName={blackName}
+            whiteElo={whiteElo}
+            blackElo={blackElo}
+            playedLikeTooltip={playedLikeTooltip}
           />
         </div>
       </div>

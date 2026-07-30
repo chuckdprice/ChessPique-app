@@ -19,6 +19,9 @@ interface AnalysisTabsProps {
   startSeconds: number
   whiteName: string
   blackName: string
+  whiteElo: string | null
+  blackElo: string | null
+  playedLikeTooltip: string
 }
 
 const TABS: Array<{ id: Tab; label: string }> = [
@@ -57,6 +60,9 @@ export default function AnalysisTabs({
   startSeconds,
   whiteName,
   blackName,
+  whiteElo,
+  blackElo,
+  playedLikeTooltip,
 }: AnalysisTabsProps) {
   const [tab, setTab] = useState<Tab>('evaluation')
 
@@ -108,6 +114,9 @@ export default function AnalysisTabs({
               analysis={analysis}
               whiteName={whiteName}
               blackName={blackName}
+              whiteElo={whiteElo}
+              blackElo={blackElo}
+              playedLikeTooltip={playedLikeTooltip}
             />
           ) : (
             <AnalysisPending progress={progress} error={analysisError} />

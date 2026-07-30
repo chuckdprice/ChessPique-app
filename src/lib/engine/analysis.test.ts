@@ -4,11 +4,13 @@ import { replayGame } from '../gameModel'
 import {
   buildGameAnalysis,
   classify,
+  DECIDED_CP,
   findPhases,
   moveAccuracy,
   phaseOfPly,
   pieceMaterial,
   playedLikeRating,
+  PLAYED_LIKE_MAE,
   scoreCp,
   winPct,
 } from './analysis'
@@ -60,11 +62,59 @@ describe('classify', () => {
 })
 
 describe('playedLikeRating', () => {
-  it('decreases with ACPL and stays in range', () => {
-    expect(playedLikeRating(10)).toBeGreaterThan(playedLikeRating(80))
-    expect(playedLikeRating(0)).toBeLessThanOrEqual(3200)
-    expect(playedLikeRating(500)).toBeGreaterThanOrEqual(400)
-    expect(playedLikeRating(37) % 50).toBe(0)
+  it('decreases as average win-% loss grows', () => {
+    expect(playedLikeRating(1)).toBeGreaterThan(playedLikeRating(5))
+    expect(playedLikeRating(5)).toBeGreaterThan(playedLikeRating(20))
+  })
+
+  it('stays inside a plausible rating range at the extremes', () => {
+    expect(playedLikeRating(0)).toBeLessThanOrEqual(3000)
+    expect(playedLikeRating(0.001)).toBeLessThanOrEqual(3000)
+    expect(playedLikeRating(100)).toBeGreaterThanOrEqual(400)
+  })
+
+  it('is rounded coarsely, reflecting the fit uncertainty', () => {
+    for (const loss of [0.7, 2.3, 4.1, 8.8, 15]) {
+      expect(playedLikeRating(loss) % 100).toBe(0)
+    }
+    // The rounding must not imply more precision than the fit actually has.
+    expect(PLAYED_LIKE_MAE).toBeGreaterThan(100)
+  })
+
+  it('reproduces the calibrated anchor points', () => {
+    // From scripts/fit-rating-curve.mjs over the 100-sample dataset.
+    expect(playedLikeRating(2)).toBe(1900)
+    expect(playedLikeRating(5)).toBe(1500)
+    expect(playedLikeRating(12)).toBe(1100)
+  })
+})
+
+describe('decided-position handling', () => {
+  const moves: Move[] = [
+    { number: 1, color: 'w', san: 'e4', emtSeconds: 0, anchorClockSeconds: null, clkSeconds: 0 },
+    { number: 1, color: 'b', san: 'e5', emtSeconds: 0, anchorClockSeconds: null, clkSeconds: 0 },
+  ]
+  const { fens, ucis } = replayGame(moves)
+  const noBest = [
+    { uci: null, san: null },
+    { uci: null, san: null },
+  ]
+
+  it('flags moves made from already-decided positions', () => {
+    // White moves from a balanced position; Black from a lost one.
+    const evals = [{ cp: 0 }, { cp: DECIDED_CP + 500 }, { cp: DECIDED_CP + 400 }]
+    const analysis = buildGameAnalysis(fens, moves, evals, noBest, ucis)
+    expect(analysis.moves[0].fromUndecided).toBe(true)
+    expect(analysis.moves[1].fromUndecided).toBe(false)
+  })
+
+  it('falls back to all moves when too few undecided ones remain', () => {
+    // Only two plies, so the undecided-only sample is below the minimum and
+    // the summary must still produce a usable number.
+    const evals = [{ cp: 900 }, { cp: 950 }, { cp: 1000 }]
+    const analysis = buildGameAnalysis(fens, moves, evals, noBest, ucis)
+    expect(Number.isFinite(analysis.white.awl)).toBe(true)
+    expect(analysis.white.playedLike).toBeGreaterThanOrEqual(400)
   })
 })
 

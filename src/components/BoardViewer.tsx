@@ -15,9 +15,11 @@ interface BoardViewerProps {
   onPlyChange: (ply: number) => void
   whiteName: string
   blackName: string
-  /** Parenthetical after the name, e.g. "(719 / ~1650)". */
+  /** Parenthetical after the name, e.g. "(719 / ~1600)". */
   whiteRating: string | null
   blackRating: string | null
+  /** Hover explanation for the played-like figure. */
+  ratingTooltip: string
   analysis: GameAnalysis | null
   evalScore: Score | null
   showEvalBar: boolean
@@ -26,10 +28,12 @@ interface BoardViewerProps {
 function PlayerRow({
   name,
   rating,
+  ratingTooltip,
   color,
 }: {
   name: string
   rating: string | null
+  ratingTooltip: string
   color: 'w' | 'b'
 }) {
   return (
@@ -41,7 +45,14 @@ function PlayerRow({
         {name}
         <span className="sr-only">{color === 'w' ? ' (White)' : ' (Black)'}</span>
       </span>
-      {rating && <span className="shrink-0 font-score text-xs text-ink-mute">{rating}</span>}
+      {rating && (
+        <span
+          className="shrink-0 cursor-help font-score text-xs text-ink-mute"
+          title={ratingTooltip}
+        >
+          {rating}
+        </span>
+      )}
     </div>
   )
 }
@@ -64,6 +75,7 @@ export default function BoardViewer({
   blackName,
   whiteRating,
   blackRating,
+  ratingTooltip,
   analysis,
   evalScore,
   showEvalBar,
@@ -97,6 +109,7 @@ export default function BoardViewer({
         <PlayerRow
           name={topName}
           rating={topRating}
+          ratingTooltip={ratingTooltip}
           color={orientation === 'white' ? 'b' : 'w'}
         />
         <div className="flex items-stretch gap-2">
@@ -134,6 +147,7 @@ export default function BoardViewer({
         <PlayerRow
           name={bottomName}
           rating={bottomRating}
+          ratingTooltip={ratingTooltip}
           color={orientation === 'white' ? 'w' : 'b'}
         />
       </div>

@@ -61,6 +61,8 @@ export interface MoveAnalysis {
   winPctLoss: number
   /** Centipawn loss, capped at 1000. */
   cpl: number
+  /** True when the position before the move was not already decided. */
+  fromUndecided: boolean
   /** Per-move accuracy, 0-100. */
   accuracy: number
   classification: Classification
@@ -76,7 +78,12 @@ export interface PhaseAccuracy {
 export interface PlayerSummary {
   accuracy: number
   acpl: number
-  /** Estimated performance rating, rounded to 50. */
+  /**
+   * Average win-% lost per move, over undecided positions where possible —
+   * the input to the played-like estimate.
+   */
+  awl: number
+  /** Estimated performance rating, rounded to PLAYED_LIKE_ROUNDING. */
   playedLike: number
   counts: Record<Classification, number>
   phaseAccuracy: PhaseAccuracy
@@ -124,11 +131,44 @@ export function classify(winPctLoss: number, playedBest: boolean): Classificatio
   return 'blunder'
 }
 
-/** Estimated performance rating from average centipawn loss. */
-export function playedLikeRating(acpl: number): number {
-  const raw = 3100 * Math.exp(-0.01 * acpl)
-  const clamped = Math.max(400, Math.min(3200, raw))
-  return Math.round(clamped / 50) * 50
+/**
+ * A position this far from equal is treated as already decided. Move quality
+ * there says little about strength — cheap "still winning" moves and desperate
+ * losing ones both distort the numbers — so those plies are excluded from the
+ * rating estimate.
+ */
+export const DECIDED_CP = 400
+/** Below this many undecided plies, fall back to all of a player's moves. */
+const MIN_UNDECIDED_MOVES = 8
+
+/**
+ * Calibrated rating curve: rating = PLAYED_LIKE_A - PLAYED_LIKE_B * ln(average
+ * win-% lost per move in undecided positions).
+ *
+ * Fitted by scripts/calibrate-rating.mjs + scripts/fit-rating-curve.mjs over 50
+ * rated Lichess *rapid* games (100 player-samples, ratings 740-2431) analyzed
+ * with the same REVIEW_DEPTH search this app uses. That script compares several
+ * candidate metrics; this one measured best (R² 0.31, MAE 331 Elo) against raw
+ * ACPL (R² 0.18), capped ACPL (0.20), median CPL (0.07), and accuracy (0.19).
+ *
+ * Two limits are inherent to the method, not defects:
+ *  - The result sits on the **Lichess rapid scale**, which runs higher than
+ *    USCF/FIDE OTB ratings for the same player.
+ *  - A single game is a weak rating signal (R² 0.31): quiet games look strong
+ *    and sharp games look weak whoever is playing. Hence the coarse rounding,
+ *    the "~" prefix, and the explanation on hover.
+ */
+export const PLAYED_LIKE_A = 2142
+export const PLAYED_LIKE_B = 411
+/** Mean absolute error of the fit, in Elo — quoted in the UI tooltip. */
+export const PLAYED_LIKE_MAE = 331
+const PLAYED_LIKE_ROUNDING = 100
+
+/** Estimated performance rating from average win-% loss in undecided positions. */
+export function playedLikeRating(avgWinPctLoss: number): number {
+  const raw = PLAYED_LIKE_A - PLAYED_LIKE_B * Math.log(Math.max(0.25, avgWinPctLoss))
+  const clamped = Math.max(400, Math.min(3000, raw))
+  return Math.round(clamped / PLAYED_LIKE_ROUNDING) * PLAYED_LIKE_ROUNDING
 }
 
 /** Non-pawn, non-king material (both sides) in pawns-equivalent points. */
@@ -211,6 +251,7 @@ export function buildGameAnalysis(
       scoreAfter,
       winPctLoss,
       cpl,
+      fromUndecided: Math.abs(scoreCp(scoreBefore)) <= DECIDED_CP,
       accuracy: moveAccuracy(winPctLoss),
       classification: classify(winPctLoss, playedBest),
       bestMoveSan: bestMoves[i]?.san ?? null,
@@ -229,10 +270,17 @@ export function buildGameAnalysis(
       return inPhase.length === 0 ? null : mean(inPhase.map((m) => m.accuracy))
     }
     const acpl = mean(own.map((m) => m.cpl))
+    // Prefer undecided positions; a game decided early would otherwise leave
+    // too few moves to say anything.
+    const undecided = own.filter((m) => m.fromUndecided)
+    const awl = mean(
+      (undecided.length >= MIN_UNDECIDED_MOVES ? undecided : own).map((m) => m.winPctLoss),
+    )
     return {
       accuracy: mean(own.map((m) => m.accuracy)),
       acpl,
-      playedLike: playedLikeRating(acpl),
+      awl,
+      playedLike: playedLikeRating(awl),
       counts,
       phaseAccuracy: {
         opening: phaseAcc('opening'),

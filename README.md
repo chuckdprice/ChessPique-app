@@ -27,14 +27,60 @@ The app bundles the **single-threaded lite build of Stockfish 18 (WASM)**, copie
 `public/stockfish/` by `scripts/copy-stockfish.mjs` on `npm install`. Single-threaded means no
 `SharedArrayBuffer`, so no COOP/COEP headers are needed and it deploys as a plain static site.
 
-When a game loads, every position is evaluated (300 ms each) to produce:
+When a game loads, every position is evaluated with a **depth-20 search** (capped at 2.5 s per
+position, typically ~0.6 s) to produce:
 
 - **Move classification** — the engine's own move is *Best*; otherwise the move is graded by
   how much win probability it gave up: ≤2% *Excellent*, ≤5% *Good*, ≤10% *Inaccuracy*,
   ≤20% *Mistake*, above that *Blunder*.
 - **Accuracy** per move and per player, split by game phase (opening / middlegame / endgame).
-- **"Played like" rating**, estimated from average centipawn loss and shown after each
-  player's own rating: `Price, Chuck (719 / ~1900)`.
+- **"Played like" rating**, shown after each player's own rating:
+  `Price, Chuck (719 / ~1600)`. See below for how it is calibrated and how much to trust it.
+
+### How the "played like" rating is calibrated — and its limits
+
+The estimate comes from **average win-percentage lost per move, counting only positions that
+were not already decided** (within ±4 pawns). Move quality in a decided position says little
+about strength — cheap "still winning" moves and desperate lost-position moves both distort the
+numbers. The curve is
+
+```
+rating = 2142 − 411 × ln(average win-% lost per move)
+```
+
+fitted against **50 rated Lichess rapid games (100 player-samples, ratings 740–2431)**,
+analyzed with the exact depth-20 search this app uses. The fitting script compares candidate
+metrics; this one measured best by a clear margin:
+
+| metric | R² | MAE (Elo) |
+| --- | --- | --- |
+| win-% loss, undecided positions | **0.31** | **331** |
+| capped centipawn loss | 0.20 | 360 |
+| accuracy | 0.19 | 369 |
+| raw ACPL | 0.18 | 366 |
+| median centipawn loss | 0.07 | 396 |
+
+Reproduce it with:
+
+```bash
+node scripts/fetch-calibration-games.mjs calibration-games.pgn 8
+node scripts/calibrate-rating.mjs calibration-games.pgn shard-0.json 0 25
+node scripts/fit-rating-curve.mjs shard-*.json
+```
+
+`calibrate-rating.mjs` stores raw per-ply evaluations, so `fit-rating-curve.mjs` can compare
+candidate metrics (raw ACPL, capped ACPL, median CPL, win-% loss, accuracy) without paying for
+engine time again. Two limits are inherent to the approach and worth stating plainly:
+
+- **It is on the Lichess rapid scale.** Those ratings run higher than USCF or FIDE OTB ratings
+  for the same player, so an OTB-rated player will usually see a larger number here.
+- **One game is a weak rating signal.** Even the best metric reaches only R² ≈ 0.31, with a
+  mean absolute error of ±331 Elo, and the fit compresses toward the middle: in the calibration
+  sample it over-rated 800–1000 players by ~540 and under-rated 2200–2400 players by ~490.
+  Quiet games look "strong" and sharp games look "weak" regardless of who is playing. The figure
+  is therefore rounded to the nearest 100, prefixed with `~`, and explained on hover — treat it
+  as a rough indicator, not a measurement. Accuracy and move classification are on much firmer
+  ground.
 
 ## Appearance
 

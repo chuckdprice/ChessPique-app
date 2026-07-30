@@ -7,7 +7,7 @@ import EnginePanel from './components/EnginePanel'
 import MoveTable from './components/MoveTable'
 import PgnInput from './components/PgnInput'
 import TagEditor from './components/TagEditor'
-import { analyzeGame } from './lib/engine/analysis'
+import { analyzeGame, PLAYED_LIKE_MAE } from './lib/engine/analysis'
 import type { GameAnalysis } from './lib/engine/analysis'
 import type { Score } from './lib/engine/uci'
 import {
@@ -184,6 +184,13 @@ export default function App() {
     if (!elo && playedLikeText == null) return null
     return `(${elo ?? '—'} / ${playedLikeText ?? '—'})`
   }
+  const ratingTooltip =
+    `Rating from the PGN tag / estimated "played like" rating for this game.\n\n` +
+    `Estimated from average capped centipawn loss, calibrated against rated Lichess ` +
+    `rapid games, so it sits on the Lichess rapid scale — which runs higher than USCF ` +
+    `or FIDE OTB ratings.\n\n` +
+    `One game is a weak signal: typical error is around ±${PLAYED_LIKE_MAE} points, ` +
+    `so treat it as a rough indicator rather than a measurement.`
   const whiteRating = game
     ? ratingLabel(findHeader(headers, 'WhiteElo'), analysis?.white.playedLike)
     : null
@@ -278,6 +285,7 @@ export default function App() {
                 blackName={blackName}
                 whiteRating={whiteRating}
                 blackRating={blackRating}
+                ratingTooltip={ratingTooltip}
                 analysis={analysis}
                 evalScore={evalScore}
                 showEvalBar={showEvalBar}

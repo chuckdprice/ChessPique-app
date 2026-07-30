@@ -27,6 +27,7 @@ const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'times', label: 'Move Times' },
 ]
 
+/** Short placeholder; the banner above the board carries the live progress. */
 function AnalysisPending({
   progress,
   error,
@@ -34,27 +35,14 @@ function AnalysisPending({
   progress: { done: number; total: number } | null
   error: string | null
 }) {
-  if (error) {
-    return (
-      <p className="px-6 py-8 text-center text-sm text-ink-mute">
-        Engine analysis unavailable: {error}
-      </p>
-    )
-  }
-  const pct = progress && progress.total > 0 ? (progress.done / progress.total) * 100 : 0
   return (
-    <div className="px-6 py-8 text-center" role="status">
-      <p className="text-sm text-ink-mute">
-        Analyzing game with Stockfish…{' '}
-        {progress ? `${progress.done}/${progress.total} positions` : 'starting engine'}
-      </p>
-      <div className="mx-auto mt-3 h-1.5 w-64 overflow-hidden rounded-full bg-buff-soft">
-        <div
-          className="h-full rounded-full bg-felt transition-[width] duration-300"
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-    </div>
+    <p className="px-6 py-10 text-center text-sm text-ink-mute">
+      {error
+        ? `Engine review unavailable: ${error}`
+        : progress && progress.total > 0
+          ? `Waiting for the engine review — ${progress.done} of ${progress.total} positions done.`
+          : 'Waiting for the engine review to start…'}
+    </p>
   )
 }
 

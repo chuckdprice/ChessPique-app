@@ -36,7 +36,10 @@ export interface AnalyzeResult extends AnalyzeUpdate {
 
 export interface AnalyzeOptions {
   fen: string
+  /** Time limit; with `depth` set it acts as a safety cap. */
   movetimeMs: number
+  /** Optional target depth — the search stops at whichever limit hits first. */
+  depth?: number
   multiPv?: number
   onUpdate?: (update: AnalyzeUpdate) => void
 }
@@ -131,7 +134,13 @@ export class Engine {
     return run
   }
 
-  private runSearch({ fen, movetimeMs, multiPv, onUpdate }: AnalyzeOptions): Promise<AnalyzeResult> {
+  private runSearch({
+    fen,
+    movetimeMs,
+    depth: targetDepth,
+    multiPv,
+    onUpdate,
+  }: AnalyzeOptions): Promise<AnalyzeResult> {
     if (!this.worker) return Promise.reject(new Error('Engine not initialized'))
     const whiteToMove = fen.split(' ')[1] !== 'b'
     const lines = new Map<number, EngineLine>()
@@ -160,7 +169,10 @@ export class Engine {
       if (multiPv != null) this.send(`setoption name MultiPV value ${multiPv}`)
       this.send(`position fen ${fen}`)
       this.searching = true
-      this.send(`go movetime ${Math.max(50, Math.round(movetimeMs))}`)
+      // Both limits may be given; Stockfish stops at whichever comes first.
+      const limits = [`movetime ${Math.max(50, Math.round(movetimeMs))}`]
+      if (targetDepth) limits.unshift(`depth ${targetDepth}`)
+      this.send(`go ${limits.join(' ')}`)
     })
   }
 

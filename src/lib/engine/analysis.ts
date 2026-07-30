@@ -254,7 +254,17 @@ export function buildGameAnalysis(
 // ---------------------------------------------------------------------------
 // Batch engine runner
 
+/**
+ * Batch-review search limits. Depth-based for consistency across positions,
+ * with a time cap so pathological positions can't stall the review. These are
+ * the settings the "played like" curve was calibrated against
+ * (scripts/calibrate-rating.mjs) — changing them invalidates that fit.
+ */
+export const REVIEW_DEPTH = 20
+export const REVIEW_MOVETIME_CAP_MS = 2500
+
 export interface AnalyzeGameOptions {
+  depth?: number
   movetimeMs?: number
   onProgress?: (done: number, total: number) => void
   /** Flip to true to abort; the promise then resolves null. */
@@ -277,10 +287,15 @@ export async function analyzeGame(
   playedUcis: string[],
   options: AnalyzeGameOptions = {},
 ): Promise<GameAnalysis | null> {
-  const { movetimeMs = 300, onProgress, signal } = options
+  const {
+    depth = REVIEW_DEPTH,
+    movetimeMs = REVIEW_MOVETIME_CAP_MS,
+    onProgress,
+    signal,
+  } = options
   const engine = new Engine()
   try {
-    await engine.init({ hashMb: 16, multiPv: 1 })
+    await engine.init({ hashMb: 64, multiPv: 1 })
     const evals: Score[] = []
     const bestMoves: Array<{ uci: string | null; san: string | null }> = []
 
@@ -291,7 +306,7 @@ export async function analyzeGame(
         evals.push(terminal)
         bestMoves.push({ uci: null, san: null })
       } else {
-        const result = await engine.analyze({ fen: fens[i], movetimeMs, multiPv: 1 })
+        const result = await engine.analyze({ fen: fens[i], depth, movetimeMs, multiPv: 1 })
         const top = result.lines[0]
         evals.push(top?.score ?? { cp: 0 })
         bestMoves.push({

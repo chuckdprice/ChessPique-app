@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import AnalysisProgress from './components/AnalysisProgress'
 import AnalysisTabs from './components/AnalysisTabs'
 import AppearanceMenu from './components/AppearanceSettings'
 import BoardViewer from './components/BoardViewer'
@@ -95,7 +96,6 @@ export default function App() {
     const signal = { cancelled: false }
     analysisSignal.current = signal
     analyzeGame(game.replay.fens, game.result.moves, game.replay.ucis, {
-      movetimeMs: 300,
       signal,
       onProgress: (done, total) => {
         if (!signal.cancelled) setAnalysisProgress({ done, total })
@@ -255,6 +255,10 @@ export default function App() {
                 Download converted PGN
               </button>
             </div>
+
+            {(!analysis || analysisError) && (
+              <AnalysisProgress progress={analysisProgress} error={analysisError} />
+            )}
 
             <div className="grid gap-6 lg:grid-cols-[16rem_minmax(0,1fr)_15rem]">
               <TagEditor

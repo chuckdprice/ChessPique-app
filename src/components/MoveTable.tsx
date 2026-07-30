@@ -1,5 +1,8 @@
 import { useEffect, useRef } from 'react'
 import type { Move } from '../lib/convert'
+import { CLASSIFICATION_SYMBOL } from '../lib/engine/analysis'
+import type { GameAnalysis } from '../lib/engine/analysis'
+import { classColor } from './ClassBadge'
 
 interface MoveTableProps {
   moves: Move[]
@@ -7,6 +10,7 @@ interface MoveTableProps {
   /** Current ply: 0 = start, ply i = position after moves[i-1]. */
   ply: number
   onPlyChange: (ply: number) => void
+  analysis: GameAnalysis | null
 }
 
 interface Row {
@@ -15,7 +19,7 @@ interface Row {
   black: { san: string; ply: number } | null
 }
 
-export default function MoveTable({ moves, result, ply, onPlyChange }: MoveTableProps) {
+export default function MoveTable({ moves, result, ply, onPlyChange, analysis }: MoveTableProps) {
   const currentRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
@@ -37,6 +41,8 @@ export default function MoveTable({ moves, result, ply, onPlyChange }: MoveTable
   const cellButton = (cell: { san: string; ply: number } | null) => {
     if (!cell) return <span className="px-2 text-ink-mute">…</span>
     const current = cell.ply === ply
+    const moveAnalysis = analysis?.moves[cell.ply - 1]
+    const color = moveAnalysis ? classColor(moveAnalysis.classification) : undefined
     return (
       <button
         type="button"
@@ -46,8 +52,18 @@ export default function MoveTable({ moves, result, ply, onPlyChange }: MoveTable
         className={`w-full rounded px-2 py-0.5 text-left font-score text-sm transition-colors ${
           current ? 'bg-felt text-buff' : 'hover:bg-buff-soft'
         }`}
+        style={current ? undefined : { color }}
       >
         {cell.san}
+        {moveAnalysis && (
+          <span
+            className="ml-1 text-[10px] font-bold"
+            style={current ? undefined : { color }}
+            aria-hidden="true"
+          >
+            {CLASSIFICATION_SYMBOL[moveAnalysis.classification]}
+          </span>
+        )}
       </button>
     )
   }

@@ -1,22 +1,160 @@
 @import "tailwindcss";
 
-@theme {
+/*
+ * Semantic color system. Raw values live on :root scoped by data-theme and
+ * data-accent; Tailwind utilities reference them through @theme inline, so
+ * components keep using bg-felt / text-ink / border-rule and pick up theme
+ * and accent changes automatically.
+ */
+
+:root {
+  /* ---- Light theme (default) ---- */
+  --page: #f7f6f1;
+  --card: #fffefb;
+  --ink: #23221e;
+  --ink-mute: #6d675c;
+  --rule: #e3ded2;
+  --field: #f6f1e4; /* input backgrounds, hover washes */
+  --on-accent: #f5f0e2;
+
+  /* Charts */
+  --chart-grid: #e9e5da;
+  --chart-axis: #c3c2b7;
+  --chart-tick: #898781;
+  --white-series-line: #8f8468;
+  --white-series-fill: #ece7da;
+  --black-series-line: #26241f;
+  --black-series-fill: #3a3733;
+  --black-series-stroke: transparent;
+  --eval-fill: #b8b4a8;
+
+  /* Status */
+  --warn-bg: #fdf5e0;
+  --warn-text: #7a5a10;
+  --danger-bg: #fdecea;
+  --danger-text: #9b2c22;
+
+  /* Move classification (shared with dark unless overridden) */
+  --class-best: #0ca30c;
+  --class-excellent: #0ca30c;
+  --class-good: #7a9a10;
+  --class-inaccuracy: #c98500;
+  --class-mistake: #d96a34;
+  --class-blunder: #d03b3b;
+
+  /* ---- Accent: tournament green (default) ---- */
+  --accent: #1e5943;
+  --accent-hover: #153f30;
+  --accent-bright: #2c7a5c;
+}
+
+:root[data-accent="blue"] {
+  --accent: #1e56b0;
+  --accent-hover: #16407f;
+  --accent-bright: #3572d4;
+}
+:root[data-accent="purple"] {
+  --accent: #6d3ab8;
+  --accent-hover: #532b8f;
+  --accent-bright: #8b5cf6;
+}
+:root[data-accent="orange"] {
+  --accent: #b35309;
+  --accent-hover: #8a3e06;
+  --accent-bright: #d97316;
+}
+:root[data-accent="red"] {
+  --accent: #b32424;
+  --accent-hover: #8a1b1b;
+  --accent-bright: #d94040;
+}
+
+:root[data-theme="dark"] {
+  --page: #0d0d0d;
+  --card: #1a1a19;
+  --ink: #f2f1ec;
+  --ink-mute: #a29c8e;
+  --rule: #2e2e2b;
+  --field: #232321;
+  --on-accent: #f5f0e2;
+
+  --chart-grid: #2c2c2a;
+  --chart-axis: #4a4a46;
+  --chart-tick: #898781;
+  --white-series-line: #c9c0a8;
+  --white-series-fill: #e6e0d0;
+  --black-series-line: #8a8578;
+  --black-series-fill: #34322d;
+  --black-series-stroke: #8a8578;
+  --eval-fill: #6f6b60;
+
+  --warn-bg: #322810;
+  --warn-text: #ecc465;
+  --danger-bg: #391b17;
+  --danger-text: #f0968c;
+
+  --class-best: #35c435;
+  --class-excellent: #35c435;
+  --class-good: #a3c022;
+  --class-inaccuracy: #e9a92a;
+  --class-mistake: #ee7f47;
+  --class-blunder: #ef5350;
+}
+
+/* Slightly brighter accents on the dark surface */
+:root[data-theme="dark"]:not([data-accent]),
+:root[data-theme="dark"][data-accent="green"] {
+  --accent: #23684f;
+  --accent-hover: #2c8161;
+  --accent-bright: #3d9a76;
+}
+:root[data-theme="dark"][data-accent="blue"] {
+  --accent: #2563c4;
+  --accent-hover: #2f74e0;
+  --accent-bright: #5a94e8;
+}
+:root[data-theme="dark"][data-accent="purple"] {
+  --accent: #7c4bd0;
+  --accent-hover: #8d61dc;
+  --accent-bright: #a685ec;
+}
+:root[data-theme="dark"][data-accent="orange"] {
+  --accent: #c05e10;
+  --accent-hover: #d4711f;
+  --accent-bright: #e08a40;
+}
+:root[data-theme="dark"][data-accent="red"] {
+  --accent: #c23434;
+  --accent-hover: #d44848;
+  --accent-bright: #e06a6a;
+}
+
+@theme inline {
   --font-display: "Lora", Georgia, "Times New Roman", serif;
   --font-score: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
 
-  /* Tournament-hall palette: vinyl-board green + score-sheet buff */
-  --color-felt: #1e5943;
-  --color-felt-deep: #153f30;
-  --color-felt-bright: #2c7a5c;
-  --color-buff: #efe8d6;
-  --color-buff-soft: #f6f1e4;
-  --color-paper: #f7f6f1;
-  --color-card: #fffefb;
-  --color-ink: #23221e;
-  --color-ink-mute: #6d675c;
-  --color-rule: #e3ded2;
-  --color-white-series: #8f8468;
-  --color-black-series: #26241f;
+  --color-felt: var(--accent);
+  --color-felt-deep: var(--accent-hover);
+  --color-felt-bright: var(--accent-bright);
+  --color-buff: var(--on-accent);
+  --color-buff-soft: var(--field);
+  --color-paper: var(--page);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-ink-mute: var(--ink-mute);
+  --color-rule: var(--rule);
+
+  --color-warn-bg: var(--warn-bg);
+  --color-warn-text: var(--warn-text);
+  --color-danger-bg: var(--danger-bg);
+  --color-danger-text: var(--danger-text);
+
+  --color-class-best: var(--class-best);
+  --color-class-excellent: var(--class-excellent);
+  --color-class-good: var(--class-good);
+  --color-class-inaccuracy: var(--class-inaccuracy);
+  --color-class-mistake: var(--class-mistake);
+  --color-class-blunder: var(--class-blunder);
 }
 
 html {
@@ -39,7 +177,11 @@ body {
   @apply bg-paper text-ink antialiased;
 }
 
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
 :focus-visible {
-  outline: 2px solid var(--color-felt-bright);
+  outline: 2px solid var(--accent-bright);
   outline-offset: 2px;
 }

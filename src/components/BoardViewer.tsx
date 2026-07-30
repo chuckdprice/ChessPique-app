@@ -2,7 +2,11 @@ import { useState } from 'react'
 import { Chessboard } from 'react-chessboard'
 import { formatClockTime } from '../lib/convert'
 import type { Move } from '../lib/convert'
+import type { GameAnalysis } from '../lib/engine/analysis'
+import type { Score } from '../lib/engine/uci'
 import type { ReplayedGame } from '../lib/gameModel'
+import ClassBadge from './ClassBadge'
+import EvalBar from './EvalBar'
 
 interface BoardViewerProps {
   replay: ReplayedGame
@@ -11,20 +15,44 @@ interface BoardViewerProps {
   onPlyChange: (ply: number) => void
   whiteName: string
   blackName: string
+  /** Parenthetical after the name, e.g. "(719 / ~1650)". */
+  whiteRating: string | null
+  blackRating: string | null
+  analysis: GameAnalysis | null
+  evalScore: Score | null
+  showEvalBar: boolean
 }
 
-function PlayerRow({ name, color }: { name: string; color: 'w' | 'b' }) {
+function PlayerRow({
+  name,
+  rating,
+  color,
+}: {
+  name: string
+  rating: string | null
+  color: 'w' | 'b'
+}) {
   return (
-    <div className="flex items-center gap-2 py-1.5">
-      <span aria-hidden="true" className="text-lg leading-none text-ink">
+    <div className="flex items-baseline gap-2 py-1.5">
+      <span aria-hidden="true" className="self-center text-lg leading-none text-ink">
         {color === 'w' ? '♔' : '♚'}
       </span>
-      <span className="text-sm font-medium">
+      <span className="truncate text-sm font-medium">
         {name}
         <span className="sr-only">{color === 'w' ? ' (White)' : ' (Black)'}</span>
       </span>
+      {rating && <span className="shrink-0 font-score text-xs text-ink-mute">{rating}</span>}
     </div>
   )
+}
+
+/** Top-right-corner position of a square as percentages, given orientation. */
+function squareCorner(square: string, orientation: 'white' | 'black') {
+  const file = square.charCodeAt(0) - 97 // a=0
+  const rank = parseInt(square[1], 10) // 1..8
+  const col = orientation === 'white' ? file : 7 - file
+  const row = orientation === 'white' ? 8 - rank : rank - 1
+  return { left: (col + 1) * 12.5, top: row * 12.5 }
 }
 
 export default function BoardViewer({
@@ -34,11 +62,19 @@ export default function BoardViewer({
   onPlyChange,
   whiteName,
   blackName,
+  whiteRating,
+  blackRating,
+  analysis,
+  evalScore,
+  showEvalBar,
 }: BoardViewerProps) {
   const [orientation, setOrientation] = useState<'white' | 'black'>('white')
   const lastPly = replay.fens.length - 1
   const move = ply > 0 ? moves[ply - 1] : null
   const highlight = replay.lastMoveSquares[ply]
+  const moveAnalysis = ply > 0 ? (analysis?.moves[ply - 1] ?? null) : null
+  const badgeSquare = moveAnalysis && highlight ? highlight[1] : null
+  const badgePos = badgeSquare ? squareCorner(badgeSquare, orientation) : null
 
   const squareStyles: Record<string, React.CSSProperties> = {}
   if (highlight) {
@@ -49,32 +85,57 @@ export default function BoardViewer({
 
   const topName = orientation === 'white' ? blackName : whiteName
   const bottomName = orientation === 'white' ? whiteName : blackName
+  const topRating = orientation === 'white' ? blackRating : whiteRating
+  const bottomRating = orientation === 'white' ? whiteRating : blackRating
 
   const navButton =
     'rounded-md border border-rule bg-card px-3 py-1.5 text-lg leading-none text-ink transition-colors hover:bg-buff-soft disabled:cursor-not-allowed disabled:opacity-30'
 
   return (
     <section aria-label="Chessboard" className="flex flex-col items-center gap-2">
-      <div className="w-full max-w-[560px]">
-        <PlayerRow name={topName} color={orientation === 'white' ? 'b' : 'w'} />
-        <div className="overflow-hidden rounded-lg shadow-md">
-          <Chessboard
-            options={{
-              position: replay.fens[ply],
-              boardOrientation: orientation,
-              allowDragging: false,
-              allowDrawingArrows: false,
-              animationDurationInMs: 150,
-              squareStyles,
-              lightSquareStyle: { backgroundColor: '#efe8d6' },
-              darkSquareStyle: { backgroundColor: '#4e7d63' },
-              darkSquareNotationStyle: { color: '#efe8d6' },
-              lightSquareNotationStyle: { color: '#4e7d63' },
-              boardStyle: { width: '100%' },
-            }}
-          />
+      <div className="w-full max-w-[600px]">
+        <PlayerRow
+          name={topName}
+          rating={topRating}
+          color={orientation === 'white' ? 'b' : 'w'}
+        />
+        <div className="flex items-stretch gap-2">
+          {showEvalBar && <EvalBar score={evalScore} orientation={orientation} />}
+          <div className="relative min-w-0 flex-1 overflow-hidden rounded-lg shadow-md">
+            <Chessboard
+              options={{
+                position: replay.fens[ply],
+                boardOrientation: orientation,
+                allowDragging: false,
+                allowDrawingArrows: false,
+                animationDurationInMs: 150,
+                squareStyles,
+                lightSquareStyle: { backgroundColor: '#efe8d6' },
+                darkSquareStyle: { backgroundColor: '#4e7d63' },
+                darkSquareNotationStyle: { color: '#efe8d6' },
+                lightSquareNotationStyle: { color: '#4e7d63' },
+                boardStyle: { width: '100%' },
+              }}
+            />
+            {moveAnalysis && badgePos && (
+              <div
+                className="pointer-events-none absolute z-10"
+                style={{
+                  left: `${badgePos.left}%`,
+                  top: `${badgePos.top}%`,
+                  transform: 'translate(-70%, -30%)',
+                }}
+              >
+                <ClassBadge classification={moveAnalysis.classification} size={20} />
+              </div>
+            )}
+          </div>
         </div>
-        <PlayerRow name={bottomName} color={orientation === 'white' ? 'w' : 'b'} />
+        <PlayerRow
+          name={bottomName}
+          rating={bottomRating}
+          color={orientation === 'white' ? 'w' : 'b'}
+        />
       </div>
 
       <div className="flex items-center gap-2" role="group" aria-label="Move navigation">

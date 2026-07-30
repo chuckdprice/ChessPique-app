@@ -1,0 +1,195 @@
+import { useEffect, useRef, useState } from 'react'
+import { Chess } from 'chess.js'
+import { Engine, ENGINE_NAME, formatScore } from '../lib/engine/uci'
+import type { AnalyzeUpdate, EngineLine } from '../lib/engine/uci'
+import { saveEngineSettings } from '../lib/settings'
+import type { EngineSettings } from '../lib/settings'
+import EngineSettingsPanel from './EngineSettings'
+
+interface EnginePanelProps {
+  fen: string
+  enabled: boolean
+  onEnabledChange: (enabled: boolean) => void
+  settings: EngineSettings
+  onSettingsChange: (next: EngineSettings) => void
+  /** Latest top-line score (white POV) for the eval bar; null when idle. */
+  onTopScore?: (score: import('../lib/engine/uci').Score | null) => void
+}
+
+/** Format a PV as numbered SAN from the given position, e.g. "9... e4 10. Ne1 h5". */
+function numberedLine(fen: string, sans: string[]): string {
+  const parts = fen.split(' ')
+  let moveNo = parseInt(parts[5] ?? '1', 10) || 1
+  let white = parts[1] !== 'b'
+  const out: string[] = []
+  for (const [i, san] of sans.entries()) {
+    if (white) out.push(`${moveNo}. ${san}`)
+    else if (i === 0) out.push(`${moveNo}... ${san}`)
+    else out.push(san)
+    if (!white) moveNo += 1
+    white = !white
+  }
+  return out.join(' ')
+}
+
+export default function EnginePanel({
+  fen,
+  enabled,
+  onEnabledChange,
+  settings,
+  onSettingsChange,
+  onTopScore,
+}: EnginePanelProps) {
+  const engineRef = useRef<Engine | null>(null)
+  const [update, setUpdate] = useState<AnalyzeUpdate | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const lastFlush = useRef(0)
+  const onTopScoreRef = useRef(onTopScore)
+  onTopScoreRef.current = onTopScore
+
+  // Live analysis loop: restart on position, toggle, or settings change.
+  useEffect(() => {
+    if (!enabled) {
+      engineRef.current?.stop()
+      onTopScoreRef.current?.(null)
+      return
+    }
+    let cancelled = false
+    const gameOver = new Chess(fen).isGameOver()
+    if (gameOver) {
+      setUpdate(null)
+      return
+    }
+
+    const run = async () => {
+      if (!engineRef.current) engineRef.current = new Engine()
+      const engine = engineRef.current
+      await engine.init({ hashMb: settings.hashMb, multiPv: settings.multiPv })
+      if (cancelled) return
+      engine.stop()
+      setUpdate(null)
+      await engine.analyze({
+        fen,
+        movetimeMs: settings.searchTimeSec * 1000,
+        multiPv: settings.multiPv,
+        onUpdate: (u) => {
+          if (cancelled) return
+          // Throttle re-renders; info lines can arrive very frequently.
+          const now = performance.now()
+          if (now - lastFlush.current > 120 || u.depth < 8) {
+            lastFlush.current = now
+            setUpdate(u)
+            onTopScoreRef.current?.(u.lines[0]?.score ?? null)
+          }
+        },
+      })
+    }
+    void run()
+
+    return () => {
+      cancelled = true
+      engineRef.current?.stop()
+    }
+  }, [enabled, fen, settings])
+
+  // Tear the worker down when the panel unmounts.
+  useEffect(
+    () => () => {
+      engineRef.current?.destroy()
+      engineRef.current = null
+    },
+    [],
+  )
+
+  const topLine: EngineLine | undefined = update?.lines[0]
+
+  return (
+    <section
+      aria-label="Engine analysis"
+      className="relative rounded-xl border border-rule bg-card shadow-sm"
+    >
+      <div className="flex items-center gap-3 px-4 py-3">
+        <button
+          type="button"
+          role="switch"
+          aria-checked={enabled}
+          aria-label="Toggle engine analysis"
+          onClick={() => onEnabledChange(!enabled)}
+          className={`relative h-6 w-10 shrink-0 rounded-full transition-colors ${
+            enabled ? 'bg-felt' : 'bg-rule'
+          }`}
+        >
+          <span
+            className={`absolute top-0.5 size-5 rounded-full bg-card shadow transition-[left] ${
+              enabled ? 'left-[18px]' : 'left-0.5'
+            }`}
+          />
+        </button>
+
+        <span className="font-score text-xl font-semibold tabular-nums">
+          {enabled && topLine ? formatScore(topLine.score) : '—'}
+        </span>
+
+        <span className="min-w-0 flex-1 truncate text-xs text-ink-mute">
+          {ENGINE_NAME} · WASM{enabled && update ? ` · d${update.depth}` : ''}
+        </span>
+
+        <button
+          type="button"
+          onClick={() => setSettingsOpen((o) => !o)}
+          aria-expanded={settingsOpen}
+          aria-label="Engine settings"
+          title="Engine settings"
+          className="rounded-md p-1.5 text-ink-mute transition-colors hover:bg-buff-soft hover:text-ink"
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            className="size-4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.01a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55h.01a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.01a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1Z" />
+          </svg>
+        </button>
+      </div>
+
+      {settingsOpen && (
+        <EngineSettingsPanel
+          value={settings}
+          onChange={(next) => {
+            onSettingsChange(next)
+            saveEngineSettings(next)
+          }}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
+
+      {enabled && (
+        <ul className="border-t border-rule px-4 py-2">
+          {(update?.lines ?? []).map((line) => (
+            <li
+              key={line.multipv}
+              className="truncate py-1 font-score text-xs"
+              title={numberedLine(fen, line.pvSan)}
+            >
+              <span className="mr-2 inline-block w-10 font-semibold tabular-nums">
+                {formatScore(line.score)}
+              </span>
+              <span className="text-ink-mute">{numberedLine(fen, line.pvSan)}</span>
+            </li>
+          ))}
+          {!update && (
+            <li className="py-1 text-xs text-ink-mute">
+              {new Chess(fen).isGameOver() ? 'Game over' : 'Thinking…'}
+            </li>
+          )}
+        </ul>
+      )}
+    </section>
+  )
+}

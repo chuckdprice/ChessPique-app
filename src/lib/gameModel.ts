@@ -6,6 +6,8 @@ export interface ReplayedGame {
   fens: string[]
   /** lastMoveSquares[i] = [from, to] of ply i (1-indexed like fens). */
   lastMoveSquares: Array<[string, string] | null>
+  /** ucis[i] is the UCI string of moves[i] (0-indexed like the moves array). */
+  ucis: string[]
 }
 
 export class ReplayError extends Error {}
@@ -15,12 +17,14 @@ export function replayGame(moves: Move[]): ReplayedGame {
   const chess = new Chess()
   const fens: string[] = [chess.fen()]
   const lastMoveSquares: Array<[string, string] | null> = [null]
+  const ucis: string[] = []
 
   for (const move of moves) {
     try {
       const played = chess.move(move.san)
       fens.push(chess.fen())
       lastMoveSquares.push([played.from, played.to])
+      ucis.push(`${played.from}${played.to}${played.promotion ?? ''}`)
     } catch {
       throw new ReplayError(
         `Illegal or unrecognized move: ${move.number}${move.color === 'w' ? '.' : '...'} ${move.san}`,
@@ -28,7 +32,7 @@ export function replayGame(moves: Move[]): ReplayedGame {
     }
   }
 
-  return { fens, lastMoveSquares }
+  return { fens, lastMoveSquares, ucis }
 }
 
 export interface ChartRow {

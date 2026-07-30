@@ -16,12 +16,14 @@ interface ClockChartProps {
   startSeconds: number
   whiteName: string
   blackName: string
+  /** Render without the outer card chrome (for use inside the analysis tabs). */
+  embedded?: boolean
 }
 
-const WHITE_COLOR = '#8f8468'
-const WHITE_FILL = '#ece7da'
-const BLACK_COLOR = '#26241f'
-const BLACK_FILL = '#3a3733'
+const WHITE_COLOR = 'var(--white-series-line)'
+const WHITE_FILL = 'var(--white-series-fill)'
+const BLACK_COLOR = 'var(--black-series-line)'
+const BLACK_FILL = 'var(--black-series-fill)'
 
 function formatMinSec(seconds: number): string {
   const s = Math.max(0, Math.round(seconds))
@@ -84,6 +86,7 @@ export default function ClockChart({
   startSeconds,
   whiteName,
   blackName,
+  embedded = false,
 }: ClockChartProps) {
   const maxClock = Math.max(
     startSeconds,
@@ -110,15 +113,24 @@ export default function ClockChart({
   )
 
   return (
-    <section aria-label="Clock chart" className="rounded-xl border border-rule bg-card shadow-sm">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b border-rule px-6 py-4">
-        <div>
-          <h2 className="font-display text-lg font-semibold">Time usage</h2>
-          <p className="mt-0.5 text-sm text-ink-mute">
-            Lines show time remaining (left axis). Bars show time spent on each move (right
-            axis).
-          </p>
-        </div>
+    <section
+      aria-label="Clock chart"
+      className={embedded ? '' : 'rounded-xl border border-rule bg-card shadow-sm'}
+    >
+      <div
+        className={`flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 px-6 py-4 ${
+          embedded ? 'pb-0' : 'border-b border-rule'
+        }`}
+      >
+        {!embedded && (
+          <div>
+            <h2 className="font-display text-lg font-semibold">Time usage</h2>
+            <p className="mt-0.5 text-sm text-ink-mute">
+              Lines show time remaining (left axis). Bars show time spent on each move (right
+              axis).
+            </p>
+          </div>
+        )}
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-mute">
           {legendItem(`${whiteName} — remaining`, WHITE_COLOR, 'line')}
           {legendItem(`${blackName} — remaining`, BLACK_COLOR, 'line')}
@@ -129,19 +141,19 @@ export default function ClockChart({
       <div className="px-2 py-4">
         <ResponsiveContainer width="100%" height={340}>
           <ComposedChart data={rows} margin={{ top: 8, right: 8, bottom: 4, left: 12 }}>
-            <CartesianGrid stroke="#e9e5da" vertical={false} />
+            <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
             <XAxis
               dataKey="moveNumber"
-              tick={{ fontSize: 11, fill: '#898781' }}
+              tick={{ fontSize: 11, fill: 'var(--chart-tick)' }}
               tickLine={false}
-              axisLine={{ stroke: '#c3c2b7' }}
+              axisLine={{ stroke: 'var(--chart-axis)' }}
               interval="preserveStartEnd"
               label={{
                 value: 'Move number',
                 position: 'insideBottom',
                 offset: -2,
                 fontSize: 11,
-                fill: '#898781',
+                fill: 'var(--chart-tick)',
               }}
             />
             <YAxis
@@ -149,7 +161,7 @@ export default function ClockChart({
               domain={[0, maxClock]}
               ticks={clockTicks(maxClock)}
               tickFormatter={formatClockTime}
-              tick={{ fontSize: 11, fill: '#898781' }}
+              tick={{ fontSize: 11, fill: 'var(--chart-tick)' }}
               tickLine={false}
               axisLine={false}
               width={58}
@@ -159,7 +171,7 @@ export default function ClockChart({
                 position: 'insideLeft',
                 offset: -4,
                 fontSize: 11,
-                fill: '#898781',
+                fill: 'var(--chart-tick)',
                 style: { textAnchor: 'middle' },
               }}
             />
@@ -167,7 +179,7 @@ export default function ClockChart({
               yAxisId="emt"
               orientation="right"
               tickFormatter={formatMinSec}
-              tick={{ fontSize: 11, fill: '#898781' }}
+              tick={{ fontSize: 11, fill: 'var(--chart-tick)' }}
               tickLine={false}
               axisLine={false}
               width={48}
@@ -177,13 +189,13 @@ export default function ClockChart({
                 position: 'insideRight',
                 offset: -2,
                 fontSize: 11,
-                fill: '#898781',
+                fill: 'var(--chart-tick)',
                 style: { textAnchor: 'middle' },
               }}
             />
             <Tooltip
               content={<ChartTooltip whiteName={whiteName} blackName={blackName} />}
-              cursor={{ fill: 'rgba(30, 89, 67, 0.06)' }}
+              cursor={{ fill: 'var(--chart-grid)', fillOpacity: 0.45 }}
             />
             <Bar
               yAxisId="emt"
@@ -198,6 +210,8 @@ export default function ClockChart({
               yAxisId="emt"
               dataKey="blackEmt"
               fill={BLACK_FILL}
+              stroke="var(--black-series-stroke)"
+              strokeWidth={1}
               radius={[3, 3, 0, 0]}
               maxBarSize={14}
             />

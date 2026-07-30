@@ -1,9 +1,22 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import AnalysisTabs from './components/AnalysisTabs'
+import AppearanceMenu from './components/AppearanceSettings'
 import BoardViewer from './components/BoardViewer'
-import ClockChart from './components/ClockChart'
+import EnginePanel from './components/EnginePanel'
 import MoveTable from './components/MoveTable'
 import PgnInput from './components/PgnInput'
 import TagEditor from './components/TagEditor'
+import { analyzeGame } from './lib/engine/analysis'
+import type { GameAnalysis } from './lib/engine/analysis'
+import type { Score } from './lib/engine/uci'
+import {
+  applyAppearance,
+  loadAppearance,
+  loadEngineSettings,
+  saveAppearance,
+  watchSystemTheme,
+} from './lib/settings'
+import type { AppearanceSettings, EngineSettings } from './lib/settings'
 import { buildPgn, convertPgn } from './lib/convert'
 import type { ConvertOptions, ConvertResult } from './lib/convert'
 import { buildChartRows, replayGame } from './lib/gameModel'
@@ -25,12 +38,35 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const [inputOpen, setInputOpen] = useState(true)
   const [overridesOpen, setOverridesOpen] = useState(false)
+  const [appearance, setAppearance] = useState<AppearanceSettings>(loadAppearance)
+  const [engineSettings, setEngineSettings] = useState<EngineSettings>(loadEngineSettings)
+  const [engineOn, setEngineOn] = useState(false)
+  const [liveScore, setLiveScore] = useState<Score | null>(null)
+  const [analysis, setAnalysis] = useState<GameAnalysis | null>(null)
+  const [analysisProgress, setAnalysisProgress] = useState<{ done: number; total: number } | null>(null)
+  const [analysisError, setAnalysisError] = useState<string | null>(null)
+  const analysisSignal = useRef<{ cancelled: boolean } | null>(null)
   const resultsRef = useRef<HTMLDivElement>(null)
+
+  const appearanceRef = useRef(appearance)
+  appearanceRef.current = appearance
+  useEffect(() => {
+    applyAppearance(appearance)
+    saveAppearance(appearance)
+  }, [appearance])
+  useEffect(() => watchSystemTheme(() => appearanceRef.current), [])
 
   const handleConvert = (text: string, options: ConvertOptions) => {
     try {
       const result = convertPgn(text, options)
       const replay = replayGame(result.moves)
+      // Clear stale analysis in the same render batch as the new game, so no
+      // render ever pairs the old analysis with the new move list.
+      if (analysisSignal.current) analysisSignal.current.cancelled = true
+      setAnalysis(null)
+      setAnalysisProgress(null)
+      setAnalysisError(null)
+      setLiveScore(null)
       setGame({ result, replay })
       setHeaders(result.headers)
       setPly(0)
@@ -46,6 +82,43 @@ export default function App() {
       if (message.includes('starting clock')) setOverridesOpen(true)
     }
   }
+
+  // Full-game Stockfish analysis: kicks off automatically for each new game.
+  useEffect(() => {
+    if (analysisSignal.current) analysisSignal.current.cancelled = true
+    setAnalysis(null)
+    setAnalysisProgress(null)
+    setAnalysisError(null)
+    setLiveScore(null)
+    if (!game) return
+
+    const signal = { cancelled: false }
+    analysisSignal.current = signal
+    analyzeGame(game.replay.fens, game.result.moves, game.replay.ucis, {
+      movetimeMs: 300,
+      signal,
+      onProgress: (done, total) => {
+        if (!signal.cancelled) setAnalysisProgress({ done, total })
+      },
+    })
+      .then((result) => {
+        if (!signal.cancelled && result) setAnalysis(result)
+      })
+      .catch((e) => {
+        if (!signal.cancelled) {
+          setAnalysisError(e instanceof Error ? e.message : String(e))
+        }
+      })
+      .finally(() => {
+        if (!signal.cancelled) setAnalysisProgress(null)
+      })
+
+    return () => {
+      signal.cancelled = true
+    }
+  }, [game])
+
+  const handleTopScore = useCallback((score: Score | null) => setLiveScore(score), [])
 
   // Arrow-key navigation, except while typing in a field.
   useEffect(() => {
@@ -105,6 +178,23 @@ export default function App() {
   const whiteName = (game && findHeader(headers, 'White')) || 'White'
   const blackName = (game && findHeader(headers, 'Black')) || 'Black'
 
+  // "(Elo / ~played-like)" plate suffix; played-like fills in after analysis.
+  const ratingLabel = (elo: string | undefined, playedLike: number | undefined) => {
+    const playedLikeText = playedLike != null ? `~${playedLike}` : analysisProgress ? '…' : null
+    if (!elo && playedLikeText == null) return null
+    return `(${elo ?? '—'} / ${playedLikeText ?? '—'})`
+  }
+  const whiteRating = game
+    ? ratingLabel(findHeader(headers, 'WhiteElo'), analysis?.white.playedLike)
+    : null
+  const blackRating = game
+    ? ratingLabel(findHeader(headers, 'BlackElo'), analysis?.black.playedLike)
+    : null
+
+  const currentFen = game ? game.replay.fens[ply] : null
+  const evalScore: Score | null = analysis ? (analysis.evals[ply] ?? null) : liveScore
+  const showEvalBar = !!game && (analysis != null || engineOn)
+
   return (
     <div className="min-h-screen">
       <header className="bg-felt text-buff">
@@ -112,7 +202,7 @@ export default function App() {
           <span aria-hidden="true" className="text-4xl leading-none">
             ♞
           </span>
-          <div>
+          <div className="min-w-0 flex-1">
             <h1 className="font-display text-2xl font-semibold tracking-tight">
               ChessNoteR PGN Converter
             </h1>
@@ -121,6 +211,7 @@ export default function App() {
               Chess.com understand.
             </p>
           </div>
+          <AppearanceMenu value={appearance} onChange={setAppearance} />
         </div>
       </header>
 
@@ -139,7 +230,7 @@ export default function App() {
             {game.result.warnings.length > 0 && (
               <div
                 role="status"
-                className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-900"
+                className="rounded-xl border border-warn-text/25 bg-warn-bg px-5 py-4 text-sm text-warn-text"
               >
                 <p className="font-medium">
                   Some moves were missing timing data — their clocks were carried forward:
@@ -181,17 +272,41 @@ export default function App() {
                 onPlyChange={setPly}
                 whiteName={whiteName}
                 blackName={blackName}
+                whiteRating={whiteRating}
+                blackRating={blackRating}
+                analysis={analysis}
+                evalScore={evalScore}
+                showEvalBar={showEvalBar}
               />
-              <MoveTable
-                moves={game.result.moves}
-                result={game.result.result}
-                ply={ply}
-                onPlyChange={setPly}
-              />
+              <div className="flex min-h-0 flex-col gap-4">
+                {currentFen && (
+                  <EnginePanel
+                    fen={currentFen}
+                    enabled={engineOn}
+                    onEnabledChange={setEngineOn}
+                    settings={engineSettings}
+                    onSettingsChange={setEngineSettings}
+                    onTopScore={handleTopScore}
+                  />
+                )}
+                <MoveTable
+                  moves={game.result.moves}
+                  result={game.result.result}
+                  ply={ply}
+                  onPlyChange={setPly}
+                  analysis={analysis}
+                />
+              </div>
             </div>
 
-            <ClockChart
-              rows={chartRows}
+            <AnalysisTabs
+              analysis={analysis}
+              progress={analysisProgress}
+              analysisError={analysisError}
+              moves={game.result.moves}
+              ply={ply}
+              onPlyChange={setPly}
+              chartRows={chartRows}
               startSeconds={game.result.timeControl.startSeconds}
               whiteName={whiteName}
               blackName={blackName}

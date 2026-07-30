@@ -195,7 +195,7 @@ export default function PgnInput({
 
       {error && (
         <div role="alert" className="border-t border-rule px-6 py-4">
-          <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>
+          <p className="rounded-lg bg-danger-bg px-4 py-3 text-sm text-danger-text">{error}</p>
         </div>
       )}
       </details>

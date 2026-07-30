@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Arrow } from 'react-chessboard'
 import AnalysisPage from './components/AnalysisPage'
 import AppearanceMenu from './components/AppearanceSettings'
+import BrandMark from './components/BrandMark'
 import PgnInput from './components/PgnInput'
 import StepNav from './components/StepNav'
 import type { Page } from './components/StepNav'
@@ -31,9 +32,15 @@ function findHeader(headers: Array<{ name: string; value: string }>, name: strin
   return headers.find((h) => h.name === name)?.value
 }
 
-/** Engine lines fade from best to worst; the played move gets its own colour. */
-const ENGINE_ARROW_ALPHA = [0.85, 0.62, 0.45, 0.34, 0.26]
-const PLAYED_MOVE_ARROW = 'rgba(237, 173, 47, 1)'
+/**
+ * Arrow colours. Blue for the engine's candidate moves (it reads clearly on
+ * both the cream and green squares, which the old green did not) fading from
+ * best to worst, and warm orange for the move actually played next — the two
+ * are directly comparable because both belong to the side to move.
+ */
+const ENGINE_ARROW_ALPHA = [0.95, 0.7, 0.52, 0.4, 0.3]
+const ENGINE_ARROW_RGB = '38, 122, 255'
+const NEXT_MOVE_ARROW = 'rgba(244, 130, 32, 0.95)'
 
 export default function App() {
   const [game, setGame] = useState<LoadedGame | null>(null)
@@ -195,30 +202,46 @@ export default function App() {
     : null
 
   const evalScore: Score | null = analysis ? (analysis.evals[ply] ?? null) : liveScore
-  // Always reserve the bar's column so the board does not shift sideways when
-  // the review finishes; it simply sits neutral until there is a score.
-  const showEvalBar = !!game
 
-  // Engine suggestions fade best→worst; the move actually played is drawn last
-  // in a brighter colour so it stands out against them.
+  // Engine candidates fade best→worst, then the game's own next move is drawn
+  // on top. The move already on the board gets no arrow — the highlighted
+  // squares already show it, and it belongs to the other side.
   const arrows: Arrow[] = useMemo(() => {
     if (!engineOn || !game) return []
-    const engineArrows: Arrow[] = engineMoves
-      .slice(0, ENGINE_ARROW_ALPHA.length)
-      .map((uci, i) => ({
-        startSquare: uci.slice(0, 2),
-        endSquare: uci.slice(2, 4),
-        color: `rgba(44, 129, 97, ${ENGINE_ARROW_ALPHA[i]})`,
-      }))
-    const played = game.replay.lastMoveSquares[ply]
-    if (played) {
-      engineArrows.push({
-        startSquare: played[0],
-        endSquare: played[1],
-        color: PLAYED_MOVE_ARROW,
+    // lastMoveSquares[ply + 1] is the move played *from* this position, so it
+    // is by the same side the engine is thinking for. Only that one.
+    const nextMove = game.replay.lastMoveSquares[ply + 1]
+    const nextKey = nextMove ? `${nextMove[0]}${nextMove[1]}` : null
+
+    // The board keys arrows by from-to, so every square pair may appear once.
+    // Mid-search the engine can list the same first move under two multipv
+    // slots, and the played move often *is* the engine's pick — in both cases
+    // the duplicate is dropped and the orange next-move arrow wins.
+    const seen = new Set<string>()
+    if (nextKey) seen.add(nextKey)
+
+    const list: Arrow[] = []
+    engineMoves.slice(0, ENGINE_ARROW_ALPHA.length).forEach((uci, i) => {
+      const from = uci.slice(0, 2)
+      const to = uci.slice(2, 4)
+      const key = `${from}${to}`
+      if (seen.has(key)) return
+      seen.add(key)
+      list.push({
+        startSquare: from,
+        endSquare: to,
+        color: `rgba(${ENGINE_ARROW_RGB}, ${ENGINE_ARROW_ALPHA[i]})`,
+      })
+    })
+
+    if (nextMove) {
+      list.push({
+        startSquare: nextMove[0],
+        endSquare: nextMove[1],
+        color: NEXT_MOVE_ARROW,
       })
     }
-    return engineArrows
+    return list
   }, [engineOn, engineMoves, game, ply])
 
   const analysisPercent =
@@ -238,12 +261,10 @@ export default function App() {
     <div className="flex h-dvh flex-col overflow-hidden">
       <header className="shrink-0 bg-felt text-buff">
         <div className="mx-auto flex max-w-[1600px] items-center gap-4 px-4 py-2.5 sm:px-6">
-          <span aria-hidden="true" className="text-3xl leading-none">
-            ♞
-          </span>
+          <BrandMark />
           <div className="min-w-0 flex-1">
             <h1 className="font-display text-xl font-semibold leading-tight tracking-tight">
-              ChessNoteR PGN Converter
+              ChessNoteR Game Analysis
             </h1>
             <p className="text-[11px] leading-tight text-buff/70">
               Copyright (c) 2026, Chuck Price
@@ -321,7 +342,6 @@ export default function App() {
             blackRating={blackRating}
             ratingTooltip={ratingTooltip}
             evalScore={evalScore}
-            showEvalBar={showEvalBar}
             engineOn={engineOn}
             onEngineOnChange={setEngineOn}
             engineSettings={engineSettings}

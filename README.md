@@ -1,7 +1,8 @@
-# ChessNoteR PGN Converter
+# ChessNoteR Game Analysis
 
 A static web app that converts PGN files exported by the [ChessNoteR](https://chessnoter.com)
-e-notation device into standard PGNs that Lichess and Chess.com can use.
+e-notation device into standard PGNs that Lichess and Chess.com can use, then reviews the
+game with Stockfish.
 
 ChessNoteR writes elapsed-move-time comments like `{[%emt 0:01:23]}` and occasional bare
 clock readings like `{56:00}`. This app converts them into one `{[%clk h:mm:ss]}` comment

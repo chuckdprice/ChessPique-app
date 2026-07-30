@@ -42,7 +42,7 @@ export function PlayerPlateRow({
   ratingTooltip: string
 }) {
   return (
-    <div className="flex items-baseline gap-2 py-1">
+    <div className="flex h-full items-center gap-2">
       <span aria-hidden="true" className="self-center text-base leading-none text-ink">
         {color === 'w' ? '♔' : '♚'}
       </span>
@@ -166,32 +166,29 @@ export function BoardNav({
       >
         «
       </button>
+      {/* Fixed widths so the row never reflows as move names change length. */}
       <button
         type="button"
-        className={`${button} min-w-0 flex-1 text-left font-score text-xs`}
+        className={`${button} flex w-28 items-center gap-1.5 font-score text-xs`}
         onClick={() => onPlyChange(Math.max(0, ply - 1))}
         disabled={ply === 0}
         aria-label={prevLabel ? `Previous move: ${prevLabel}` : 'Back to starting position'}
       >
-        <span aria-hidden="true" className="mr-1.5">
-          ‹
-        </span>
+        <span aria-hidden="true">‹</span>
         <span className="truncate">{prevLabel ?? 'Start'}</span>
       </button>
-      <span className="shrink-0 rounded-md bg-felt px-3 py-1.5 font-score text-xs font-semibold text-buff">
+      <span className="w-24 shrink-0 truncate rounded-md bg-felt px-2 py-1.5 text-center font-score text-xs font-semibold text-buff">
         {currentLabel ?? 'Start'}
       </span>
       <button
         type="button"
-        className={`${button} min-w-0 flex-1 text-right font-score text-xs`}
+        className={`${button} flex w-28 items-center justify-end gap-1.5 font-score text-xs`}
         onClick={() => onPlyChange(Math.min(lastPly, ply + 1))}
         disabled={ply === lastPly}
         aria-label={nextLabel ? `Next move: ${nextLabel}` : 'Next move'}
       >
         <span className="truncate">{nextLabel ?? '—'}</span>
-        <span aria-hidden="true" className="ml-1.5">
-          ›
-        </span>
+        <span aria-hidden="true">›</span>
       </button>
       <button
         type="button"

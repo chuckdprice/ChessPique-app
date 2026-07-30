@@ -1,7 +1,12 @@
-import { useEffect, useRef } from 'react'
+import { Fragment, useEffect, useRef } from 'react'
 import type { Move } from '../lib/convert'
-import { CLASSIFICATION_SYMBOL, hasMoveMarker } from '../lib/engine/analysis'
-import type { GameAnalysis } from '../lib/engine/analysis'
+import {
+  CLASSIFICATION_LABEL,
+  CLASSIFICATION_SYMBOL,
+  hasMoveMarker,
+} from '../lib/engine/analysis'
+import type { Classification, GameAnalysis, MoveAnalysis } from '../lib/engine/analysis'
+import { formatScore } from '../lib/engine/uci'
 import { classColor } from './ClassBadge'
 
 interface MoveTableProps {
@@ -13,13 +18,27 @@ interface MoveTableProps {
   analysis: GameAnalysis | null
 }
 
-interface Row {
-  number: number
-  white: { san: string; ply: number } | null
-  black: { san: string; ply: number } | null
+interface Cell {
+  san: string
+  ply: number
 }
 
-export default function MoveTable({ moves, result, ply, onPlyChange, analysis }: MoveTableProps) {
+interface Row {
+  number: number
+  white: Cell | null
+  black: Cell | null
+}
+
+/** Classifications that earn a "best move was…" note under the move. */
+const NEEDS_ADVICE: Classification[] = ['inaccuracy', 'mistake', 'blunder']
+
+export default function MoveTable({
+  moves,
+  result,
+  ply,
+  onPlyChange,
+  analysis,
+}: MoveTableProps) {
   const currentRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
@@ -38,33 +57,74 @@ export default function MoveTable({ moves, result, ply, onPlyChange, analysis }:
     else row.black = cell
   })
 
-  const cellButton = (cell: { san: string; ply: number } | null) => {
-    if (!cell) return <span className="px-2 text-ink-mute">…</span>
+  const analysisFor = (cell: Cell | null): MoveAnalysis | null =>
+    cell ? (analysis?.moves[cell.ply - 1] ?? null) : null
+
+  const moveCell = (cell: Cell | null) => {
+    if (!cell) return <td className="px-2 text-ink-mute">…</td>
     const current = cell.ply === ply
-    const moveAnalysis = analysis?.moves[cell.ply - 1]
-    const color = moveAnalysis ? classColor(moveAnalysis.classification) : undefined
+    const info = analysisFor(cell)
+    const color = info ? classColor(info.classification) : undefined
     return (
-      <button
-        type="button"
-        ref={current ? currentRef : undefined}
-        onClick={() => onPlyChange(cell.ply)}
-        aria-current={current ? 'true' : undefined}
-        className={`w-full rounded px-2 py-0.5 text-left font-score text-sm transition-colors ${
-          current ? 'bg-felt text-buff' : 'hover:bg-buff-soft'
-        }`}
-        style={current ? undefined : { color }}
-      >
-        {cell.san}
-        {moveAnalysis && hasMoveMarker(moveAnalysis.classification) && (
-          <span
-            className="ml-1 text-[10px] font-bold"
-            style={current ? undefined : { color }}
-            aria-hidden="true"
+      <td className="py-0.5 pr-1">
+        <button
+          type="button"
+          ref={current ? currentRef : undefined}
+          onClick={() => onPlyChange(cell.ply)}
+          aria-current={current ? 'true' : undefined}
+          className={`w-full rounded px-2 py-0.5 text-left font-score text-sm transition-colors ${
+            current ? 'bg-felt text-buff' : 'hover:bg-buff-soft'
+          }`}
+          style={current ? undefined : { color }}
+        >
+          {cell.san}
+          {info && hasMoveMarker(info.classification) && (
+            <span className="ml-1 text-[10px] font-bold" aria-hidden="true">
+              {CLASSIFICATION_SYMBOL[info.classification]}
+            </span>
+          )}
+        </button>
+      </td>
+    )
+  }
+
+  /** Evaluation after the move, in one muted colour regardless of value. */
+  const evalCell = (cell: Cell | null) => {
+    const info = analysisFor(cell)
+    return (
+      <td className="py-0.5 pr-2 text-right font-score text-xs text-ink-mute tabular-nums">
+        {info ? formatScore(info.scoreAfter) : ''}
+      </td>
+    )
+  }
+
+  /** "Inaccuracy. c4 was best." shown beneath a flagged move. */
+  const adviceRow = (cell: Cell, info: MoveAnalysis) => {
+    const color = classColor(info.classification)
+    return (
+      <tr key={`advice-${cell.ply}`}>
+        <td />
+        <td colSpan={4} className="pb-1 pr-2">
+          <button
+            type="button"
+            onClick={() => onPlyChange(cell.ply)}
+            className="block w-full rounded-r border-l-[3px] px-2 py-0.5 text-left text-[11px] transition-opacity hover:opacity-80"
+            style={{
+              borderColor: color,
+              color,
+              backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)`,
+            }}
           >
-            {CLASSIFICATION_SYMBOL[moveAnalysis.classification]}
-          </span>
-        )}
-      </button>
+            {CLASSIFICATION_LABEL[info.classification]}.
+            {info.bestMoveSan ? (
+              <>
+                {' '}
+                <span className="font-score font-semibold">{info.bestMoveSan}</span> was best.
+              </>
+            ) : null}
+          </button>
+        </td>
+      </tr>
     )
   }
 
@@ -78,23 +138,39 @@ export default function MoveTable({ moves, result, ply, onPlyChange, analysis }:
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-2 py-1">
         <table className="w-full border-collapse">
-          <thead>
-            <tr className="text-xs uppercase tracking-wide text-ink-mute">
-              <th className="w-9 px-2 py-1 text-right font-medium">#</th>
-              <th className="px-2 py-1 text-left font-medium">White</th>
-              <th className="px-2 py-1 text-left font-medium">Black</th>
-            </tr>
-          </thead>
+          <colgroup>
+            <col className="w-8" />
+            <col />
+            <col className="w-12" />
+            <col />
+            <col className="w-12" />
+          </colgroup>
           <tbody>
-            {rows.map((row) => (
-              <tr key={row.number} className="border-t border-rule/60">
-                <td className="px-2 py-0.5 text-right font-score text-xs text-ink-mute">
-                  {row.number}
-                </td>
-                <td className="py-0.5 pr-1">{cellButton(row.white)}</td>
-                <td className="py-0.5 pr-1">{cellButton(row.black)}</td>
-              </tr>
-            ))}
+            {rows.map((row) => {
+              const whiteInfo = analysisFor(row.white)
+              const blackInfo = analysisFor(row.black)
+              const advice: React.ReactNode[] = []
+              if (row.white && whiteInfo && NEEDS_ADVICE.includes(whiteInfo.classification)) {
+                advice.push(adviceRow(row.white, whiteInfo))
+              }
+              if (row.black && blackInfo && NEEDS_ADVICE.includes(blackInfo.classification)) {
+                advice.push(adviceRow(row.black, blackInfo))
+              }
+              return (
+                <Fragment key={row.number}>
+                  <tr className="border-t border-rule/60">
+                    <td className="px-1 py-0.5 text-right font-score text-xs text-ink-mute">
+                      {row.number}.
+                    </td>
+                    {moveCell(row.white)}
+                    {evalCell(row.white)}
+                    {moveCell(row.black)}
+                    {evalCell(row.black)}
+                  </tr>
+                  {advice}
+                </Fragment>
+              )
+            })}
           </tbody>
         </table>
         {result && (

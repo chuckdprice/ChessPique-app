@@ -149,9 +149,7 @@ export default function EnginePanel({
           </span>
         )}
 
-        <span className="min-w-0 flex-1 truncate text-xs text-ink-mute">
-          {ENGINE_NAME} · WASM
-        </span>
+        <span className="min-w-0 flex-1 truncate text-xs text-ink-mute">{ENGINE_NAME}</span>
 
         <button
           type="button"
@@ -198,9 +196,6 @@ export default function EnginePanel({
             >
               <span className="w-10 shrink-0 font-semibold tabular-nums">
                 {formatScore(line.score)}
-              </span>
-              <span className="w-7 shrink-0 text-[10px] text-ink-mute tabular-nums">
-                d{line.depth}
               </span>
               <span className="truncate text-ink-mute">{numberedLine(fen, line.pvSan)}</span>
             </li>

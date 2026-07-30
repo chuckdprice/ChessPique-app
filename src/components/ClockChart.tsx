@@ -118,8 +118,8 @@ export default function ClockChart({
       className={embedded ? '' : 'rounded-xl border border-rule bg-card shadow-sm'}
     >
       <div
-        className={`flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 px-6 py-4 ${
-          embedded ? 'pb-0' : 'border-b border-rule'
+        className={`flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 px-6 ${
+          embedded ? 'py-0' : 'border-b border-rule py-4'
         }`}
       >
         {!embedded && (
@@ -138,8 +138,8 @@ export default function ClockChart({
           {legendItem(`${blackName} — per move`, BLACK_FILL, 'bar')}
         </div>
       </div>
-      <div className="px-2 py-4">
-        <ResponsiveContainer width="100%" height={340}>
+      <div className={embedded ? 'px-2 pt-1' : 'px-2 py-4'}>
+        <ResponsiveContainer width="100%" height={150}>
           <ComposedChart data={rows} margin={{ top: 8, right: 8, bottom: 4, left: 12 }}>
             <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
             <XAxis

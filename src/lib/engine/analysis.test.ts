@@ -4,8 +4,11 @@ import { replayGame } from '../gameModel'
 import {
   buildGameAnalysis,
   classify,
+  CLASSIFICATION_SYMBOL,
+  CLASSIFICATIONS,
   DECIDED_CP,
   findPhases,
+  hasMoveMarker,
   moveAccuracy,
   phaseOfPly,
   pieceMaterial,
@@ -58,6 +61,20 @@ describe('classify', () => {
     expect(classify(8, false)).toBe('inaccuracy')
     expect(classify(15, false)).toBe('mistake')
     expect(classify(30, false)).toBe('blunder')
+  })
+})
+
+describe('hasMoveMarker', () => {
+  it('stays silent for Good and marks every other classification', () => {
+    expect(hasMoveMarker('good')).toBe(false)
+    for (const c of CLASSIFICATIONS.filter((x) => x !== 'good')) {
+      expect(hasMoveMarker(c)).toBe(true)
+    }
+  })
+
+  it('still gives Good a symbol for the classification table', () => {
+    // The table lists every class; only the move list and board suppress Good.
+    expect(CLASSIFICATION_SYMBOL.good).toBeTruthy()
   })
 })
 

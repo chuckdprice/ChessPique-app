@@ -1,60 +1,25 @@
-import { useState } from 'react'
-import { Chessboard } from 'react-chessboard'
+import { Chessboard, defaultArrowOptions } from 'react-chessboard'
+import type { Arrow } from 'react-chessboard'
 import { formatClockTime } from '../lib/convert'
 import type { Move } from '../lib/convert'
+import { hasMoveMarker } from '../lib/engine/analysis'
 import type { GameAnalysis } from '../lib/engine/analysis'
-import type { Score } from '../lib/engine/uci'
 import type { ReplayedGame } from '../lib/gameModel'
 import ClassBadge from './ClassBadge'
-import EvalBar from './EvalBar'
+
+export interface PlayerPlate {
+  name: string
+  /** e.g. "(719 / ~1600 Lichess Rapid)" */
+  rating: string | null
+  clock: number
+}
 
 interface BoardViewerProps {
   replay: ReplayedGame
-  moves: Move[]
   ply: number
-  onPlyChange: (ply: number) => void
-  whiteName: string
-  blackName: string
-  /** Parenthetical after the name, e.g. "(719 / ~1600)". */
-  whiteRating: string | null
-  blackRating: string | null
-  /** Hover explanation for the played-like figure. */
-  ratingTooltip: string
+  orientation: 'white' | 'black'
   analysis: GameAnalysis | null
-  evalScore: Score | null
-  showEvalBar: boolean
-}
-
-function PlayerRow({
-  name,
-  rating,
-  ratingTooltip,
-  color,
-}: {
-  name: string
-  rating: string | null
-  ratingTooltip: string
-  color: 'w' | 'b'
-}) {
-  return (
-    <div className="flex items-baseline gap-2 py-1.5">
-      <span aria-hidden="true" className="self-center text-lg leading-none text-ink">
-        {color === 'w' ? '♔' : '♚'}
-      </span>
-      <span className="truncate text-sm font-medium">
-        {name}
-        <span className="sr-only">{color === 'w' ? ' (White)' : ' (Black)'}</span>
-      </span>
-      {rating && (
-        <span
-          className="shrink-0 cursor-help font-score text-xs text-ink-mute"
-          title={ratingTooltip}
-        >
-          {rating}
-        </span>
-      )}
-    </div>
-  )
+  arrows: Arrow[]
 }
 
 /** Top-right-corner position of a square as percentages, given orientation. */
@@ -66,26 +31,54 @@ function squareCorner(square: string, orientation: 'white' | 'black') {
   return { left: (col + 1) * 12.5, top: row * 12.5 }
 }
 
+/** Name + rating on the left, remaining clock right-aligned to the board edge. */
+export function PlayerPlateRow({
+  plate,
+  color,
+  ratingTooltip,
+}: {
+  plate: PlayerPlate
+  color: 'w' | 'b'
+  ratingTooltip: string
+}) {
+  return (
+    <div className="flex items-baseline gap-2 py-1">
+      <span aria-hidden="true" className="self-center text-base leading-none text-ink">
+        {color === 'w' ? '♔' : '♚'}
+      </span>
+      <span className="truncate text-sm font-medium">
+        {plate.name}
+        <span className="sr-only">{color === 'w' ? ' (White)' : ' (Black)'}</span>
+      </span>
+      {plate.rating && (
+        <span
+          className="shrink-0 cursor-help font-score text-[11px] text-ink-mute"
+          title={ratingTooltip}
+        >
+          {plate.rating}
+        </span>
+      )}
+      <span
+        className="ml-auto shrink-0 rounded bg-buff-soft px-2 py-0.5 font-score text-sm font-semibold tabular-nums"
+        aria-label={`${color === 'w' ? 'White' : 'Black'} clock`}
+      >
+        {formatClockTime(plate.clock)}
+      </span>
+    </div>
+  )
+}
+
 export default function BoardViewer({
   replay,
-  moves,
   ply,
-  onPlyChange,
-  whiteName,
-  blackName,
-  whiteRating,
-  blackRating,
-  ratingTooltip,
+  orientation,
   analysis,
-  evalScore,
-  showEvalBar,
+  arrows,
 }: BoardViewerProps) {
-  const [orientation, setOrientation] = useState<'white' | 'black'>('white')
-  const lastPly = replay.fens.length - 1
-  const move = ply > 0 ? moves[ply - 1] : null
   const highlight = replay.lastMoveSquares[ply]
   const moveAnalysis = ply > 0 ? (analysis?.moves[ply - 1] ?? null) : null
-  const badgeSquare = moveAnalysis && highlight ? highlight[1] : null
+  const showBadge = moveAnalysis != null && hasMoveMarker(moveAnalysis.classification)
+  const badgeSquare = showBadge && highlight ? highlight[1] : null
   const badgePos = badgeSquare ? squareCorner(badgeSquare, orientation) : null
 
   const squareStyles: Record<string, React.CSSProperties> = {}
@@ -95,128 +88,144 @@ export default function BoardViewer({
     }
   }
 
-  const topName = orientation === 'white' ? blackName : whiteName
-  const bottomName = orientation === 'white' ? whiteName : blackName
-  const topRating = orientation === 'white' ? blackRating : whiteRating
-  const bottomRating = orientation === 'white' ? whiteRating : blackRating
+  return (
+    <div className="relative size-(--board-size) overflow-hidden rounded-lg shadow-md">
+      <Chessboard
+        options={{
+          position: replay.fens[ply],
+          boardOrientation: orientation,
+          allowDragging: false,
+          allowDrawingArrows: false,
+          animationDurationInMs: 150,
+          squareStyles,
+          arrows,
+          // Keep the library's geometry defaults; only take over opacity so the
+          // per-arrow rgba alpha is the single source of fade.
+          arrowOptions: { ...defaultArrowOptions, opacity: 1, activeOpacity: 1 },
+          lightSquareStyle: { backgroundColor: '#efe8d6' },
+          darkSquareStyle: { backgroundColor: '#4e7d63' },
+          darkSquareNotationStyle: { color: '#efe8d6' },
+          lightSquareNotationStyle: { color: '#4e7d63' },
+          boardStyle: { width: '100%', height: '100%' },
+        }}
+      />
+      {moveAnalysis && badgePos && (
+        <div
+          className="pointer-events-none absolute z-10"
+          style={{
+            left: `${badgePos.left}%`,
+            top: `${badgePos.top}%`,
+            transform: 'translate(-70%, -30%)',
+          }}
+        >
+          <ClassBadge classification={moveAnalysis.classification} size={20} />
+        </div>
+      )}
+    </div>
+  )
+}
 
-  const navButton =
-    'rounded-md border border-rule bg-card px-3 py-1.5 text-lg leading-none text-ink transition-colors hover:bg-buff-soft disabled:cursor-not-allowed disabled:opacity-30'
+interface BoardNavProps {
+  moves: Move[]
+  ply: number
+  lastPly: number
+  onPlyChange: (ply: number) => void
+  onRotate: () => void
+  orientation: 'white' | 'black'
+}
+
+/** "12. h3" / "13... Bg6" label for the move that lands on `ply`. */
+export function plyLabel(moves: Move[], ply: number): string | null {
+  if (ply <= 0 || ply > moves.length) return null
+  const move = moves[ply - 1]
+  return `${move.number}${move.color === 'w' ? '.' : '…'} ${move.san}`
+}
+
+export function BoardNav({
+  moves,
+  ply,
+  lastPly,
+  onPlyChange,
+  onRotate,
+  orientation,
+}: BoardNavProps) {
+  const button =
+    'rounded-md border border-rule bg-card px-2.5 py-1.5 leading-none text-ink transition-colors hover:bg-buff-soft disabled:cursor-not-allowed disabled:opacity-30'
+  const prevLabel = plyLabel(moves, ply - 1)
+  const nextLabel = plyLabel(moves, ply + 1)
+  const currentLabel = plyLabel(moves, ply)
 
   return (
-    <section aria-label="Chessboard" className="flex flex-col items-center gap-2">
-      <div className="w-full max-w-[600px]">
-        <PlayerRow
-          name={topName}
-          rating={topRating}
-          ratingTooltip={ratingTooltip}
-          color={orientation === 'white' ? 'b' : 'w'}
-        />
-        <div className="flex items-stretch gap-2">
-          {showEvalBar && <EvalBar score={evalScore} orientation={orientation} />}
-          <div className="relative min-w-0 flex-1 overflow-hidden rounded-lg shadow-md">
-            <Chessboard
-              options={{
-                position: replay.fens[ply],
-                boardOrientation: orientation,
-                allowDragging: false,
-                allowDrawingArrows: false,
-                animationDurationInMs: 150,
-                squareStyles,
-                lightSquareStyle: { backgroundColor: '#efe8d6' },
-                darkSquareStyle: { backgroundColor: '#4e7d63' },
-                darkSquareNotationStyle: { color: '#efe8d6' },
-                lightSquareNotationStyle: { color: '#4e7d63' },
-                boardStyle: { width: '100%' },
-              }}
-            />
-            {moveAnalysis && badgePos && (
-              <div
-                className="pointer-events-none absolute z-10"
-                style={{
-                  left: `${badgePos.left}%`,
-                  top: `${badgePos.top}%`,
-                  transform: 'translate(-70%, -30%)',
-                }}
-              >
-                <ClassBadge classification={moveAnalysis.classification} size={20} />
-              </div>
-            )}
-          </div>
-        </div>
-        <PlayerRow
-          name={bottomName}
-          rating={bottomRating}
-          ratingTooltip={ratingTooltip}
-          color={orientation === 'white' ? 'w' : 'b'}
-        />
-      </div>
-
-      <div className="flex items-center gap-2" role="group" aria-label="Move navigation">
-        <button
-          type="button"
-          className={navButton}
-          onClick={() => onPlyChange(0)}
-          disabled={ply === 0}
-          aria-label="Go to start"
-        >
-          «
-        </button>
-        <button
-          type="button"
-          className={navButton}
-          onClick={() => onPlyChange(Math.max(0, ply - 1))}
-          disabled={ply === 0}
-          aria-label="Previous move"
-        >
+    <div className="flex items-center gap-2" role="group" aria-label="Move navigation">
+      <button
+        type="button"
+        className={`${button} text-lg`}
+        onClick={() => onPlyChange(0)}
+        disabled={ply === 0}
+        aria-label="Go to start"
+      >
+        «
+      </button>
+      <button
+        type="button"
+        className={`${button} min-w-0 flex-1 text-left font-score text-xs`}
+        onClick={() => onPlyChange(Math.max(0, ply - 1))}
+        disabled={ply === 0}
+        aria-label={prevLabel ? `Previous move: ${prevLabel}` : 'Back to starting position'}
+      >
+        <span aria-hidden="true" className="mr-1.5">
           ‹
-        </button>
-        <button
-          type="button"
-          className={navButton}
-          onClick={() => onPlyChange(Math.min(lastPly, ply + 1))}
-          disabled={ply === lastPly}
-          aria-label="Next move"
-        >
+        </span>
+        <span className="truncate">{prevLabel ?? 'Start'}</span>
+      </button>
+      <span className="shrink-0 rounded-md bg-felt px-3 py-1.5 font-score text-xs font-semibold text-buff">
+        {currentLabel ?? 'Start'}
+      </span>
+      <button
+        type="button"
+        className={`${button} min-w-0 flex-1 text-right font-score text-xs`}
+        onClick={() => onPlyChange(Math.min(lastPly, ply + 1))}
+        disabled={ply === lastPly}
+        aria-label={nextLabel ? `Next move: ${nextLabel}` : 'Next move'}
+      >
+        <span className="truncate">{nextLabel ?? '—'}</span>
+        <span aria-hidden="true" className="ml-1.5">
           ›
-        </button>
-        <button
-          type="button"
-          className={navButton}
-          onClick={() => onPlyChange(lastPly)}
-          disabled={ply === lastPly}
-          aria-label="Go to end"
+        </span>
+      </button>
+      <button
+        type="button"
+        className={`${button} text-lg`}
+        onClick={() => onPlyChange(lastPly)}
+        disabled={ply === lastPly}
+        aria-label="Go to end"
+      >
+        »
+      </button>
+      <button
+        type="button"
+        className={button}
+        onClick={onRotate}
+        aria-label={`Rotate board — view from ${orientation === 'white' ? "Black's" : "White's"} side`}
+        title="Rotate board"
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 24 24"
+          className="size-[18px]"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
         >
-          »
-        </button>
-        <button
-          type="button"
-          className={navButton}
-          onClick={() => setOrientation((o) => (o === 'white' ? 'black' : 'white'))}
-          aria-label={`Rotate board — view from ${orientation === 'white' ? "Black's" : "White's"} side`}
-          title="Rotate board"
-        >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 24 24"
-            className="size-[18px]"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-            <path d="M21 3v6h-6" />
-          </svg>
-        </button>
-      </div>
-
-      <p className="h-5 font-score text-sm text-ink-mute" aria-live="polite">
-        {move
-          ? `${move.number}${move.color === 'w' ? '.' : '...'} ${move.san} — clock ${formatClockTime(move.clkSeconds ?? 0)}`
-          : 'Starting position — use the arrows or ← → keys'}
-      </p>
-    </section>
+          <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+          <path d="M21 3v6h-6" />
+        </svg>
+      </button>
+      <span className="sr-only" aria-live="polite">
+        {currentLabel ?? 'Starting position'}
+      </span>
+    </div>
   )
 }

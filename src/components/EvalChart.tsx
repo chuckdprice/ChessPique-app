@@ -92,7 +92,7 @@ export default function EvalChart({
 
   return (
     <div>
-      <ResponsiveContainer width="100%" height={260}>
+      <ResponsiveContainer width="100%" height={150}>
         <AreaChart
           data={rows}
           margin={{ top: 8, right: 12, bottom: 4, left: 0 }}
@@ -163,12 +163,7 @@ export default function EvalChart({
           <ReferenceLine x={ply} stroke="var(--accent-bright)" strokeWidth={1.5} />
         </AreaChart>
       </ResponsiveContainer>
-      <p className="mt-1 px-3 text-xs text-ink-mute">
-        White advantage fills upward, Black downward (clipped at ±10). Click the chart to jump
-        to a move.
-      </p>
-
-      <div className="mt-2 overflow-x-auto">
+      <div className="mt-1 overflow-x-auto">
         <table className="w-full min-w-96">
           <thead>
             <tr className="text-xs uppercase tracking-wide text-ink-mute">

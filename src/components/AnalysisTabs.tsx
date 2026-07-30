@@ -61,8 +61,15 @@ export default function AnalysisTabs({
   const [tab, setTab] = useState<Tab>('evaluation')
 
   return (
-    <section aria-label="Game analysis" className="rounded-xl border border-rule bg-card shadow-sm">
-      <div role="tablist" aria-label="Analysis views" className="flex gap-1 border-b border-rule px-3 pt-2">
+    <section
+      aria-label="Game analysis"
+      className="flex h-full min-h-0 flex-col rounded-xl border border-rule bg-card shadow-sm"
+    >
+      <div
+        role="tablist"
+        aria-label="Analysis views"
+        className="flex shrink-0 gap-1 border-b border-rule px-3 pt-1.5"
+      >
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -70,7 +77,7 @@ export default function AnalysisTabs({
             role="tab"
             aria-selected={tab === t.id}
             onClick={() => setTab(t.id)}
-            className={`rounded-t-lg border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
+            className={`rounded-t-lg border-b-2 px-4 py-1.5 text-sm font-medium transition-colors ${
               tab === t.id
                 ? 'border-felt-bright text-ink'
                 : 'border-transparent text-ink-mute hover:text-ink'
@@ -81,7 +88,7 @@ export default function AnalysisTabs({
         ))}
       </div>
 
-      <div className="py-4">
+      <div className="min-h-0 flex-1 overflow-y-auto py-2">
         {tab === 'evaluation' &&
           (analysis ? (
             <EvalChart

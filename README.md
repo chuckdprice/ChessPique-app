@@ -7,10 +7,24 @@ ChessNoteR writes elapsed-move-time comments like `{[%emt 0:01:23]}` and occasio
 clock readings like `{56:00}`. This app converts them into one `{[%clk h:mm:ss]}` comment
 per move, normalizes the `TimeControl` tag (for example `G70/d10` → `4200d10`), and lets you:
 
-- Paste a PGN or upload/drop the `.pgn` file (uploads convert immediately)
-- Step through the game on a board with arrow buttons, the move list, or ← → keys, and flip
-  the board to either player's perspective
-- Edit every PGN tag before downloading
+The app is a three-step flow shown as chevron tabs across the top — **PGN Upload → PGN Tags →
+Game Analysis** — sized so a 1440×900 desktop window needs no scrolling on any step.
+
+- **PGN Upload**: paste a PGN or upload/drop the `.pgn` file (uploads convert immediately).
+  The source PGN sits on the left and the converted `%clk` PGN on the right, with buttons to
+  download it or copy it straight to the clipboard.
+- **PGN Tags**: edit every PGN tag; changes flow live into the converted PGN, the download,
+  and the clipboard copy.
+- **Game Analysis**: board, engine, move list, and charts in one screen.
+
+On the analysis page you can:
+
+- Step through the game with the navigation buttons (which name the previous and next moves),
+  the move list, or ← → keys, and flip the board to either player's perspective
+- See each player's remaining clock beside their name, and their rating alongside the
+  estimated "played like" rating
+- Turn the engine on to get arrows for its top lines — shaded from best to worst — with the
+  move actually played highlighted in gold
 - Review the game with Stockfish 18: an eval bar beside the board, per-move classification
   (Best → Blunder) in the move list and on the board, and three analysis tabs — Evaluation,
   Move Classification, and Move Times

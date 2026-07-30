@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import AnalysisProgress from './components/AnalysisProgress'
-import AnalysisTabs from './components/AnalysisTabs'
+import type { Arrow } from 'react-chessboard'
+import AnalysisPage from './components/AnalysisPage'
 import AppearanceMenu from './components/AppearanceSettings'
-import BoardViewer from './components/BoardViewer'
-import EnginePanel from './components/EnginePanel'
-import MoveTable from './components/MoveTable'
 import PgnInput from './components/PgnInput'
+import StepNav from './components/StepNav'
+import type { Page } from './components/StepNav'
 import TagEditor from './components/TagEditor'
+import { buildPgn, convertPgn } from './lib/convert'
+import type { ConvertOptions, ConvertResult } from './lib/convert'
 import { analyzeGame, PLAYED_LIKE_MAE } from './lib/engine/analysis'
 import type { GameAnalysis } from './lib/engine/analysis'
 import type { Score } from './lib/engine/uci'
+import { buildChartRows, replayGame } from './lib/gameModel'
+import type { ReplayedGame } from './lib/gameModel'
 import {
   applyAppearance,
   loadAppearance,
@@ -18,10 +21,6 @@ import {
   watchSystemTheme,
 } from './lib/settings'
 import type { AppearanceSettings, EngineSettings } from './lib/settings'
-import { buildPgn, convertPgn } from './lib/convert'
-import type { ConvertOptions, ConvertResult } from './lib/convert'
-import { buildChartRows, replayGame } from './lib/gameModel'
-import type { ReplayedGame } from './lib/gameModel'
 
 interface LoadedGame {
   result: ConvertResult
@@ -32,22 +31,31 @@ function findHeader(headers: Array<{ name: string; value: string }>, name: strin
   return headers.find((h) => h.name === name)?.value
 }
 
+/** Engine lines fade from best to worst; the played move gets its own colour. */
+const ENGINE_ARROW_ALPHA = [0.85, 0.62, 0.45, 0.34, 0.26]
+const PLAYED_MOVE_ARROW = 'rgba(237, 173, 47, 1)'
+
 export default function App() {
   const [game, setGame] = useState<LoadedGame | null>(null)
   const [headers, setHeaders] = useState<Array<{ name: string; value: string }>>([])
   const [ply, setPly] = useState(0)
+  const [page, setPage] = useState<Page>('upload')
+  // Source PGN lives here, not in PgnInput, so switching pages does not lose it.
+  const [sourceText, setSourceText] = useState('')
+  const [sourceFileName, setSourceFileName] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [inputOpen, setInputOpen] = useState(true)
   const [overridesOpen, setOverridesOpen] = useState(false)
   const [appearance, setAppearance] = useState<AppearanceSettings>(loadAppearance)
   const [engineSettings, setEngineSettings] = useState<EngineSettings>(loadEngineSettings)
   const [engineOn, setEngineOn] = useState(false)
   const [liveScore, setLiveScore] = useState<Score | null>(null)
+  const [engineMoves, setEngineMoves] = useState<string[]>([])
   const [analysis, setAnalysis] = useState<GameAnalysis | null>(null)
-  const [analysisProgress, setAnalysisProgress] = useState<{ done: number; total: number } | null>(null)
+  const [analysisProgress, setAnalysisProgress] = useState<{ done: number; total: number } | null>(
+    null,
+  )
   const [analysisError, setAnalysisError] = useState<string | null>(null)
   const analysisSignal = useRef<{ cancelled: boolean } | null>(null)
-  const resultsRef = useRef<HTMLDivElement>(null)
 
   const appearanceRef = useRef(appearance)
   appearanceRef.current = appearance
@@ -68,18 +76,17 @@ export default function App() {
       setAnalysisProgress(null)
       setAnalysisError(null)
       setLiveScore(null)
+      setEngineMoves([])
       setGame({ result, replay })
       setHeaders(result.headers)
       setPly(0)
       setError(null)
-      setInputOpen(false)
-      requestAnimationFrame(() => {
-        resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      })
+      setPage('analysis')
     } catch (e) {
       setGame(null)
       const message = e instanceof Error ? e.message : String(e)
       setError(message)
+      setPage('upload')
       if (message.includes('starting clock')) setOverridesOpen(true)
     }
   }
@@ -119,10 +126,11 @@ export default function App() {
   }, [game])
 
   const handleTopScore = useCallback((score: Score | null) => setLiveScore(score), [])
+  const handleEngineMoves = useCallback((ucis: string[]) => setEngineMoves(ucis), [])
 
-  // Arrow-key navigation, except while typing in a field.
+  // Arrow-key navigation on the analysis page, except while typing in a field.
   useEffect(() => {
-    if (!game) return
+    if (!game || page !== 'analysis') return
     const lastPly = game.replay.fens.length - 1
     const onKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement
@@ -150,47 +158,35 @@ export default function App() {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [game])
+  }, [game, page])
 
-  const chartRows = useMemo(
-    () => (game ? buildChartRows(game.result.moves) : []),
-    [game],
+  const chartRows = useMemo(() => (game ? buildChartRows(game.result.moves) : []), [game])
+
+  const convertedPgn = useMemo(
+    () => (game ? buildPgn(headers, game.result.moves, game.result.result) : null),
+    [game, headers],
   )
 
-  const download = () => {
-    if (!game) return
-    const pgn = buildPgn(headers, game.result.moves, game.result.result)
+  const downloadName = useMemo(() => {
     const white = findHeader(headers, 'White') ?? 'White'
     const black = findHeader(headers, 'Black') ?? 'Black'
     const date = findHeader(headers, 'Date') ?? ''
     const stem = `${white} vs ${black}${date ? ` ${date.replaceAll('.', '-')}` : ''}`
       .replace(/[\\/:*?"<>|]/g, '')
       .trim()
-    const blob = new Blob([pgn], { type: 'application/x-chess-pgn' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${stem || 'converted'}.pgn`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
+    return `${stem || 'converted'}.pgn`
+  }, [headers])
 
   const whiteName = (game && findHeader(headers, 'White')) || 'White'
   const blackName = (game && findHeader(headers, 'Black')) || 'Black'
 
-  // "(Elo / ~played-like)" plate suffix; played-like fills in after analysis.
+  // "(Elo / ~played-like Lichess Rapid)"; played-like fills in after analysis.
   const ratingLabel = (elo: string | undefined, playedLike: number | undefined) => {
-    const playedLikeText = playedLike != null ? `~${playedLike}` : analysisProgress ? '…' : null
+    const playedLikeText =
+      playedLike != null ? `~${playedLike} Lichess Rapid` : analysisProgress ? '…' : null
     if (!elo && playedLikeText == null) return null
     return `(${elo ?? '—'} / ${playedLikeText ?? '—'})`
   }
-  const ratingTooltip =
-    `Rating from the PGN tag / estimated "played like" rating for this game.\n\n` +
-    `Estimated from average capped centipawn loss, calibrated against rated Lichess ` +
-    `rapid games, so it sits on the Lichess rapid scale — which runs higher than USCF ` +
-    `or FIDE OTB ratings.\n\n` +
-    `One game is a weak signal: typical error is around ±${PLAYED_LIKE_MAE} points, ` +
-    `so treat it as a rough indicator rather than a measurement.`
   const whiteRating = game
     ? ratingLabel(findHeader(headers, 'WhiteElo'), analysis?.white.playedLike)
     : null
@@ -198,138 +194,144 @@ export default function App() {
     ? ratingLabel(findHeader(headers, 'BlackElo'), analysis?.black.playedLike)
     : null
 
-  const currentFen = game ? game.replay.fens[ply] : null
   const evalScore: Score | null = analysis ? (analysis.evals[ply] ?? null) : liveScore
-  const showEvalBar = !!game && (analysis != null || engineOn)
+  // Always reserve the bar's column so the board does not shift sideways when
+  // the review finishes; it simply sits neutral until there is a score.
+  const showEvalBar = !!game
+
+  // Engine suggestions fade best→worst; the move actually played is drawn last
+  // in a brighter colour so it stands out against them.
+  const arrows: Arrow[] = useMemo(() => {
+    if (!engineOn || !game) return []
+    const engineArrows: Arrow[] = engineMoves
+      .slice(0, ENGINE_ARROW_ALPHA.length)
+      .map((uci, i) => ({
+        startSquare: uci.slice(0, 2),
+        endSquare: uci.slice(2, 4),
+        color: `rgba(44, 129, 97, ${ENGINE_ARROW_ALPHA[i]})`,
+      }))
+    const played = game.replay.lastMoveSquares[ply]
+    if (played) {
+      engineArrows.push({
+        startSquare: played[0],
+        endSquare: played[1],
+        color: PLAYED_MOVE_ARROW,
+      })
+    }
+    return engineArrows
+  }, [engineOn, engineMoves, game, ply])
+
+  const analysisPercent =
+    analysisProgress && analysisProgress.total > 0
+      ? Math.round((analysisProgress.done / analysisProgress.total) * 100)
+      : null
+
+  const ratingTooltip =
+    `Rating from the PGN tag / estimated "played like" rating for this game.\n\n` +
+    `Estimated from average win-% lost per move in undecided positions, calibrated against ` +
+    `rated Lichess rapid games, so it sits on the Lichess rapid scale — which runs higher ` +
+    `than USCF or FIDE OTB ratings.\n\n` +
+    `One game is a weak signal: typical error is around ±${PLAYED_LIKE_MAE} points, ` +
+    `so treat it as a rough indicator rather than a measurement.`
 
   return (
-    <div className="min-h-screen">
-      <header className="bg-felt text-buff">
-        <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-6 sm:px-6">
-          <span aria-hidden="true" className="text-4xl leading-none">
+    <div className="flex h-dvh flex-col overflow-hidden">
+      <header className="shrink-0 bg-felt text-buff">
+        <div className="mx-auto flex max-w-[1600px] items-center gap-4 px-4 py-2.5 sm:px-6">
+          <span aria-hidden="true" className="text-3xl leading-none">
             ♞
           </span>
           <div className="min-w-0 flex-1">
-            <h1 className="font-display text-2xl font-semibold tracking-tight">
+            <h1 className="font-display text-xl font-semibold leading-tight tracking-tight">
               ChessNoteR PGN Converter
             </h1>
-            <p className="mt-0.5 text-sm text-buff/80">
-              Turn ChessNoteR %emt timing into standard %clk comments that Lichess and
-              Chess.com understand.
+            <p className="text-[11px] leading-tight text-buff/70">
+              Copyright (c) 2026, Chuck Price
             </p>
           </div>
+          <span
+            className="shrink-0 rounded-full bg-buff/15 px-2.5 py-1 font-score text-xs"
+            title="Application version"
+          >
+            v{__APP_VERSION__}
+          </span>
           <AppearanceMenu value={appearance} onChange={setAppearance} />
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl space-y-8 px-4 py-8 sm:px-6">
-        <PgnInput
-          onConvert={handleConvert}
-          error={error}
-          open={inputOpen}
-          onOpenChange={setInputOpen}
-          overridesOpen={overridesOpen}
-          onOverridesOpenChange={setOverridesOpen}
+      <div className="mx-auto w-full max-w-[1600px] shrink-0 px-4 pt-2 sm:px-6">
+        <StepNav
+          page={page}
+          onPageChange={setPage}
+          gameLoaded={!!game}
+          analysisPercent={analysisPercent}
         />
+      </div>
 
-        {game && (
-          <div ref={resultsRef} className="scroll-mt-6 space-y-8">
-            {game.result.warnings.length > 0 && (
-              <div
-                role="status"
-                className="rounded-xl border border-warn-text/25 bg-warn-bg px-5 py-4 text-sm text-warn-text"
-              >
-                <p className="font-medium">
-                  Some moves were missing timing data — their clocks were carried forward:
-                </p>
-                <ul className="mt-1 list-inside list-disc">
-                  {game.result.warnings.map((w) => (
-                    <li key={w}>{w}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
+      <main
+        className="mx-auto flex w-full min-h-0 max-w-[1600px] flex-1 flex-col px-4 py-2 sm:px-6"
+        style={
+          {
+            // Board fills the height left over by header, steps, plates, nav
+            // and charts, so the analysis page fits without scrolling.
+            '--board-size': 'clamp(280px, calc(100dvh - 470px), 560px)',
+          } as React.CSSProperties
+        }
+      >
+        {page === 'upload' && (
+          <PgnInput
+            onConvert={handleConvert}
+            error={error}
+            text={sourceText}
+            onTextChange={setSourceText}
+            sourceFileName={sourceFileName}
+            onSourceFileNameChange={setSourceFileName}
+            convertedPgn={convertedPgn}
+            downloadName={downloadName}
+            overridesOpen={overridesOpen}
+            onOverridesOpenChange={setOverridesOpen}
+          />
+        )}
 
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <h2 className="font-display text-xl font-semibold">
-                {whiteName} vs {blackName}
-              </h2>
-              <button
-                type="button"
-                onClick={download}
-                className="rounded-lg bg-felt px-5 py-2.5 font-medium text-buff shadow-sm transition-colors hover:bg-felt-deep"
-              >
-                Download converted PGN
-              </button>
-            </div>
+        {page === 'tags' && game && convertedPgn && (
+          <TagEditor
+            headers={headers}
+            onChange={(index, value) =>
+              setHeaders((prev) => prev.map((h, i) => (i === index ? { ...h, value } : h)))
+            }
+            pgn={convertedPgn}
+            downloadName={downloadName}
+          />
+        )}
 
-            {(!analysis || analysisError) && (
-              <AnalysisProgress progress={analysisProgress} error={analysisError} />
-            )}
-
-            <div className="grid gap-6 lg:grid-cols-[16rem_minmax(0,1fr)_15rem]">
-              <TagEditor
-                headers={headers}
-                onChange={(index, value) =>
-                  setHeaders((prev) =>
-                    prev.map((h, i) => (i === index ? { ...h, value } : h)),
-                  )
-                }
-              />
-              <BoardViewer
-                replay={game.replay}
-                moves={game.result.moves}
-                ply={ply}
-                onPlyChange={setPly}
-                whiteName={whiteName}
-                blackName={blackName}
-                whiteRating={whiteRating}
-                blackRating={blackRating}
-                ratingTooltip={ratingTooltip}
-                analysis={analysis}
-                evalScore={evalScore}
-                showEvalBar={showEvalBar}
-              />
-              <div className="flex min-h-0 flex-col gap-4">
-                {currentFen && (
-                  <EnginePanel
-                    fen={currentFen}
-                    enabled={engineOn}
-                    onEnabledChange={setEngineOn}
-                    settings={engineSettings}
-                    onSettingsChange={setEngineSettings}
-                    onTopScore={handleTopScore}
-                  />
-                )}
-                <MoveTable
-                  moves={game.result.moves}
-                  result={game.result.result}
-                  ply={ply}
-                  onPlyChange={setPly}
-                  analysis={analysis}
-                />
-              </div>
-            </div>
-
-            <AnalysisTabs
-              analysis={analysis}
-              progress={analysisProgress}
-              analysisError={analysisError}
-              moves={game.result.moves}
-              ply={ply}
-              onPlyChange={setPly}
-              chartRows={chartRows}
-              startSeconds={game.result.timeControl.startSeconds}
-              whiteName={whiteName}
-              blackName={blackName}
-            />
-          </div>
+        {page === 'analysis' && game && (
+          <AnalysisPage
+            result={game.result}
+            replay={game.replay}
+            moves={game.result.moves}
+            ply={ply}
+            onPlyChange={setPly}
+            analysis={analysis}
+            analysisProgress={analysisProgress}
+            analysisError={analysisError}
+            chartRows={chartRows}
+            whiteName={whiteName}
+            blackName={blackName}
+            whiteRating={whiteRating}
+            blackRating={blackRating}
+            ratingTooltip={ratingTooltip}
+            evalScore={evalScore}
+            showEvalBar={showEvalBar}
+            engineOn={engineOn}
+            onEngineOnChange={setEngineOn}
+            engineSettings={engineSettings}
+            onEngineSettingsChange={setEngineSettings}
+            onTopScore={handleTopScore}
+            onEngineMoves={handleEngineMoves}
+            arrows={arrows}
+          />
         )}
       </main>
-
-      <footer className="border-t border-rule py-6 text-center text-xs text-ink-mute">
-        Conversion runs entirely in your browser — your games never leave this page.
-      </footer>
     </div>
   )
 }

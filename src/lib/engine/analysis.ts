@@ -45,6 +45,16 @@ export const CLASSIFICATION_SYMBOL: Record<Classification, string> = {
   blunder: '??',
 }
 
+/**
+ * Whether a classification earns a marker in the move list and on the board.
+ * "Good" is deliberately silent: it is the unremarkable case, and marking it
+ * added noise without telling the reader anything. The Move Classification tab
+ * still counts and labels it.
+ */
+export function hasMoveMarker(classification: Classification): boolean {
+  return classification !== 'good'
+}
+
 /** Win-percent-loss thresholds (mover's perspective). */
 const EXCELLENT_MAX = 2
 const GOOD_MAX = 5

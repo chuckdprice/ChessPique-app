@@ -14,6 +14,8 @@ interface EnginePanelProps {
   onSettingsChange: (next: EngineSettings) => void
   /** Latest top-line score (white POV) for the eval bar; null when idle. */
   onTopScore?: (score: import('../lib/engine/uci').Score | null) => void
+  /** First UCI move of each line, best first — drives the board arrows. */
+  onFirstMoves?: (ucis: string[]) => void
 }
 
 /** Format a PV as numbered SAN from the given position, e.g. "9... e4 10. Ne1 h5". */
@@ -39,6 +41,7 @@ export default function EnginePanel({
   settings,
   onSettingsChange,
   onTopScore,
+  onFirstMoves,
 }: EnginePanelProps) {
   const engineRef = useRef<Engine | null>(null)
   const [update, setUpdate] = useState<AnalyzeUpdate | null>(null)
@@ -46,12 +49,15 @@ export default function EnginePanel({
   const lastFlush = useRef(0)
   const onTopScoreRef = useRef(onTopScore)
   onTopScoreRef.current = onTopScore
+  const onFirstMovesRef = useRef(onFirstMoves)
+  onFirstMovesRef.current = onFirstMoves
 
   // Live analysis loop: restart on position, toggle, or settings change.
   useEffect(() => {
     if (!enabled) {
       engineRef.current?.stop()
       onTopScoreRef.current?.(null)
+      onFirstMovesRef.current?.([])
       return
     }
     let cancelled = false
@@ -80,6 +86,9 @@ export default function EnginePanel({
             lastFlush.current = now
             setUpdate(u)
             onTopScoreRef.current?.(u.lines[0]?.score ?? null)
+            onFirstMovesRef.current?.(
+              u.lines.map((line) => line.pvUci[0]).filter((uci): uci is string => !!uci),
+            )
           }
         },
       })
@@ -130,8 +139,18 @@ export default function EnginePanel({
           {enabled && topLine ? formatScore(topLine.score) : '—'}
         </span>
 
+        {/* Search depth gets its own non-shrinking badge so it is never clipped. */}
+        {enabled && (
+          <span
+            title="Search depth reached for this position"
+            className="shrink-0 rounded bg-buff-soft px-1.5 py-0.5 font-score text-xs font-semibold tabular-nums"
+          >
+            d{update?.depth ?? '—'}
+          </span>
+        )}
+
         <span className="min-w-0 flex-1 truncate text-xs text-ink-mute">
-          {ENGINE_NAME} · WASM{enabled && update ? ` · d${update.depth}` : ''}
+          {ENGINE_NAME} · WASM
         </span>
 
         <button
@@ -174,13 +193,16 @@ export default function EnginePanel({
           {(update?.lines ?? []).map((line) => (
             <li
               key={line.multipv}
-              className="truncate py-1 font-score text-xs"
-              title={numberedLine(fen, line.pvSan)}
+              className="flex items-baseline gap-2 py-0.5 font-score text-xs"
+              title={`depth ${line.depth}: ${numberedLine(fen, line.pvSan)}`}
             >
-              <span className="mr-2 inline-block w-10 font-semibold tabular-nums">
+              <span className="w-10 shrink-0 font-semibold tabular-nums">
                 {formatScore(line.score)}
               </span>
-              <span className="text-ink-mute">{numberedLine(fen, line.pvSan)}</span>
+              <span className="w-7 shrink-0 text-[10px] text-ink-mute tabular-nums">
+                d{line.depth}
+              </span>
+              <span className="truncate text-ink-mute">{numberedLine(fen, line.pvSan)}</span>
             </li>
           ))}
           {!update && (

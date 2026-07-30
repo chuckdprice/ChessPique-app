@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { Move } from '../lib/convert'
-import { CLASSIFICATION_SYMBOL } from '../lib/engine/analysis'
+import { CLASSIFICATION_SYMBOL, hasMoveMarker } from '../lib/engine/analysis'
 import type { GameAnalysis } from '../lib/engine/analysis'
 import { classColor } from './ClassBadge'
 
@@ -55,7 +55,7 @@ export default function MoveTable({ moves, result, ply, onPlyChange, analysis }:
         style={current ? undefined : { color }}
       >
         {cell.san}
-        {moveAnalysis && (
+        {moveAnalysis && hasMoveMarker(moveAnalysis.classification) && (
           <span
             className="ml-1 text-[10px] font-bold"
             style={current ? undefined : { color }}
@@ -71,13 +71,12 @@ export default function MoveTable({ moves, result, ply, onPlyChange, analysis }:
   return (
     <section
       aria-label="Moves"
-      className="flex flex-col rounded-xl border border-rule bg-card shadow-sm"
+      className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-rule bg-card shadow-sm"
     >
-      <div className="border-b border-rule px-4 py-3">
-        <h2 className="font-display text-base font-semibold">Moves</h2>
-        <p className="mt-0.5 text-xs text-ink-mute">Click a move to show it on the board.</p>
+      <div className="shrink-0 border-b border-rule px-4 py-2">
+        <h2 className="font-display text-sm font-semibold">Moves</h2>
       </div>
-      <div className="max-h-[560px] flex-1 overflow-y-auto px-2 py-2">
+      <div className="min-h-0 flex-1 overflow-y-auto px-2 py-1">
         <table className="w-full border-collapse">
           <thead>
             <tr className="text-xs uppercase tracking-wide text-ink-mute">

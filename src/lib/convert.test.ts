@@ -8,7 +8,7 @@ import {
   parseClockTime,
   parseTimecontrolHeader,
 } from './convert'
-import { buildChartRows, replayGame } from './gameModel'
+import { buildChartRows, clockAtPly, replayGame } from './gameModel'
 
 const root = join(__dirname, '..', '..')
 const samplePgn = readFileSync(
@@ -91,6 +91,28 @@ describe('convertPgn on the ChessNoteR sample game', () => {
   it('replays cleanly to checkmate', () => {
     const { fens } = replayGame(result.moves)
     expect(fens).toHaveLength(58)
+  })
+
+  it('reports each side’s remaining clock at a given ply', () => {
+    const { moves } = result
+    const start = result.timeControl.startSeconds // 4200
+
+    // Before anyone has moved, both clocks read the full time control.
+    expect(clockAtPly(moves, 0, 'w', start)).toBe(4200)
+    expect(clockAtPly(moves, 0, 'b', start)).toBe(4200)
+
+    // After White's 1. d4 (ply 1), Black still has the full clock.
+    expect(clockAtPly(moves, 1, 'w', start)).toBe(moves[0].clkSeconds)
+    expect(clockAtPly(moves, 1, 'b', start)).toBe(4200)
+
+    // Mid-game: each side shows its own most recent clock.
+    const ply = 16 // after 8... Ng4
+    expect(clockAtPly(moves, ply, 'w', start)).toBe(4020) // 8. Ne5 anchor {1:07:00}
+    expect(clockAtPly(moves, ply, 'b', start)).toBe(moves[15].clkSeconds)
+
+    // Past the final move, the last known clock persists for both.
+    expect(clockAtPly(moves, moves.length, 'w', start)).toBe(1607) // 29. Qb7# 0:26:47
+    expect(clockAtPly(moves, moves.length, 'b', start)).toBe(3013) // 28... Kb8 0:50:13
   })
 
   it('builds one chart row per move number', () => {

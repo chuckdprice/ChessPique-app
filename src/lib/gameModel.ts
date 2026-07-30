@@ -35,6 +35,22 @@ export function replayGame(moves: Move[]): ReplayedGame {
   return { fens, lastMoveSquares, ucis }
 }
 
+/**
+ * A side's remaining clock at the given ply: the clock after their most recent
+ * move at or before `ply`, or the starting time before they have moved.
+ */
+export function clockAtPly(
+  moves: Move[],
+  ply: number,
+  color: 'w' | 'b',
+  startSeconds: number,
+): number {
+  for (let i = Math.min(ply, moves.length) - 1; i >= 0; i--) {
+    if (moves[i].color === color) return moves[i].clkSeconds ?? startSeconds
+  }
+  return startSeconds
+}
+
 export interface ChartRow {
   moveNumber: number
   whiteSan: string | null

@@ -8,14 +8,14 @@ ChessNoteR writes elapsed-move-time comments like `{[%emt 0:01:23]}` and occasio
 clock readings like `{56:00}`. This app converts them into one `{[%clk h:mm:ss]}` comment
 per move, normalizes the `TimeControl` tag (for example `G70/d10` → `4200d10`), and lets you:
 
-The app is a three-step flow shown as chevron tabs across the top — **PGN Up/Download → PGN Tags →
-Game Analysis** — sized so a 1440×900 desktop window needs no scrolling on any step.
+The app is a two-step flow shown as chevron tabs across the top — **PGN File → Game Analysis** —
+sized so a 1440×900 desktop window needs no scrolling on either step.
 
-- **PGN Up/Download**: paste a PGN or upload/drop the `.pgn` file (uploads convert immediately).
-  The source PGN sits on the left and the converted `%clk` PGN on the right, with buttons to
-  download it or copy it straight to the clipboard.
-- **PGN Tags**: edit every PGN tag; changes flow live into the converted PGN, the download,
-  and the clipboard copy.
+- **PGN File**: everything file-related on one screen. PGN tags are edited on the left, where
+  changes flow live into the converted PGN, the download, and the clipboard copy. The right
+  side holds two tabs: *Original PGN*, where you paste a PGN or upload/drop the `.pgn` file
+  (uploads convert immediately), and *Converted PGN*, showing the `%clk` output with buttons
+  to download it or copy it straight to the clipboard.
 - **Game Analysis**: board, engine, move list, and charts in one screen.
 
 On the analysis page you can:
@@ -30,8 +30,8 @@ On the analysis page you can:
   move actually played highlighted in gold
 - Review the game with Stockfish 18: an eval bar beside the board, per-move classification
   (Best, Inaccuracy → Blunder; Good and Excellent stay unmarked) in the move list, on the board
-  and as dots on the evaluation graph, and three analysis tabs — Evaluation,
-  Move Classification, and Move Times
+  and as dots on the evaluation graph, and four analysis tabs — Evaluation,
+  Phase Accuracy, Move Classification, and Move Times
 - Turn on the live engine panel for a continuously updating evaluation of the current
   position, with configurable search time, number of lines, and memory
 - Download the converted PGN with your edited tags

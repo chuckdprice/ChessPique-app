@@ -1,17 +1,16 @@
-export type Page = 'upload' | 'tags' | 'analysis'
+export type Page = 'pgn' | 'analysis'
 
 interface StepNavProps {
   page: Page
   onPageChange: (page: Page) => void
-  /** Tags and Analysis are unreachable until a game has been converted. */
+  /** Analysis is unreachable until a game has been converted. */
   gameLoaded: boolean
   /** 0-100 while the engine review runs; null when idle or finished. */
   analysisPercent: number | null
 }
 
 const STEPS: Array<{ id: Page; label: string }> = [
-  { id: 'upload', label: 'PGN Up/Download' },
-  { id: 'tags', label: 'PGN Tags' },
+  { id: 'pgn', label: 'PGN File' },
   { id: 'analysis', label: 'Game Analysis' },
 ]
 
@@ -41,7 +40,7 @@ export default function StepNav({
     <nav aria-label="Steps" className="flex select-none">
       {STEPS.map((step, i) => {
         const active = page === step.id
-        const disabled = step.id !== 'upload' && !gameLoaded
+        const disabled = step.id === 'analysis' && !gameLoaded
         return (
           <button
             key={step.id}

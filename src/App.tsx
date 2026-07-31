@@ -2,10 +2,9 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import type { Arrow } from 'react-chessboard'
 import AppearanceMenu from './components/AppearanceSettings'
 import BrandMark from './components/BrandMark'
-import PgnInput from './components/PgnInput'
+import PgnFilePage from './components/PgnFilePage'
 import StepNav from './components/StepNav'
 import type { Page } from './components/StepNav'
-import TagEditor from './components/TagEditor'
 import { buildPgn, convertPgn } from './lib/convert'
 import type { ConvertOptions, ConvertResult } from './lib/convert'
 import { analyzeGame, PLAYED_LIKE_MAE } from './lib/engine/analysis'
@@ -53,8 +52,8 @@ export default function App() {
   const [game, setGame] = useState<LoadedGame | null>(null)
   const [headers, setHeaders] = useState<Array<{ name: string; value: string }>>([])
   const [ply, setPly] = useState(0)
-  const [page, setPage] = useState<Page>('upload')
-  // Source PGN lives here, not in PgnInput, so switching pages does not lose it.
+  const [page, setPage] = useState<Page>('pgn')
+  // Source PGN lives here, not in PgnFilePage, so switching pages does not lose it.
   const [sourceText, setSourceText] = useState('')
   const [sourceFileName, setSourceFileName] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -110,9 +109,13 @@ export default function App() {
       setPage('analysis')
     } catch (e) {
       setGame(null)
+      // The tags belonged to the game that just went away, and the tag pane is
+      // now always on screen — left alone they would sit there looking editable
+      // while feeding a converted PGN that no longer exists.
+      setHeaders([])
       const message = e instanceof Error ? e.message : String(e)
       setError(message)
-      setPage('upload')
+      setPage('pgn')
       if (message.includes('starting clock')) setOverridesOpen(true)
     }
   }
@@ -150,6 +153,10 @@ export default function App() {
       signal.cancelled = true
     }
   }, [game])
+
+  const handleHeaderChange = useCallback((index: number, value: string) => {
+    setHeaders((prev) => prev.map((h, i) => (i === index ? { ...h, value } : h)))
+  }, [])
 
   const handleTopScore = useCallback((score: Score | null) => setLiveScore(score), [])
   const handleEngineMoves = useCallback((ucis: string[]) => setEngineMoves(ucis), [])
@@ -311,8 +318,8 @@ export default function App() {
           } as React.CSSProperties
         }
       >
-        {page === 'upload' && (
-          <PgnInput
+        {page === 'pgn' && (
+          <PgnFilePage
             onConvert={handleConvert}
             error={error}
             text={sourceText}
@@ -321,19 +328,10 @@ export default function App() {
             onSourceFileNameChange={setSourceFileName}
             convertedPgn={convertedPgn}
             downloadName={downloadName}
+            headers={headers}
+            onHeaderChange={handleHeaderChange}
             overridesOpen={overridesOpen}
             onOverridesOpenChange={setOverridesOpen}
-          />
-        )}
-
-        {page === 'tags' && game && convertedPgn && (
-          <TagEditor
-            headers={headers}
-            onChange={(index, value) =>
-              setHeaders((prev) => prev.map((h, i) => (i === index ? { ...h, value } : h)))
-            }
-            pgn={convertedPgn}
-            downloadName={downloadName}
           />
         )}
 

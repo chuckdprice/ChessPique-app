@@ -5,8 +5,9 @@ import type { ChartRow } from '../lib/gameModel'
 import ClassificationTable from './ClassificationTable'
 import ClockChart from './ClockChart'
 import EvalChart from './EvalChart'
+import PhaseAccuracyTable from './PhaseAccuracyTable'
 
-type Tab = 'evaluation' | 'classification' | 'times'
+type Tab = 'evaluation' | 'phases' | 'classification' | 'times'
 
 interface AnalysisTabsProps {
   analysis: GameAnalysis | null
@@ -26,6 +27,7 @@ interface AnalysisTabsProps {
 
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'evaluation', label: 'Evaluation' },
+  { id: 'phases', label: 'Phase Accuracy' },
   { id: 'classification', label: 'Move Classification' },
   { id: 'times', label: 'Move Times' },
 ]
@@ -97,11 +99,14 @@ export default function AnalysisTabs({
       <div className="min-h-0 flex-1 overflow-y-auto py-2">
         {tab === 'evaluation' &&
           (analysis ? (
-            <EvalChart
+            <EvalChart analysis={analysis} moves={moves} ply={ply} onPlyChange={onPlyChange} />
+          ) : (
+            <AnalysisPending progress={progress} error={analysisError} />
+          ))}
+        {tab === 'phases' &&
+          (analysis ? (
+            <PhaseAccuracyTable
               analysis={analysis}
-              moves={moves}
-              ply={ply}
-              onPlyChange={onPlyChange}
               whiteName={whiteName}
               blackName={blackName}
             />

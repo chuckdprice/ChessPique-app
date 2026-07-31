@@ -13,7 +13,8 @@ import type { ChartRow } from '../lib/gameModel'
 
 interface ClockChartProps {
   rows: ChartRow[]
-  startSeconds: number
+  /** Null when the PGN carried no time control to scale the clock axis by. */
+  startSeconds: number | null
   whiteName: string
   blackName: string
   /** Render without the outer card chrome (for use inside the analysis tabs). */
@@ -67,7 +68,7 @@ function ChartTooltip({ active, payload, whiteName, blackName }: TooltipContentP
         />
         <span className="font-score">{san}</span>
         <span className="text-ink-mute">
-          {name} · spent {formatMinSec(emt ?? 0)} · left{' '}
+          {name} · spent {emt != null ? formatMinSec(emt) : '—'} · left{' '}
           {clk != null ? formatClockTime(clk) : '—'}
         </span>
       </div>
@@ -75,8 +76,8 @@ function ChartTooltip({ active, payload, whiteName, blackName }: TooltipContentP
   return (
     <div className="rounded-lg border border-rule bg-card px-3 py-2 text-xs shadow-md">
       <p className="font-semibold">Move {row.moveNumber}</p>
-      {side(whiteName, row.whiteSan, row.whiteClk, row.whiteEmt, WHITE_FILL)}
-      {side(blackName, row.blackSan, row.blackClk, row.blackEmt, BLACK_FILL)}
+      {side(whiteName, row.whiteSan, row.whiteClk, row.whiteSpent, WHITE_FILL)}
+      {side(blackName, row.blackSan, row.blackClk, row.blackSpent, BLACK_FILL)}
     </div>
   )
 }
@@ -88,10 +89,28 @@ export default function ClockChart({
   blackName,
   embedded = false,
 }: ClockChartProps) {
+  const hasClocks = rows.some((r) => r.whiteClk != null || r.blackClk != null)
+  const hasSpent = rows.some((r) => r.whiteSpent != null || r.blackSpent != null)
+  // Without a declared time control the axis still has to reach the highest
+  // clock the game actually shows.
   const maxClock = Math.max(
-    startSeconds,
+    startSeconds ?? 0,
     ...rows.flatMap((r) => [r.whiteClk ?? 0, r.blackClk ?? 0]),
   )
+
+  if (!hasClocks && !hasSpent) {
+    return (
+      <section
+        aria-label="Clock chart"
+        className={embedded ? '' : 'rounded-xl border border-rule bg-card shadow-sm'}
+      >
+        <p className="px-6 py-10 text-center text-sm text-ink-mute">
+          This PGN has no clock times, so there is nothing to chart. Everything else on the
+          analysis page still works.
+        </p>
+      </section>
+    )
+  }
 
   const legendItem = (label: string, swatch: string, shape: 'line' | 'bar') => (
     <span className="flex items-center gap-1.5">
@@ -197,23 +216,31 @@ export default function ClockChart({
               content={<ChartTooltip whiteName={whiteName} blackName={blackName} />}
               cursor={{ fill: 'var(--chart-grid)', fillOpacity: 0.45 }}
             />
+            {/*
+              Animation off, as on the eval chart. The engine review re-renders
+              this chart once per reviewed position, which restarts the grow-in
+              animation every time — for a long game the bars sit at their
+              zero-height first frame for the whole review and read as missing.
+            */}
             <Bar
               yAxisId="emt"
-              dataKey="whiteEmt"
+              dataKey="whiteSpent"
               fill={WHITE_FILL}
               stroke={WHITE_COLOR}
               strokeWidth={1}
               radius={[3, 3, 0, 0]}
               maxBarSize={14}
+              isAnimationActive={false}
             />
             <Bar
               yAxisId="emt"
-              dataKey="blackEmt"
+              dataKey="blackSpent"
               fill={BLACK_FILL}
               stroke="var(--black-series-stroke)"
               strokeWidth={1}
               radius={[3, 3, 0, 0]}
               maxBarSize={14}
+              isAnimationActive={false}
             />
             <Line
               yAxisId="clock"
@@ -223,6 +250,7 @@ export default function ClockChart({
               strokeWidth={2}
               dot={false}
               activeDot={{ r: 4 }}
+              isAnimationActive={false}
             />
             <Line
               yAxisId="clock"
@@ -232,6 +260,7 @@ export default function ClockChart({
               strokeWidth={2}
               dot={false}
               activeDot={{ r: 4 }}
+              isAnimationActive={false}
             />
           </ComposedChart>
         </ResponsiveContainer>

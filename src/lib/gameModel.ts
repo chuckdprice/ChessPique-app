@@ -43,8 +43,8 @@ export function clockAtPly(
   moves: Move[],
   ply: number,
   color: 'w' | 'b',
-  startSeconds: number,
-): number {
+  startSeconds: number | null,
+): number | null {
   for (let i = Math.min(ply, moves.length) - 1; i >= 0; i--) {
     if (moves[i].color === color) return moves[i].clkSeconds ?? startSeconds
   }
@@ -106,8 +106,9 @@ export interface ChartRow {
   blackSan: string | null
   whiteClk: number | null
   blackClk: number | null
-  whiteEmt: number | null
-  blackEmt: number | null
+  /** Time spent on the move — from %emt, or reconstructed from the clock. */
+  whiteSpent: number | null
+  blackSpent: number | null
 }
 
 /** Group per-ply timing data into one row per integer move number. */
@@ -122,19 +123,19 @@ export function buildChartRows(moves: Move[]): ChartRow[] {
         blackSan: null,
         whiteClk: null,
         blackClk: null,
-        whiteEmt: null,
-        blackEmt: null,
+        whiteSpent: null,
+        blackSpent: null,
       }
       byNumber.set(move.number, row)
     }
     if (move.color === 'w') {
       row.whiteSan = move.san
       row.whiteClk = move.clkSeconds
-      row.whiteEmt = move.emtSeconds
+      row.whiteSpent = move.spentSeconds
     } else {
       row.blackSan = move.san
       row.blackClk = move.clkSeconds
-      row.blackEmt = move.emtSeconds
+      row.blackSpent = move.spentSeconds
     }
   }
   return [...byNumber.values()].sort((a, b) => a.moveNumber - b.moveNumber)

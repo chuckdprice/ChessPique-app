@@ -156,3 +156,83 @@ describe('convertPgn edge cases', () => {
     expect(() => convertPgn('[Event "x"]\n[TimeControl "G5"]\n\n')).toThrow(ConvertError)
   })
 })
+
+describe('PGNs that already carry %clk', () => {
+  const clkOnly = [
+    '[TimeControl "4200d10"]',
+    '',
+    '1. d4 {[%clk 1:10:00]} d5 {[%clk 1:09:48]}',
+    '2. Nf3 {[%clk 1:09:56]} e6 {[%clk 1:09:33]}',
+    '*',
+  ].join('\n')
+
+  it('keeps the anchored clocks', () => {
+    const { moves } = convertPgn(clkOnly)
+    expect(moves.map((m) => m.clkSeconds)).toEqual([4200, 4188, 4196, 4173])
+  })
+
+  it('reconstructs time spent from the clock drop plus the delay', () => {
+    const { moves } = convertPgn(clkOnly)
+    // White never moved the clock on move 1, so the move cost at most the delay.
+    expect(moves[0].spentSeconds).toBe(10)
+    // Black dropped 12s on top of the 10s delay.
+    expect(moves[1].spentSeconds).toBe(4200 - 4188 + 10)
+    // White dropped 4s from 4200 the next move.
+    expect(moves[2].spentSeconds).toBe(4200 - 4196 + 10)
+    expect(moves[3].spentSeconds).toBe(4188 - 4173 + 10)
+  })
+
+  it('adds the increment back when reconstructing', () => {
+    const pgn = ['[TimeControl "300+30"]', '', '1. e4 {[%clk 0:05:20]} *'].join('\n')
+    const { moves } = convertPgn(pgn)
+    // Clock rose 20s under a 30s increment, so the move took 10s.
+    expect(moves[0].spentSeconds).toBe(300 - 320 + 30)
+  })
+
+  it('prefers an explicit %emt over the reconstruction', () => {
+    const pgn = [
+      '[TimeControl "4200d10"]',
+      '',
+      '1. d4 {[%emt 0:00:25]} {[%clk 1:09:35]} *',
+    ].join('\n')
+    const { moves } = convertPgn(pgn)
+    expect(moves[0].spentSeconds).toBe(25)
+  })
+
+  it('needs no time control when every clock is an anchor', () => {
+    const pgn = '1. d4 {[%clk 1:10:00]} d5 {[%clk 1:09:48]} *'
+    const { moves, timeControl } = convertPgn(pgn)
+    expect(timeControl).toBeNull()
+    expect(moves[0].clkSeconds).toBe(4200)
+  })
+})
+
+describe('PGNs with no timing at all', () => {
+  const bare = '[Event "Bare"]\n[Result "*"]\n\n1. d4 d5 2. Nf3 Nf6 *'
+
+  it('converts without a time control instead of throwing', () => {
+    const { moves, timeControl, warnings } = convertPgn(bare)
+    expect(timeControl).toBeNull()
+    expect(moves).toHaveLength(4)
+    expect(warnings).toEqual([])
+    expect(moves.every((m) => m.clkSeconds == null)).toBe(true)
+    expect(moves.every((m) => m.spentSeconds == null)).toBe(true)
+  })
+
+  it('emits no %clk comments', () => {
+    const { pgn } = convertPgn(bare)
+    expect(pgn).not.toContain('%clk')
+    expect(pgn).toContain('1. d4 d5')
+  })
+
+  it('stays unclocked even when a TimeControl header is present', () => {
+    const pgn = '[TimeControl "4200d10"]\n\n1. d4 d5 *'
+    const { moves, pgn: out } = convertPgn(pgn)
+    expect(moves.every((m) => m.clkSeconds == null)).toBe(true)
+    expect(out).not.toContain('%clk')
+  })
+
+  it('still refuses a bare %emt game with no starting clock', () => {
+    expect(() => convertPgn('1. e4 {[%emt 0:00:30]} *')).toThrow(ConvertError)
+  })
+})

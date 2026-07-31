@@ -11,7 +11,8 @@ export interface PlayerPlate {
   name: string
   /** Overall game accuracy, ready to print — e.g. "(87.3%)". */
   accuracy: string | null
-  clock: number
+  /** Remaining clock, or null when the PGN has no clock times. */
+  clock: number | null
 }
 
 interface BoardViewerProps {
@@ -55,12 +56,14 @@ export function PlayerPlateRow({
           {plate.accuracy}
         </span>
       )}
-      <span
-        className="ml-auto shrink-0 rounded bg-buff-soft px-2 py-0.5 font-score text-sm font-semibold tabular-nums"
-        aria-label={`${color === 'w' ? 'White' : 'Black'} clock`}
-      >
-        {formatClockTime(plate.clock)}
-      </span>
+      {plate.clock != null && (
+        <span
+          className="ml-auto shrink-0 rounded bg-buff-soft px-2 py-0.5 font-score text-sm font-semibold tabular-nums"
+          aria-label={`${color === 'w' ? 'White' : 'Black'} clock`}
+        >
+          {formatClockTime(plate.clock)}
+        </span>
+      )}
     </div>
   )
 }

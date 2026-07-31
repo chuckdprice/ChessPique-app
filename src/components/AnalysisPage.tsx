@@ -75,7 +75,10 @@ export default function AnalysisPage({
 }: AnalysisPageProps) {
   const [orientation, setOrientation] = useState<'white' | 'black'>('white')
   const lastPly = replay.fens.length - 1
-  const startSeconds = result.timeControl.startSeconds
+  // A game with no clocks anywhere shows none: falling back to the time control
+  // would pin a full starting clock beside both players for every move.
+  const hasClocks = moves.some((m) => m.clkSeconds != null)
+  const startSeconds = hasClocks ? (result.timeControl?.startSeconds ?? null) : null
 
   // Accuracy needs the whole review, so it stays a placeholder until then.
   const accuracyLabel = (accuracy: number | undefined) =>

@@ -27,6 +27,12 @@ export interface Move {
   emtSeconds: number | null
   anchorClockSeconds: number | null
   clkSeconds: number | null
+  /**
+   * Time this move took. Comes straight from %emt when the PGN has one, and is
+   * otherwise reconstructed from the clock; null when the PGN carries no timing
+   * at all. See deriveSpentTimes.
+   */
+  spentSeconds: number | null
 }
 
 export type TimeControlMode = 'delay' | 'increment' | 'none'
@@ -51,7 +57,8 @@ export interface ConvertResult {
   headers: Array<{ name: string; value: string }>
   moves: Move[]
   result: string | null
-  timeControl: TimeControl
+  /** Null when the PGN has no timing data and no time control was supplied. */
+  timeControl: TimeControl | null
   warnings: string[]
 }
 
@@ -181,10 +188,16 @@ export function timeControlHeaderValue(tc: TimeControl): string {
   return String(tc.startSeconds)
 }
 
+/**
+ * @param requireStart Whether a starting clock is needed to convert this game.
+ *   Only %emt moves need one to count down from; a PGN whose clocks are all
+ *   %clk anchors, or which has no timing at all, converts without it.
+ */
 function resolveTimecontrol(
   headers: Map<string, string>,
   options: ConvertOptions,
-): TimeControl {
+  requireStart: boolean,
+): TimeControl | null {
   const headerValue = headers.get('TimeControl')
   const detected = headerValue ? parseTimecontrolHeader(headerValue) : null
 
@@ -197,15 +210,18 @@ function resolveTimecontrol(
     startSeconds = detected.startSeconds
   }
 
-  if (startSeconds == null) {
-    throw new ConvertError(
-      'Could not determine the starting clock time from the TimeControl header. ' +
-        'Enter the time control manually below.',
-    )
-  }
-
   if (options.delay != null && options.increment != null) {
     throw new ConvertError('Use either a delay or an increment, not both.')
+  }
+
+  if (startSeconds == null) {
+    if (requireStart) {
+      throw new ConvertError(
+        'Could not determine the starting clock time from the TimeControl header. ' +
+          'Enter the time control manually below.',
+      )
+    }
+    return null
   }
 
   if (options.delay != null) {
@@ -323,6 +339,7 @@ export function parseMoves(movetext: string): {
       emtSeconds,
       anchorClockSeconds,
       clkSeconds: null,
+      spentSeconds: null,
     })
 
     if (sideToMove === 'w') {
@@ -362,28 +379,75 @@ export function applyTimeRule(
   return previousClock - emtSeconds
 }
 
-export function calculateClocks(moves: Move[], tc: TimeControl): string[] {
-  const clocks: Record<'w' | 'b', number> = { w: tc.startSeconds, b: tc.startSeconds }
+export function calculateClocks(moves: Move[], tc: TimeControl | null): string[] {
+  const clocks: Record<'w' | 'b', number | null> = {
+    w: tc?.startSeconds ?? null,
+    b: tc?.startSeconds ?? null,
+  }
   const warnings: string[] = []
 
   for (const move of moves) {
+    const running = clocks[move.color]
     if (move.anchorClockSeconds != null) {
       move.clkSeconds = move.anchorClockSeconds
-    } else if (move.emtSeconds != null) {
-      move.clkSeconds = applyTimeRule(clocks[move.color], move.emtSeconds, tc)
-    } else {
-      move.clkSeconds = clocks[move.color]
+    } else if (move.emtSeconds != null && running != null && tc) {
+      move.clkSeconds = applyTimeRule(running, move.emtSeconds, tc)
+    } else if (running != null) {
+      move.clkSeconds = running
       warnings.push(
         `Move ${move.number}${move.color === 'w' ? '.' : '...'} ${move.san} ` +
           'had no %emt or clock anchor; reused previous clock.',
       )
+    } else {
+      // Nothing to count down from yet — leave this move unclocked.
+      move.clkSeconds = null
     }
 
-    clocks[move.color] = Math.max(0, move.clkSeconds)
-    move.clkSeconds = clocks[move.color]
+    if (move.clkSeconds != null) {
+      move.clkSeconds = Math.max(0, move.clkSeconds)
+      clocks[move.color] = move.clkSeconds
+    }
   }
 
   return warnings
+}
+
+/**
+ * Fill in how long each move took.
+ *
+ * A %emt comment is authoritative. Otherwise the time is reconstructed from how
+ * far that player's clock fell, plus the delay or increment: a real clock only
+ * starts draining once the delay is used up, and pays the increment back after
+ * the move, so the drop alone understates the move by exactly that bonus.
+ *
+ * Under a delay this cannot tell an instant move from one that burned the whole
+ * delay — both leave the clock untouched — so an unmoved clock reads as the full
+ * delay. That is an upper bound, not a measurement.
+ *
+ * Note this is the physical clock's behaviour, not the inverse of applyTimeRule,
+ * which subtracts the entire elapsed time once it exceeds the delay. Round-trip
+ * of a PGN this app converted will therefore not reproduce the original %emt.
+ */
+export function deriveSpentTimes(moves: Move[], tc: TimeControl | null): void {
+  const previous: Record<'w' | 'b', number | null> = {
+    w: tc?.startSeconds ?? null,
+    b: tc?.startSeconds ?? null,
+  }
+  const bonus =
+    tc && (tc.mode === 'delay' || tc.mode === 'increment') ? tc.amountSeconds : 0
+
+  for (const move of moves) {
+    if (move.emtSeconds != null) {
+      move.spentSeconds = move.emtSeconds
+    } else {
+      const prev = previous[move.color]
+      move.spentSeconds =
+        prev != null && move.clkSeconds != null
+          ? Math.max(0, prev - move.clkSeconds + bonus)
+          : null
+    }
+    if (move.clkSeconds != null) previous[move.color] = move.clkSeconds
+  }
 }
 
 function updateTimecontrolHeader(headerLines: string[], value: string): string[] {
@@ -406,22 +470,28 @@ function updateTimecontrolHeader(headerLines: string[], value: string): string[]
 }
 
 export function formatMovetext(moves: Move[], result: string | null): string {
+  // An unclocked move is written bare rather than stamped with a made-up time.
+  const withClock = (move: Move) =>
+    move.clkSeconds == null
+      ? move.san
+      : `${move.san} {[%clk ${formatClockTime(move.clkSeconds)}]}`
+
   const rows: string[] = []
   let i = 0
   while (i < moves.length) {
     const move = moves[i]
     let row: string
     if (move.color === 'w') {
-      row = `${move.number}. ${move.san} {[%clk ${formatClockTime(move.clkSeconds ?? 0)}]}`
+      row = `${move.number}. ${withClock(move)}`
       const next = moves[i + 1]
       if (next && next.number === move.number && next.color === 'b') {
-        row += ` ${next.san} {[%clk ${formatClockTime(next.clkSeconds ?? 0)}]}`
+        row += ` ${withClock(next)}`
         i += 2
       } else {
         i += 1
       }
     } else {
-      row = `${move.number}... ${move.san} {[%clk ${formatClockTime(move.clkSeconds ?? 0)}]}`
+      row = `${move.number}... ${withClock(move)}`
       i += 1
     }
     rows.push(row)
@@ -451,18 +521,36 @@ export function buildPgn(
 export function convertPgn(text: string, options: ConvertOptions = {}): ConvertResult {
   const { headerLines, movetext } = splitHeadersAndMovetext(text)
   const headers = headerDict(headerLines)
-  const tc = resolveTimecontrol(headers, options)
+  // Moves are parsed before the time control is resolved, because whether a
+  // starting clock is needed at all depends on what timing the moves carry.
   const { moves, result: parsedResult } = parseMoves(movetext)
 
   if (moves.length === 0) {
     throw new ConvertError('No moves found in the PGN. Check the input format.')
   }
 
-  const warnings = calculateClocks(moves, tc)
+  const timed = moves.some((m) => m.emtSeconds != null || m.anchorClockSeconds != null)
+  // %clk anchors are absolute, so only an %emt move needs a clock to count down.
+  const needsStart = moves.some((m) => m.anchorClockSeconds == null && m.emtSeconds != null)
+  const tc = resolveTimecontrol(headers, options, needsStart)
+
+  let warnings: string[] = []
+  if (timed) {
+    warnings = calculateClocks(moves, tc)
+  } else {
+    // A move list with no timing anywhere stays unclocked, even when the file
+    // declares a TimeControl: stamping every move with the same starting time
+    // would look like real data.
+    for (const move of moves) move.clkSeconds = null
+  }
+  deriveSpentTimes(moves, tc)
+
   const result = parsedResult ?? headers.get('Result') ?? null
 
-  const tcValue = options.timecontrol || timeControlHeaderValue(tc)
-  const updatedHeaderLines = updateTimecontrolHeader(headerLines, tcValue)
+  const tcValue = options.timecontrol || (tc ? timeControlHeaderValue(tc) : null)
+  const updatedHeaderLines = tcValue
+    ? updateTimecontrolHeader(headerLines, tcValue)
+    : headerLines
 
   const orderedHeaders: Array<{ name: string; value: string }> = []
   for (const line of updatedHeaderLines) {

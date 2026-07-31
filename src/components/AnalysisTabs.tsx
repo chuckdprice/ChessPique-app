@@ -17,7 +17,7 @@ interface AnalysisTabsProps {
   ply: number
   onPlyChange: (ply: number) => void
   chartRows: ChartRow[]
-  startSeconds: number
+  startSeconds: number | null
   whiteName: string
   blackName: string
   whiteElo: string | null

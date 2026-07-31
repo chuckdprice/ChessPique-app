@@ -53,6 +53,23 @@ function ClassDot(props: { cx?: number; cy?: number; index?: number; payload?: E
   )
 }
 
+/**
+ * One tick per move number, stepping by 2 once a game is long enough that every
+ * move would crowd the axis.
+ *
+ * The axis is plotted in plies, so a tick goes on the ply carrying that move's
+ * white half — move m is plies 2m-1 and 2m — which puts the label under the
+ * point it names. Left to itself recharts picks round *ply* numbers, which land
+ * on arbitrary move numbers like 1, 8, 15, 23.
+ */
+function moveTicks(plyCount: number): number[] {
+  const lastMove = Math.max(1, Math.ceil(plyCount / 2))
+  const step = lastMove <= 30 ? 1 : 2
+  const ticks: number[] = []
+  for (let move = 1; move <= lastMove; move += step) ticks.push(move * 2 - 1)
+  return ticks
+}
+
 function moveLabel(moves: Move[], ply: number): string {
   if (ply === 0) return 'Start'
   const move = moves[ply - 1]
@@ -109,6 +126,7 @@ export default function EvalChart({ analysis, moves, ply, onPlyChange }: EvalCha
             dataKey="ply"
             type="number"
             domain={[0, rows.length - 1]}
+            ticks={moveTicks(rows.length - 1)}
             tickFormatter={(p: number) => String(Math.max(1, Math.ceil(p / 2)))}
             tick={{ fontSize: 11, fill: 'var(--chart-tick)' }}
             tickLine={false}

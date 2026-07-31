@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Arrow } from 'react-chessboard'
-import AnalysisPage from './components/AnalysisPage'
 import AppearanceMenu from './components/AppearanceSettings'
 import BrandMark from './components/BrandMark'
 import PgnInput from './components/PgnInput'
@@ -22,6 +21,14 @@ import {
   watchSystemTheme,
 } from './lib/settings'
 import type { AppearanceSettings, EngineSettings } from './lib/settings'
+
+// The analysis page owns every heavy dependency in the app — recharts for the
+// eval and clock charts, react-chessboard for the board — and none of it is
+// reachable from the upload page. Loading it on demand keeps those out of the
+// first download; the effect below warms the chunk so the page is already in
+// memory by the time a conversion finishes.
+const loadAnalysisPage = () => import('./components/AnalysisPage')
+const AnalysisPage = lazy(loadAnalysisPage)
 
 interface LoadedGame {
   result: ConvertResult
@@ -71,6 +78,18 @@ export default function App() {
     saveAppearance(appearance)
   }, [appearance])
   useEffect(() => watchSystemTheme(() => appearanceRef.current), [])
+
+  // Fetch the analysis chunk once the browser is idle, while the user is still
+  // pasting or picking a PGN, so Convert never waits on a network round trip.
+  useEffect(() => {
+    const warm = () => void loadAnalysisPage()
+    if (typeof requestIdleCallback === 'function') {
+      const id = requestIdleCallback(warm)
+      return () => cancelIdleCallback(id)
+    }
+    const id = setTimeout(warm, 1000)
+    return () => clearTimeout(id)
+  }, [])
 
   const handleConvert = (text: string, options: ConvertOptions) => {
     try {
@@ -319,31 +338,43 @@ export default function App() {
         )}
 
         {page === 'analysis' && game && (
-          <AnalysisPage
-            result={game.result}
-            replay={game.replay}
-            moves={game.result.moves}
-            ply={ply}
-            onPlyChange={setPly}
-            analysis={analysis}
-            analysisProgress={analysisProgress}
-            analysisError={analysisError}
-            chartRows={chartRows}
-            whiteName={whiteName}
-            blackName={blackName}
-            whiteElo={whiteElo}
-            blackElo={blackElo}
-            accuracyTooltip={accuracyTooltip}
-            playedLikeTooltip={playedLikeTooltip}
-            evalScore={evalScore}
-            engineOn={engineOn}
-            onEngineOnChange={setEngineOn}
-            engineSettings={engineSettings}
-            onEngineSettingsChange={setEngineSettings}
-            onTopScore={handleTopScore}
-            onEngineMoves={handleEngineMoves}
-            arrows={arrows}
-          />
+          <Suspense
+            fallback={
+              <div
+                role="status"
+                aria-live="polite"
+                className="flex flex-1 items-center justify-center text-sm text-ink-mute"
+              >
+                Loading the analysis board…
+              </div>
+            }
+          >
+            <AnalysisPage
+              result={game.result}
+              replay={game.replay}
+              moves={game.result.moves}
+              ply={ply}
+              onPlyChange={setPly}
+              analysis={analysis}
+              analysisProgress={analysisProgress}
+              analysisError={analysisError}
+              chartRows={chartRows}
+              whiteName={whiteName}
+              blackName={blackName}
+              whiteElo={whiteElo}
+              blackElo={blackElo}
+              accuracyTooltip={accuracyTooltip}
+              playedLikeTooltip={playedLikeTooltip}
+              evalScore={evalScore}
+              engineOn={engineOn}
+              onEngineOnChange={setEngineOn}
+              engineSettings={engineSettings}
+              onEngineSettingsChange={setEngineSettings}
+              onTopScore={handleTopScore}
+              onEngineMoves={handleEngineMoves}
+              arrows={arrows}
+            />
+          </Suspense>
         )}
       </main>
     </div>

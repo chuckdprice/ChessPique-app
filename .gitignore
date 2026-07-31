@@ -4,4 +4,7 @@ public/stockfish
 *.local
 .DS_Store
 .vercel
+# Games land in the repo root as they are converted; only the test fixtures
+# are version controlled.
 *.pgn
+!src/lib/__fixtures__/*.pgn

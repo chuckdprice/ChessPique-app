@@ -10,12 +10,12 @@ import {
 } from './convert'
 import { buildChartRows, clockAtPly, replayGame } from './gameModel'
 
-const root = join(__dirname, '..', '..')
+const fixtures = join(__dirname, '__fixtures__')
 const samplePgn = readFileSync(
-  join(root, 'Price-Lopez-DCC July Tuesday Tournament-4-2026.07.28.pgn'),
+  join(fixtures, 'Price-Lopez-DCC July Tuesday Tournament-4-2026.07.28.pgn'),
   'utf-8',
 )
-const expectedPgn = readFileSync(join(root, 'converted_game.pgn'), 'utf-8')
+const expectedPgn = readFileSync(join(fixtures, 'converted_game.pgn'), 'utf-8')
 
 describe('parseClockTime', () => {
   it('parses h:mm:ss', () => {

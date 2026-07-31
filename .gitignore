@@ -4,3 +4,4 @@ public/stockfish
 *.local
 .DS_Store
 .vercel
+*.pgn

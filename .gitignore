@@ -4,6 +4,16 @@ public/stockfish
 *.local
 .DS_Store
 .vercel
+
+# Secrets. Vite inlines any VITE_-prefixed variable into the client bundle, so
+# anything in here is only as private as the build it produces — a key that has
+# to stay secret belongs on a server, not in an env file read at build time.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets.json
 # Games land in the repo root as they are converted; only the test fixtures
 # are version controlled.
 *.pgn

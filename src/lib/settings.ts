@@ -19,7 +19,7 @@ export interface EngineSettings {
 
 export const ACCENTS: Accent[] = ['green', 'blue', 'purple', 'orange', 'red']
 
-export const DEFAULT_APPEARANCE: AppearanceSettings = { theme: 'system', accent: 'green' }
+export const DEFAULT_APPEARANCE: AppearanceSettings = { theme: 'system', accent: 'blue' }
 export const DEFAULT_ENGINE: EngineSettings = { searchTimeSec: 8, multiPv: 3, hashMb: 128 }
 
 const APPEARANCE_KEY = 'chessnoter.appearance'
@@ -38,7 +38,7 @@ function load<T>(key: string, fallback: T): T {
 export function loadAppearance(): AppearanceSettings {
   const a = load(APPEARANCE_KEY, DEFAULT_APPEARANCE)
   if (!['light', 'dark', 'system'].includes(a.theme)) a.theme = 'system'
-  if (!ACCENTS.includes(a.accent)) a.accent = 'green'
+  if (!ACCENTS.includes(a.accent)) a.accent = DEFAULT_APPEARANCE.accent
   return a
 }
 

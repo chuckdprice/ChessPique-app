@@ -1,7 +1,8 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Arrow } from 'react-chessboard'
-import AppearanceMenu from './components/AppearanceSettings'
+import AppMenu from './components/AppMenu'
 import BrandMark from './components/BrandMark'
+import HelpDialog from './components/HelpDialog'
 import PgnFilePage from './components/PgnFilePage'
 import StepNav from './components/StepNav'
 import type { Page } from './components/StepNav'
@@ -58,6 +59,7 @@ export default function App() {
   const [sourceFileName, setSourceFileName] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [overridesOpen, setOverridesOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
   const [appearance, setAppearance] = useState<AppearanceSettings>(loadAppearance)
   const [engineSettings, setEngineSettings] = useState<EngineSettings>(loadEngineSettings)
   const [engineOn, setEngineOn] = useState(false)
@@ -163,7 +165,7 @@ export default function App() {
 
   // Arrow-key navigation on the analysis page, except while typing in a field.
   useEffect(() => {
-    if (!game || page !== 'analysis') return
+    if (!game || page !== 'analysis' || helpOpen) return
     const lastPly = game.replay.fens.length - 1
     const onKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement
@@ -191,7 +193,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [game, page])
+  }, [game, page, helpOpen])
 
   const chartRows = useMemo(() => (game ? buildChartRows(game.result.moves) : []), [game])
 
@@ -289,13 +291,11 @@ export default function App() {
               Copyright (c) 2026, Chuck Price
             </p>
           </div>
-          <span
-            className="shrink-0 rounded-full bg-buff/15 px-2.5 py-1 font-score text-xs"
-            title="Application version"
-          >
-            v{__APP_VERSION__}
-          </span>
-          <AppearanceMenu value={appearance} onChange={setAppearance} />
+          <AppMenu
+            value={appearance}
+            onChange={setAppearance}
+            onOpenHelp={() => setHelpOpen(true)}
+          />
         </div>
       </header>
 
@@ -375,6 +375,8 @@ export default function App() {
           </Suspense>
         )}
       </main>
+
+      {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}
     </div>
   )
 }

@@ -158,6 +158,23 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               One game is a weak signal. Treat the number as a rough indicator, not a measurement.
             </p>
           </Section>
+
+          <Section title="Bugs and suggestions">
+            <p>
+              Click <Ui>Chuck Price</Ui> in the header, just under the title, to open my Lichess
+              profile — then use <Ui>Send message</Ui> there to reach my inbox. Sending one needs a
+              Lichess account of your own.
+            </p>
+            <p>
+              For a bug, the most useful thing you can include is the PGN that caused it and what
+              you expected to happen instead. Copy it from the <Ui>Original PGN</Ui> tab and paste
+              it into the message; if a clock or a chart looked wrong, say which move.
+            </p>
+            <p>
+              Suggestions are just as welcome, including ones about wording, layout, or anything
+              here that was confusing to read.
+            </p>
+          </Section>
         </div>
       </div>
     </div>

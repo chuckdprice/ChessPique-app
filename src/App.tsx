@@ -285,10 +285,34 @@ export default function App() {
           <BrandMark />
           <div className="min-w-0 flex-1">
             <h1 className="font-display text-xl font-semibold leading-tight tracking-tight">
-              ChessNoteR Game Analysis
+              {/* Only the device's name links out; "Game Analysis" is this app. */}
+              <a
+                href="https://chessnoter.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="ChessNoteR — chessnoter.com"
+                className="underline-offset-4 hover:underline"
+              >
+                ChessNoteR
+              </a>{' '}
+              Game Analysis
             </h1>
             <p className="text-[11px] leading-tight text-buff/70">
-              Copyright (c) 2026, Chuck Price
+              Copyright (c) 2026,{' '}
+              {/*
+                Underlined at rest rather than only on hover: this is the only
+                route for bug reports, so it has to read as a link before anyone
+                thinks to hover over it.
+              */}
+              <a
+                href="https://lichess.org/@/DragonBeard"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Chuck Price on Lichess — message me with bugs or suggestions"
+                className="text-buff underline decoration-buff/40 underline-offset-2 transition-colors hover:decoration-buff"
+              >
+                Chuck Price
+              </a>
             </p>
           </div>
           <AppMenu

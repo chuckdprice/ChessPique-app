@@ -8,11 +8,30 @@ interface PgnActionsProps {
 }
 
 /**
- * Lichess accepts a plain form post of a PGN, with `analyse` asking it to queue
- * a computer analysis — the same fields its own import page submits. Posting a
- * form rather than fetching sidesteps CORS and needs no API key or account.
+ * Lichess's API import endpoint, not the /import the web form posts to: that
+ * one rejects cross-origin posts with "Cross origin request forbidden". This
+ * one sets permissive CORS and takes an anonymous post, so no key or account
+ * is needed. It answers with JSON only when asked to.
+ *
+ * It has no equivalent of the web form's `analyse` checkbox — passing one is
+ * accepted and then ignored, and there is no public endpoint to request an
+ * analysis afterwards, so that stays a click on the game page.
  */
-const LICHESS_IMPORT_URL = 'https://lichess.org/import'
+const LICHESS_IMPORT_API = 'https://lichess.org/api/import'
+
+/**
+ * Lichess only understands increment time controls. Handed a delay one like
+ * `4200d10` it gives up on the whole header — the game arrives with
+ * `TimeControl "-"` and every %clk comment stripped, which is the one thing
+ * this app exists to produce.
+ *
+ * Rewriting the tag to `4200+0` keeps the clocks. The delay is not lost in any
+ * meaningful sense: it was already spent when the clock values were computed,
+ * and Lichess has no way to represent it regardless.
+ */
+function forLichess(pgn: string): string {
+  return pgn.replace(/^\[TimeControl "(\d+)d\d+"\]$/m, '[TimeControl "$1+0"]')
+}
 
 /**
  * Chess.com's analysis board reads the game from a `pgn` query parameter. A
@@ -67,12 +86,19 @@ const ExternalIcon = () => (
 /** Copy, download, and hand-off-to-an-analysis-site buttons for the PGN. */
 export default function PgnActions({ pgn, fileName, compact = false }: PgnActionsProps) {
   const [copied, setCopied] = useState(false)
+  const [lichess, setLichess] = useState<'idle' | 'importing' | 'error'>('idle')
 
   useEffect(() => {
     if (!copied) return
     const timer = setTimeout(() => setCopied(false), 1800)
     return () => clearTimeout(timer)
   }, [copied])
+
+  useEffect(() => {
+    if (lichess !== 'error') return
+    const timer = setTimeout(() => setLichess('idle'), 4000)
+    return () => clearTimeout(timer)
+  }, [lichess])
 
   const download = () => {
     const blob = new Blob([pgn], { type: 'application/x-chess-pgn' })
@@ -107,30 +133,38 @@ export default function PgnActions({ pgn, fileName, compact = false }: PgnAction
     }
   }
 
-  const openLichess = () => {
-    const form = document.createElement('form')
-    form.method = 'POST'
-    form.action = LICHESS_IMPORT_URL
-    form.target = '_blank'
-    form.rel = 'noopener'
-    form.style.display = 'none'
+  const openLichess = async () => {
+    if (lichess === 'importing') return
 
-    // A textarea, not an input: the PGN is multi-line and an input would
-    // collapse it to the first line.
-    const pgnField = document.createElement('textarea')
-    pgnField.name = 'pgn'
-    pgnField.value = pgn
-    form.appendChild(pgnField)
+    // The tab has to be opened synchronously inside the click. Opening it after
+    // the request resolves puts it outside the user gesture and popup blockers
+    // stop it. Dropping `opener` keeps lichess.org from reaching back here.
+    const tab = window.open('about:blank', '_blank')
+    if (tab) tab.opener = null
+    setLichess('importing')
 
-    const analyse = document.createElement('input')
-    analyse.type = 'hidden'
-    analyse.name = 'analyse'
-    analyse.value = 'on'
-    form.appendChild(analyse)
+    try {
+      const res = await fetch(LICHESS_IMPORT_API, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          // Without this the endpoint answers with its HTML page instead.
+          Accept: 'application/json',
+        },
+        body: new URLSearchParams({ pgn: forLichess(pgn) }),
+      })
+      if (!res.ok) throw new Error(`Lichess returned ${res.status}`)
+      const game = (await res.json()) as { url?: string }
+      if (!game.url) throw new Error('No game URL in the response')
 
-    document.body.appendChild(form)
-    form.submit()
-    document.body.removeChild(form)
+      if (tab) tab.location.href = game.url
+      else window.open(game.url, '_blank', 'noopener,noreferrer')
+      setLichess('idle')
+    } catch {
+      // Leaving a blank tab open would look like the import worked.
+      tab?.close()
+      setLichess('error')
+    }
   }
 
   const openChessCom = () => {
@@ -165,11 +199,12 @@ export default function PgnActions({ pgn, fileName, compact = false }: PgnAction
       <button
         type="button"
         onClick={openLichess}
-        title="Import to lichess.org in a new tab and request a computer analysis"
-        className={button}
+        disabled={lichess === 'importing'}
+        title="Import to lichess.org in a new tab, then request its computer analysis from the game page"
+        className={`${button} disabled:cursor-not-allowed disabled:opacity-70`}
       >
         <ExternalIcon />
-        Lichess
+        {lichess === 'importing' ? 'Importing…' : lichess === 'error' ? 'Import failed' : 'Lichess'}
       </button>
       <button
         type="button"

@@ -171,8 +171,11 @@ export default function PgnActions({ pgn, fileName, compact = false }: PgnAction
     const build = (text: string) => `${CHESSCOM_ANALYSIS_URL}?pgn=${encodeURIComponent(text)}`
     let url = build(pgn)
     if (url.length > MAX_URL_CHARS) {
-      // Drop the clock comments rather than the game: they are the bulk of the
-      // text, and chess.com's analysis board does not surface them anyway.
+      // Last resort for a marathon game: the comments are the bulk of the text,
+      // so dropping them is the difference between a usable board and a URL the
+      // browser refuses. It is a real loss though — chess.com reads these and
+      // shows a per-move time beside each move — so it only happens up here at
+      // the limit, never on a normal game.
       url = build(pgn.replace(/\s*\{\[%clk[^}]*\}/g, ''))
     }
     window.open(url, '_blank', 'noopener,noreferrer')

@@ -165,8 +165,12 @@ export default function AppMenu({ value, onChange, onOpenHelp }: AppMenuProps) {
           </div>
 
           <div className="border-t border-rule px-4 py-2 text-center">
-            <span className="font-score text-xs text-ink-mute" title="Application version">
+            <span
+              className="font-score text-xs text-ink-mute"
+              title={`Version ${__APP_VERSION__}, built from commit ${__APP_COMMIT__}. The last number is the commit count.`}
+            >
               v{__APP_VERSION__}
+              <span className="ml-1.5 opacity-70">{__APP_COMMIT__}</span>
             </span>
           </div>
         </div>

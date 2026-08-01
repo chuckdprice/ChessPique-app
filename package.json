@@ -11,6 +11,7 @@
     "postinstall": "node scripts/copy-stockfish.mjs"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "chess.js": "^1.4.0",
     "react": "^19.1.0",

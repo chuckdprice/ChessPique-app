@@ -279,7 +279,10 @@ export default function App() {
     `so treat it as a rough indicator rather than a measurement.`
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden">
+    // Phones scroll: the analysis page stacks taller than any handset, and
+    // pinning it to the viewport just clipped the parts you could not reach.
+    // From lg up the original fixed-height, no-scroll layout is kept.
+    <div className="flex min-h-dvh flex-col lg:h-dvh lg:overflow-hidden">
       <header className="shrink-0 bg-felt text-buff">
         <div className="mx-auto flex max-w-[1600px] items-center gap-4 px-4 py-2.5 sm:px-6">
           <BrandMark />
@@ -338,7 +341,14 @@ export default function App() {
           {
             // Board fills the height left over by header, steps, plates, nav
             // and charts, so the analysis page fits without scrolling.
-            '--board-size': 'clamp(280px, calc(100dvh - 470px), 560px)',
+            //
+            // The min() caps it by width as well. Height alone was enough on a
+            // desktop but not on a phone, where a board sized off a tall
+            // viewport ran past the screen edge, taking the eval bar and
+            // captured strip with it. On wide screens the width term is far
+            // larger than the height term, so this changes nothing there.
+            '--board-size':
+              'min(calc(100vw - 7rem), clamp(240px, calc(100dvh - 470px), 560px))',
           } as React.CSSProperties
         }
       >

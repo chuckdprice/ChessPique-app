@@ -31,8 +31,11 @@ const TABS: Array<{ id: PgnTab; label: string }> = [
   { id: 'converted', label: 'Converted PGN' },
 ]
 
+// min-h keeps the box readable on a phone, where the pane is only as tall as
+// its content and flex-1 would otherwise leave it a couple of lines high. On
+// desktop the pane has a fixed height and flex-1 wins, so this never binds.
 const PANE_CLASS =
-  'w-full min-h-0 flex-1 resize-none rounded-lg border border-rule bg-buff-soft/60 px-3 py-2 font-score text-[12px] leading-relaxed placeholder:text-ink-mute/60'
+  'w-full min-h-48 flex-1 resize-none rounded-lg border border-rule bg-buff-soft/60 px-3 py-2 font-score text-[12px] leading-relaxed placeholder:text-ink-mute/60 lg:min-h-0'
 
 export default function PgnFilePage({
   onConvert,

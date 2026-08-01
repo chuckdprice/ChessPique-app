@@ -76,7 +76,7 @@ export default function AnalysisTabs({
       <div
         role="tablist"
         aria-label="Analysis views"
-        className="flex shrink-0 gap-1 border-b border-rule px-3 pt-1.5"
+        className="flex shrink-0 gap-1 overflow-x-auto border-b border-rule px-3 pt-1.5"
       >
         {TABS.map((t) => (
           <button
@@ -85,7 +85,7 @@ export default function AnalysisTabs({
             role="tab"
             aria-selected={tab === t.id}
             onClick={() => setTab(t.id)}
-            className={`rounded-t-lg border-b-2 px-4 py-1.5 text-sm font-medium transition-colors ${
+            className={`shrink-0 whitespace-nowrap rounded-t-lg border-b-2 px-4 py-1.5 text-sm font-medium transition-colors ${
               tab === t.id
                 ? 'border-felt-bright text-ink'
                 : 'border-transparent text-ink-mute hover:text-ink'

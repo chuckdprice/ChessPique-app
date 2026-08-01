@@ -105,28 +105,17 @@ export default function AnalysisPage({
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       {reviewing && <AnalysisProgress progress={analysisProgress} error={analysisError} />}
 
-      <div
-        className="grid min-h-0 flex-1 gap-x-3 gap-y-1"
-        style={{
-          gridTemplateColumns: 'auto var(--board-size) auto minmax(15rem, 1fr)',
-          // The plate rows are fixed rather than auto: the right column spans
-          // rows 1-3, and an auto row would stretch to fit its content instead
-          // of ending level with the player names.
-          gridTemplateRows: '2rem var(--board-size) 2rem auto minmax(0, 1fr)',
-        }}
-      >
-        {/* Column 2, row 1 — plate above the board */}
-        <div className="min-w-0" style={{ gridColumn: 2, gridRow: 1 }}>
+      {/* Shape lives in .analysis-grid in index.css so it can change at lg. */}
+      <div className="analysis-grid min-h-0 lg:flex-1">
+        <div className="area-plate-top min-w-0">
           <PlayerPlateRow plate={topPlate} color={topColor} accuracyTooltip={accuracyTooltip} />
         </div>
 
-        {/* Column 1, row 2 — eval bar beside the board */}
-        <div style={{ gridColumn: 1, gridRow: 2 }} className="flex">
+        <div className="area-eval-bar flex">
           <EvalBar score={evalScore} orientation={orientation} />
         </div>
 
-        {/* Column 2, row 2 — the board */}
-        <div style={{ gridColumn: 2, gridRow: 2 }}>
+        <div className="area-board">
           <BoardViewer
             replay={replay}
             ply={ply}
@@ -136,17 +125,14 @@ export default function AnalysisPage({
           />
         </div>
 
-        {/* Column 3, row 2 — captured material, centred on the board */}
-        <div style={{ gridColumn: 3, gridRow: 2 }}>
+        <div className="area-captured">
           <CapturedStrip fen={replay.fens[ply]} orientation={orientation} />
         </div>
 
-        {/* Column 4, rows 1-3 — so the engine pane's top lines up with the top
-            player's name and the move list's bottom with the bottom player's. */}
-        <div
-          className="flex min-h-0 flex-col gap-2 overflow-hidden"
-          style={{ gridColumn: 4, gridRow: '1 / span 3' }}
-        >
+        {/* On lg this spans rows 1-3, so the engine pane's top lines up with the
+            top player's name and the move list's bottom with the bottom one's.
+            On a phone it sits below the board at natural height. */}
+        <div className="area-side flex min-h-0 flex-col gap-2 lg:overflow-hidden">
           <EnginePanel
             fen={replay.fens[ply]}
             enabled={engineOn}
@@ -165,8 +151,7 @@ export default function AnalysisPage({
           />
         </div>
 
-        {/* Column 2, row 3 — plate below the board */}
-        <div className="min-w-0" style={{ gridColumn: 2, gridRow: 3 }}>
+        <div className="area-plate-bottom min-w-0">
           <PlayerPlateRow
             plate={bottomPlate}
             color={bottomColor}
@@ -174,8 +159,7 @@ export default function AnalysisPage({
           />
         </div>
 
-        {/* Column 2, row 4 — navigation, centred under the board */}
-        <div style={{ gridColumn: 2, gridRow: 4 }} className="flex justify-center pt-1">
+        <div className="area-nav flex justify-center pt-1">
           <BoardNav
             moves={moves}
             ply={ply}
@@ -186,8 +170,8 @@ export default function AnalysisPage({
           />
         </div>
 
-        {/* Row 5 — charts, spanning the full width so the edges line up */}
-        <div style={{ gridColumn: '1 / -1', gridRow: 5 }} className="min-h-0">
+        {/* Charts, spanning the full width so the edges line up */}
+        <div className="area-tabs min-h-0">
           <AnalysisTabs
             analysis={analysis}
             progress={analysisProgress}

@@ -185,7 +185,9 @@ export default function PgnActions({ pgn, fileName, compact = false }: PgnAction
   const button = `inline-flex items-center gap-1.5 rounded-lg bg-felt font-medium text-buff shadow-sm transition-colors hover:bg-felt-deep ${size}`
 
   return (
-    <div className="flex shrink-0 flex-wrap items-center gap-2">
+    /* No shrink-0: it stopped the row being squeezed to the available width,
+       so flex-wrap never engaged and the last button ran off a phone screen. */
+    <div className="flex flex-wrap items-center gap-2">
       <button type="button" onClick={copy} title="Copy the PGN to the clipboard" className={button}>
         {copied ? <CheckIcon /> : <CopyIcon />}
         {copied ? 'Copied' : 'Copy'}

@@ -185,3 +185,70 @@ body {
   outline: 2px solid var(--accent-bright);
   outline-offset: 2px;
 }
+
+/*
+ * Analysis page layout.
+ *
+ * This lives here rather than as inline styles on the component because it has
+ * to change shape at a breakpoint, and inline styles cannot. Children claim a
+ * named area, so neither layout hard-codes row or column numbers.
+ *
+ * Phones stack: the board keeps the eval bar and captured strip beside it, and
+ * everything else goes underneath in reading order. The engine and move list
+ * move below the board rather than sitting in a fourth column no phone is wide
+ * enough to show.
+ */
+.analysis-grid {
+  display: grid;
+  gap: 0.25rem 0.75rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "plate-top    plate-top    plate-top"
+    "eval-bar     board        captured"
+    "plate-bottom plate-bottom plate-bottom"
+    "nav          nav          nav"
+    "side         side         side"
+    "tabs         tabs         tabs";
+}
+
+/*
+ * Landscape phones and small tablets. Wide enough for the move list beside the
+ * board, which matters most here: in landscape there is very little height, so
+ * stacking would push everything below the fold.
+ */
+@media (min-width: 640px) {
+  .analysis-grid {
+    grid-template-columns: auto auto auto minmax(11rem, 1fr);
+    grid-template-areas:
+      ".        plate-top    .        side"
+      "eval-bar board        captured side"
+      ".        plate-bottom .        side"
+      ".        nav          .        side"
+      "tabs     tabs         tabs     tabs";
+  }
+}
+
+@media (min-width: 1024px) {
+  .analysis-grid {
+    /* The plate rows are fixed rather than auto: the side column spans rows
+       1-3, and an auto row would stretch to fit its content instead of ending
+       level with the player names. */
+    grid-template-columns: auto var(--board-size) auto minmax(15rem, 1fr);
+    grid-template-rows: 2rem var(--board-size) 2rem auto minmax(0, 1fr);
+    grid-template-areas:
+      ".        plate-top    .        side"
+      "eval-bar board        captured side"
+      ".        plate-bottom .        side"
+      ".        nav          .        ."
+      "tabs     tabs         tabs     tabs";
+  }
+}
+
+.area-plate-top { grid-area: plate-top; }
+.area-eval-bar { grid-area: eval-bar; }
+.area-board { grid-area: board; }
+.area-captured { grid-area: captured; }
+.area-side { grid-area: side; }
+.area-plate-bottom { grid-area: plate-bottom; }
+.area-nav { grid-area: nav; }
+.area-tabs { grid-area: tabs; }

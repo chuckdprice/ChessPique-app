@@ -42,6 +42,9 @@ export default function MoveTable({
   const listRef = useRef<HTMLDivElement>(null)
   const currentRef = useRef<HTMLButtonElement>(null)
 
+  /** Rows of the game kept visible above the current move. */
+  const CONTEXT_ROWS = 2
+
   /**
    * Keep the current move in view by scrolling the list itself.
    *
@@ -60,11 +63,14 @@ export default function MoveTable({
     // from the wrong origin.
     const listBox = list.getBoundingClientRect()
     const moveBox = current.getBoundingClientRect()
-    if (moveBox.top < listBox.top) {
-      list.scrollTop += moveBox.top - listBox.top
-    } else if (moveBox.bottom > listBox.bottom) {
-      list.scrollTop += moveBox.bottom - listBox.bottom
-    }
+
+    // Park the move near the top with a couple of rows of the game still above
+    // it, rather than only nudging it barely into view. Stepping forward then
+    // advances the list a row at a time and what comes next is already on
+    // screen. Clamping is left to the browser: at the start of the game there
+    // is nothing above to show, and at the end nothing below.
+    const target = list.scrollTop + (moveBox.top - listBox.top) - CONTEXT_ROWS * moveBox.height
+    list.scrollTop = Math.max(0, target)
   }, [ply])
 
   const rows: Row[] = []

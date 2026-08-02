@@ -326,7 +326,7 @@ export default function App() {
         </div>
       </header>
 
-      <div className="mx-auto w-full max-w-[1600px] shrink-0 px-4 pt-2 sm:px-6">
+      <div className="app-steps mx-auto w-full max-w-[1600px] shrink-0 px-4 pt-2 sm:px-6">
         <StepNav
           page={page}
           onPageChange={setPage}

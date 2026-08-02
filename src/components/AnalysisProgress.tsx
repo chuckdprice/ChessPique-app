@@ -26,7 +26,7 @@ export default function AnalysisProgress({ progress, error }: AnalysisProgressPr
     <div
       role="status"
       aria-live="polite"
-      className="flex items-center gap-3 rounded-lg border border-rule bg-card px-3 py-1.5"
+      className="app-banner flex items-center gap-3 rounded-lg border border-rule bg-card px-3 py-1.5"
     >
       <span className="shrink-0 text-xs font-medium">
         Reviewing with Stockfish 18

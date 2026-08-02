@@ -169,25 +169,27 @@ export function BoardNav({
       {/* Fixed widths so the row never reflows as move names change length. */}
       <button
         type="button"
+        data-nav-step="prev"
         className={`${button} flex w-28 items-center gap-1.5 font-score text-xs`}
         onClick={() => onPlyChange(Math.max(0, ply - 1))}
         disabled={ply === 0}
         aria-label={prevLabel ? `Previous move: ${prevLabel}` : 'Back to starting position'}
       >
         <span aria-hidden="true">‹</span>
-        <span className="truncate">{prevLabel ?? 'Start'}</span>
+        <span data-nav-label className="truncate">{prevLabel ?? 'Start'}</span>
       </button>
-      <span className="w-24 shrink-0 truncate rounded-md bg-felt px-2 py-1.5 text-center font-score text-xs font-semibold text-buff">
+      <span data-nav-current className="w-24 shrink-0 truncate rounded-md bg-felt px-2 py-1.5 text-center font-score text-xs font-semibold text-buff">
         {currentLabel ?? 'Start'}
       </span>
       <button
         type="button"
+        data-nav-step="next"
         className={`${button} flex w-28 items-center justify-end gap-1.5 font-score text-xs`}
         onClick={() => onPlyChange(Math.min(lastPly, ply + 1))}
         disabled={ply === lastPly}
         aria-label={nextLabel ? `Next move: ${nextLabel}` : 'Next move'}
       >
-        <span className="truncate">{nextLabel ?? '—'}</span>
+        <span data-nav-label className="truncate">{nextLabel ?? '—'}</span>
         <span aria-hidden="true">›</span>
       </button>
       <button

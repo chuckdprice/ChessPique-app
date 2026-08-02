@@ -222,7 +222,7 @@ body {
        An auto track soaks up the spare width, and it did: in landscape the
        board column stretched to 467px around a 240px board while the move list
        was squeezed to 243px and had to scroll sideways to show Black's moves. */
-    grid-template-columns: auto var(--board-size) auto minmax(14rem, 1fr);
+    grid-template-columns: auto var(--board-size) auto minmax(12rem, 1fr);
     /* Every row the side column spans is pinned, never auto. An auto row lets
        the move list's full height be shared out across the rows it spans: the
        board block grew to 256px around a 165px board and pushed the nav off
@@ -277,14 +277,20 @@ body {
 }
 
 /*
- * Landscape phones have almost no height to give. Budget only for the header,
- * steps, plates and nav — the charts sit below the fold and scroll — and trim
- * those rows, so the board, both player names and the buttons are on screen
- * together instead of the buttons falling off the bottom.
+ * Landscape phones.
+ *
+ * The board block — both names, the board and the buttons — is sized to fill
+ * one screen on its own, so scrolling until the top name reaches the top puts
+ * the whole thing in view with the buttons last. The header and steps scroll
+ * away above it and the charts sit below; both are reachable, neither is
+ * charged against the board.
+ *
+ * The width term subtracts the board's own furniture plus the move list's
+ * minimum, so a board that grows can never squeeze the list out.
  */
 @media (max-height: 520px) {
   .app-main {
-    --board-size: min(calc(100vw - 7rem), max(150px, calc(100dvh - 187px)));
+    --board-size: min(calc(100vw - 20rem), max(180px, calc(100dvh - 95px)));
     padding-top: 0.15rem;
     padding-bottom: 0.15rem;
   }

@@ -218,7 +218,11 @@ body {
  */
 @media (min-width: 640px) {
   .analysis-grid {
-    grid-template-columns: auto auto auto minmax(11rem, 1fr);
+    /* The board track is pinned to the board's own size rather than left auto.
+       An auto track soaks up the spare width, and it did: in landscape the
+       board column stretched to 467px around a 240px board while the move list
+       was squeezed to 243px and had to scroll sideways to show Black's moves. */
+    grid-template-columns: auto var(--board-size) auto minmax(14rem, 1fr);
     grid-template-areas:
       ".        plate-top    .        side"
       "eval-bar board        captured side"

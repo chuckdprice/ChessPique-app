@@ -39,10 +39,32 @@ export default function MoveTable({
   onPlyChange,
   analysis,
 }: MoveTableProps) {
+  const listRef = useRef<HTMLDivElement>(null)
   const currentRef = useRef<HTMLButtonElement>(null)
 
+  /**
+   * Keep the current move in view by scrolling the list itself.
+   *
+   * scrollIntoView would be shorter, but it scrolls whichever ancestor happens
+   * to be scrollable — on a phone that is the page, so stepping through the
+   * game dragged the board off the top of the screen. Setting scrollTop can
+   * only ever move this list, and does nothing when it is not scrollable.
+   */
   useEffect(() => {
-    currentRef.current?.scrollIntoView({ block: 'nearest' })
+    const list = listRef.current
+    const current = currentRef.current
+    if (!list || !current) return
+
+    // Rects, not offsetTop: the move sits inside a table cell, so its
+    // offsetParent is that cell rather than this list and offsetTop measures
+    // from the wrong origin.
+    const listBox = list.getBoundingClientRect()
+    const moveBox = current.getBoundingClientRect()
+    if (moveBox.top < listBox.top) {
+      list.scrollTop += moveBox.top - listBox.top
+    } else if (moveBox.bottom > listBox.bottom) {
+      list.scrollTop += moveBox.bottom - listBox.bottom
+    }
   }, [ply])
 
   const rows: Row[] = []
@@ -131,9 +153,9 @@ export default function MoveTable({
   return (
     <section
       aria-label="Moves"
-      className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-rule bg-card shadow-sm"
+      className="flex max-h-80 min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-rule bg-card shadow-sm lg:max-h-none"
     >
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-1 pt-2">
+      <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-2 pb-1 pt-2">
         <table className="w-full border-collapse">
           <colgroup>
             <col className="w-8" />

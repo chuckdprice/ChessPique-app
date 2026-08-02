@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Arrow } from 'react-chessboard'
-import AppMenu from './components/AppMenu'
+import AppearanceMenu from './components/AppearanceMenu'
 import BrandMark from './components/BrandMark'
 import HelpDialog from './components/HelpDialog'
 import PgnFilePage from './components/PgnFilePage'
@@ -301,7 +301,11 @@ export default function App() {
               Game Analysis
             </h1>
             <p className="text-[11px] leading-tight text-buff/70">
-              Copyright (c) 2026,{' '}
+              <span className="font-score">v{__APP_VERSION__}</span>
+              <span aria-hidden="true" className="mx-1.5 text-buff/40">
+                |
+              </span>
+              (c) 2026{' '}
               {/*
                 Underlined at rest rather than only on hover: this is the only
                 route for bug reports, so it has to read as a link before anyone
@@ -318,11 +322,32 @@ export default function App() {
               </a>
             </p>
           </div>
-          <AppMenu
-            value={appearance}
-            onChange={setAppearance}
-            onOpenHelp={() => setHelpOpen(true)}
-          />
+
+          <div className="flex shrink-0 items-center gap-2">
+            <AppearanceMenu value={appearance} onChange={setAppearance} />
+            <button
+              type="button"
+              onClick={() => setHelpOpen(true)}
+              aria-label="How to use this app"
+              title="Help"
+              className="rounded-lg border border-buff/30 p-2 text-buff transition-colors hover:bg-buff/10"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                className="size-5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="9" />
+                <path d="M9.6 9.2a2.5 2.5 0 1 1 3.3 2.4c-.6.2-.9.7-.9 1.3v.4" />
+                <circle cx="12" cy="16.8" r="0.6" fill="currentColor" stroke="none" />
+              </svg>
+            </button>
+          </div>
         </div>
       </header>
 

@@ -40,17 +40,10 @@ const build = Number.isFinite(committedAt)
   : '0'
 const appVersion = `${major}.${minor}.${build}`
 
-// The commit is the unambiguous answer to "is my latest push live?" — the count
-// can repeat across branches, and a shallow CI clone undercounts. Vercel hands
-// the SHA over in the environment; locally, ask git.
-const commit =
-  process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? git('rev-parse', '--short', 'HEAD') ?? 'dev'
-
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   define: {
     __APP_VERSION__: JSON.stringify(appVersion),
-    __APP_COMMIT__: JSON.stringify(commit),
   },
   build: {
     rollupOptions: {

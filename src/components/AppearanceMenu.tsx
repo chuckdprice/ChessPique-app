@@ -2,10 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { ACCENTS } from '../lib/settings'
 import type { Accent, AppearanceSettings, ThemePreference } from '../lib/settings'
 
-interface AppMenuProps {
+interface AppearanceMenuProps {
   value: AppearanceSettings
   onChange: (next: AppearanceSettings) => void
-  onOpenHelp: () => void
 }
 
 const ACCENT_SWATCH: Record<Accent, string> = {
@@ -22,8 +21,8 @@ const THEMES: Array<{ id: ThemePreference; label: string; icon: string }> = [
   { id: 'system', label: 'System', icon: '💻' },
 ]
 
-/** Settings, help, and version, behind one button in the header. */
-export default function AppMenu({ value, onChange, onOpenHelp }: AppMenuProps) {
+/** Theme and accent, behind the palette button in the header. */
+export default function AppearanceMenu({ value, onChange }: AppearanceMenuProps) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
 
@@ -50,8 +49,8 @@ export default function AppMenu({ value, onChange, onOpenHelp }: AppMenuProps) {
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="menu"
-        aria-label="Settings and help"
-        title="Settings and help"
+        aria-label="Appearance settings"
+        title="Appearance"
         className="rounded-lg border border-buff/30 p-2 text-buff transition-colors hover:bg-buff/10"
       >
         <svg
@@ -64,9 +63,11 @@ export default function AppMenu({ value, onChange, onOpenHelp }: AppMenuProps) {
           strokeLinecap="round"
           strokeLinejoin="round"
         >
-          <path d="M4 7h16" />
-          <path d="M4 12h16" />
-          <path d="M4 17h16" />
+          <path d="M12 3a9 9 0 1 0 0 18c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16a5 5 0 0 0 5-5c0-4.42-4.03-8-9-8Z" />
+          <circle cx="6.5" cy="11.5" r="0.5" fill="currentColor" />
+          <circle cx="9.5" cy="7.5" r="0.5" fill="currentColor" />
+          <circle cx="14.5" cy="7.5" r="0.5" fill="currentColor" />
+          <circle cx="17.5" cy="11.5" r="0.5" fill="currentColor" />
         </svg>
       </button>
 
@@ -137,42 +138,6 @@ export default function AppMenu({ value, onChange, onOpenHelp }: AppMenuProps) {
             </div>
           </div>
 
-          <div className="border-t border-rule p-2">
-            <button
-              type="button"
-              onClick={() => {
-                setOpen(false)
-                onOpenHelp()
-              }}
-              className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left text-sm font-medium transition-colors hover:bg-buff-soft"
-            >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                className="size-4 shrink-0 text-ink-mute"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <circle cx="12" cy="12" r="9" />
-                <path d="M9.6 9.2a2.5 2.5 0 1 1 3.3 2.4c-.6.2-.9.7-.9 1.3v.4" />
-                <circle cx="12" cy="16.8" r="0.6" fill="currentColor" stroke="none" />
-              </svg>
-              How to use this app
-            </button>
-          </div>
-
-          <div className="border-t border-rule px-4 py-2 text-center">
-            <span
-              className="font-score text-xs text-ink-mute"
-              title={`Version ${__APP_VERSION__}, built from commit ${__APP_COMMIT__}. The last number is the commit count.`}
-            >
-              v{__APP_VERSION__}
-              <span className="ml-1.5 opacity-70">{__APP_COMMIT__}</span>
-            </span>
-          </div>
         </div>
       )}
     </div>

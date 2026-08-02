@@ -223,11 +223,19 @@ body {
        board column stretched to 467px around a 240px board while the move list
        was squeezed to 243px and had to scroll sideways to show Black's moves. */
     grid-template-columns: auto var(--board-size) auto minmax(14rem, 1fr);
+    /* Rows are pinned, not auto, for the same reason the desktop layout pins
+       them: the side column spans rows 1-3, so with auto rows the move list's
+       full height is shared out across them and the board block grew to 256px
+       around a 165px board, pushing the nav off the bottom. */
+    grid-template-rows: 1.75rem var(--board-size) 1.75rem auto minmax(0, 1fr);
+    /* The nav takes a row of its own rather than sitting in the board column.
+       Its buttons are ~467px wide against a 240px board, so in that column it
+       spilled sideways and landed on top of the move list. */
     grid-template-areas:
       ".        plate-top    .        side"
       "eval-bar board        captured side"
       ".        plate-bottom .        side"
-      ".        nav          .        side"
+      "nav      nav          nav      nav"
       "tabs     tabs         tabs     tabs";
   }
 }
@@ -256,3 +264,51 @@ body {
 .area-plate-bottom { grid-area: plate-bottom; }
 .area-nav { grid-area: nav; }
 .area-tabs { grid-area: tabs; }
+
+/*
+ * Board size.
+ *
+ * Normally the board takes the height left over by the header, steps, plates,
+ * nav and charts, capped by width so a tall narrow phone cannot push it past
+ * the screen edge.
+ */
+.app-main {
+  --board-size: min(calc(100vw - 7rem), clamp(240px, calc(100dvh - 470px), 560px));
+}
+
+/*
+ * Landscape phones have almost no height to give. Budget only for the header,
+ * steps, plates and nav — the charts sit below the fold and scroll — and trim
+ * those rows, so the board, both player names and the buttons are on screen
+ * together instead of the buttons falling off the bottom.
+ */
+@media (max-height: 520px) {
+  .app-main {
+    --board-size: min(calc(100vw - 7rem), max(150px, calc(100dvh - 235px)));
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+  }
+
+  .app-header > div {
+    padding-top: 0.35rem;
+    padding-bottom: 0.35rem;
+  }
+
+  /* The copyright line is the first thing worth losing for 16px of board. */
+  .app-header p {
+    display: none;
+  }
+
+  .analysis-grid {
+    row-gap: 0;
+  }
+
+  .area-plate-top,
+  .area-plate-bottom {
+    font-size: 0.8rem;
+  }
+
+  .area-nav {
+    padding-top: 0;
+  }
+}

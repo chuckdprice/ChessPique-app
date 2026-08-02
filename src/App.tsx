@@ -283,7 +283,7 @@ export default function App() {
     // pinning it to the viewport just clipped the parts you could not reach.
     // From lg up the original fixed-height, no-scroll layout is kept.
     <div className="flex min-h-dvh flex-col lg:h-dvh lg:overflow-hidden">
-      <header className="shrink-0 bg-felt text-buff">
+      <header className="app-header shrink-0 bg-felt text-buff">
         <div className="mx-auto flex max-w-[1600px] items-center gap-4 px-4 py-2.5 sm:px-6">
           <BrandMark />
           <div className="min-w-0 flex-1">
@@ -335,23 +335,9 @@ export default function App() {
         />
       </div>
 
-      <main
-        className="mx-auto flex w-full min-h-0 max-w-[1600px] flex-1 flex-col px-4 py-2 sm:px-6"
-        style={
-          {
-            // Board fills the height left over by header, steps, plates, nav
-            // and charts, so the analysis page fits without scrolling.
-            //
-            // The min() caps it by width as well. Height alone was enough on a
-            // desktop but not on a phone, where a board sized off a tall
-            // viewport ran past the screen edge, taking the eval bar and
-            // captured strip with it. On wide screens the width term is far
-            // larger than the height term, so this changes nothing there.
-            '--board-size':
-              'min(calc(100vw - 7rem), clamp(240px, calc(100dvh - 470px), 560px))',
-          } as React.CSSProperties
-        }
-      >
+      {/* --board-size lives in index.css: a short viewport needs a different
+          height budget, and a media query cannot reach an inline style. */}
+      <main className="app-main mx-auto flex w-full min-h-0 max-w-[1600px] flex-1 flex-col px-4 py-2 sm:px-6">
         {page === 'pgn' && (
           <PgnFilePage
             onConvert={handleConvert}

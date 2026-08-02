@@ -153,7 +153,7 @@ export default function MoveTable({
   return (
     <section
       aria-label="Moves"
-      className="flex max-h-80 min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-rule bg-card shadow-sm lg:max-h-none"
+      className="flex max-h-80 min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-rule bg-card shadow-sm sm:max-h-none"
     >
       <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-2 pb-1 pt-2">
         <table className="w-full border-collapse">

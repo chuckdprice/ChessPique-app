@@ -132,7 +132,10 @@ export default function AnalysisPage({
         {/* On lg this spans rows 1-3, so the engine pane's top lines up with the
             top player's name and the move list's bottom with the bottom one's.
             On a phone it sits below the board at natural height. */}
-        <div className="area-side flex min-h-0 flex-col gap-2 lg:overflow-hidden">
+        {/* overflow-hidden from sm up, where this spans the three board rows:
+            left to grow it stretches them, and the board block was 234px tall
+            around a 180px board with the nav pushed off the bottom. */}
+        <div className="area-side flex min-h-0 flex-col gap-2 sm:overflow-hidden">
           <EnginePanel
             fen={replay.fens[ply]}
             enabled={engineOn}

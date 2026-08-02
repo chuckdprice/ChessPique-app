@@ -17,11 +17,27 @@ function git(...args: string[]): string | null {
 }
 
 // Major and minor are set by hand in package.json; the patch field there is
-// ignored. The build number is the commit count, so it moves on its own with
-// every commit and tells you which push a running app was built from.
+// ignored.
 const { version } = JSON.parse(readFileSync('./package.json', 'utf-8')) as { version: string }
 const [major = '0', minor = '0'] = version.split('.')
-const build = git('rev-list', '--count', 'HEAD') ?? '0'
+
+/**
+ * Build number: minutes elapsed at the commit this build came from.
+ *
+ * The commit count was the obvious choice and it was wrong in production.
+ * Vercel clones shallowly — about a dozen commits — so `rev-list --count`
+ * counted only what it had been given and the deployed app reported build 12
+ * against a real count of 30, silently, which is the one thing a build number
+ * must never do.
+ *
+ * A commit's own timestamp is always present, shallow clone or not. It rises
+ * with every commit, never repeats, and is identical wherever it is computed.
+ */
+const BUILD_EPOCH = Date.UTC(2026, 0, 1) / 1000
+const committedAt = Number(git('log', '-1', '--format=%ct', 'HEAD'))
+const build = Number.isFinite(committedAt)
+  ? String(Math.floor((committedAt - BUILD_EPOCH) / 60))
+  : '0'
 const appVersion = `${major}.${minor}.${build}`
 
 // The commit is the unambiguous answer to "is my latest push live?" — the count

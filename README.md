@@ -24,8 +24,9 @@ On the analysis page you can:
   the move list, or ← → keys, and flip the board to either player's perspective
 - See each player's remaining clock and overall accuracy beside their name (their rating and
   the estimated "played like" rating live in the Move Classification tab)
-- Follow the material balance in the strip beside the board: captured pieces stack outward from
-  the centre on the side of the player who took them, with the lead marked at the far end
+- Follow the material balance in the strip beside the board: the pieces a player is *up* stack
+  outward from the centre on their side, with the lead marked at the far end. Even trades cancel
+  out, so four pawns apiece show nothing and five against four show one pawn
 - Turn the engine on to get arrows for its top lines — shaded from best to worst — with the
   move actually played highlighted in gold
 - Review the game with Stockfish 18: an eval bar beside the board, per-move classification

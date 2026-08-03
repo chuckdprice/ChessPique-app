@@ -59,20 +59,27 @@ const START_COUNT: Record<CapturedKind, number> = { p: 8, n: 2, b: 2, r: 2, q: 1
 const PIECE_VALUE: Record<CapturedKind, number> = { p: 1, n: 3, b: 3, r: 5, q: 9 }
 
 export interface CapturedMaterial {
-  /** Missing white pieces (captured by Black), pawns first. */
+  /** White pieces missing over and above Black's own losses, pawns first. */
   white: CapturedKind[]
-  /** Missing black pieces (captured by White), pawns first. */
+  /** Black pieces missing over and above White's own losses, pawns first. */
   black: CapturedKind[]
   /** Material difference in pawns from what is on the board; > 0 = White ahead. */
   diff: number
 }
 
 /**
- * What each side has lost, and by how much material one side leads.
+ * What each side is *up* in each kind of piece, and by how much material one
+ * side leads overall.
  *
- * The captured lists come from what is missing against the starting army, so a
- * promotion can hide a lost pawn (the count is clamped at zero). The difference
- * is measured from the pieces actually on the board instead, which stays right
+ * Only the imbalance is listed: a piece each side has lost in equal number is
+ * cancelled out, so four pawns apiece show nothing and five against four show
+ * one pawn. Every capture drawn would be twenty-odd pieces down a strip a board
+ * square wide by the endgame, too crowded to tell a rook from a bishop and
+ * saying nothing an even trade needed saying.
+ *
+ * Counts come from what is missing against the starting army, so a promotion
+ * can hide a lost pawn (each count is clamped at zero). The difference is
+ * measured from the pieces actually on the board instead, which stays right
  * through promotions.
  */
 export function capturedMaterial(fen: string): CapturedMaterial {
@@ -82,10 +89,13 @@ export function capturedMaterial(fen: string): CapturedMaterial {
     if (/[pnbrqPNBRQ]/.test(ch)) present[ch] = (present[ch] ?? 0) + 1
   }
 
-  const missing = (kind: CapturedKind, color: 'w' | 'b'): CapturedKind[] => {
+  const missing = (kind: CapturedKind, color: 'w' | 'b'): number => {
     const ch = color === 'w' ? kind.toUpperCase() : kind
-    const gone = Math.max(0, START_COUNT[kind] - (present[ch] ?? 0))
-    return Array<CapturedKind>(gone).fill(kind)
+    return Math.max(0, START_COUNT[kind] - (present[ch] ?? 0))
+  }
+  const surplus = (kind: CapturedKind, color: 'w' | 'b'): CapturedKind[] => {
+    const net = missing(kind, color) - missing(kind, color === 'w' ? 'b' : 'w')
+    return Array<CapturedKind>(Math.max(0, net)).fill(kind)
   }
   const material = (color: 'w' | 'b') =>
     CAPTURED_ORDER.reduce((total, kind) => {
@@ -94,8 +104,8 @@ export function capturedMaterial(fen: string): CapturedMaterial {
     }, 0)
 
   return {
-    white: CAPTURED_ORDER.flatMap((kind) => missing(kind, 'w')),
-    black: CAPTURED_ORDER.flatMap((kind) => missing(kind, 'b')),
+    white: CAPTURED_ORDER.flatMap((kind) => surplus(kind, 'w')),
+    black: CAPTURED_ORDER.flatMap((kind) => surplus(kind, 'b')),
     diff: material('w') - material('b'),
   }
 }

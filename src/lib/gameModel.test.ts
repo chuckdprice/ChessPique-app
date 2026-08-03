@@ -34,6 +34,22 @@ describe('capturedMaterial', () => {
     expect(captured.diff).toBe(1)
   })
 
+  it('shows nothing for a trade both sides made in kind', () => {
+    // A pawn apiece: nothing to show, and no lead.
+    const captured = capturedMaterial(fenAfter(['e4', 'd5', 'exd5', 'Qxd5']))
+    expect(captured.white).toEqual([])
+    expect(captured.black).toEqual([])
+    expect(captured.diff).toBe(0)
+  })
+
+  it('shows only the surplus when both sides have lost the same kind', () => {
+    // Black is down three pawns, White two: one pawn to show, not five.
+    const captured = capturedMaterial('rnbqkbnr/ppppp3/8/8/8/8/PPPPPP2/RNBQKBNR w KQkq - 0 1')
+    expect(captured.black).toEqual(['p'])
+    expect(captured.white).toEqual([])
+    expect(captured.diff).toBe(1)
+  })
+
   it('orders a mixed haul pawns-first', () => {
     // Black is a knight and a rook down for a pawn.
     const captured = capturedMaterial('1nbqkb1r/pppppppp/8/8/8/8/PPPPPPP1/RNBQKBNR w KQk - 0 1')

@@ -74,10 +74,13 @@ function Stack({
 }
 
 /**
- * Captured pieces in a narrow column beside the board: each side's losses stack
- * outward from the board's centre line — pawns nearest the middle — on the side
- * of the player who took them, with the material lead marked at the far end of
- * the leading player's haul.
+ * The material imbalance in a narrow column beside the board: the pieces a
+ * player is *up* stack outward from the board's centre line — pawns nearest the
+ * middle — on that player's side, with the lead in pawns marked at the far end.
+ *
+ * Only the difference is drawn, so an even trade shows nothing (see
+ * `capturedMaterial`). Most positions therefore show a piece or two, and often
+ * an empty strip, which is the honest picture of a level game.
  */
 export default function CapturedStrip({ fen, orientation }: CapturedStripProps) {
   const captured = capturedMaterial(fen)
@@ -85,7 +88,7 @@ export default function CapturedStrip({ fen, orientation }: CapturedStripProps) 
   const lead = Math.abs(captured.diff)
   const badge = lead > 0 ? `+${lead}` : null
 
-  // The bottom player's captures hang below the centre, so the lower stack
+  // The bottom player's winnings hang below the centre, so the lower stack
   // holds the pieces of whichever colour sits at the top of the board.
   const lower = {
     pieces: whiteOnBottom ? captured.black : captured.white,
@@ -95,8 +98,8 @@ export default function CapturedStrip({ fen, orientation }: CapturedStripProps) 
     pieces: whiteOnBottom ? captured.white : captured.black,
     color: whiteOnBottom ? ('w' as const) : ('b' as const),
   }
-  // The badge belongs to the leading side's own haul — the stack of pieces it
-  // captured, which is the one showing the opposite colour.
+  // The badge belongs to the leading side's own stack — the pieces it is up,
+  // which is the one showing the opposite colour.
   const badgeOnLower = captured.diff > 0 === whiteOnBottom
 
   const label =

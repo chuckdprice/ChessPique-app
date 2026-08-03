@@ -1,11 +1,14 @@
-/** What the converted PGN carries beyond the moves and their clocks. */
+/**
+ * What the converted PGN optionally carries beyond the moves and their clocks.
+ *
+ * The opening is not among these: the ECO and Opening tags are always written
+ * when the game's opening is known, as the Annotator tag always is.
+ */
 export interface PgnExtras {
   /** `[%eval ...]` on every move, from the engine review. */
   evals: boolean
   /** The annotator's own comments, kept from the source file. */
   comments: boolean
-  /** ECO and Opening tags. */
-  opening: boolean
 }
 
 interface PgnExtrasSwitchesProps {
@@ -23,7 +26,6 @@ interface PgnExtrasSwitchesProps {
 const SWITCHES: Array<{ id: keyof PgnExtras; label: string; hint: string }> = [
   { id: 'evals', label: 'Evals', hint: 'Write [%eval] on every move from the engine review' },
   { id: 'comments', label: 'Comments', hint: "Keep the source file's own move comments" },
-  { id: 'opening', label: 'Opening', hint: 'Add the ECO and Opening tags' },
 ]
 
 /** A small labelled switch, sized to sit in a row above the action buttons. */

@@ -21,16 +21,18 @@ sized so a 1440×900 desktop window needs no scrolling on either step.
 ### What goes into the converted PGN
 
 Every converted game is tagged `[Annotator "https://chessnoter.vercel.app/"]`, so a file that
-gets passed around says where it was made. Three switches on the *Converted PGN* tab, above the
-buttons that hand the file out, decide the rest — all on by default:
+gets passed around says where it was made, and `ECO` / `Opening` whenever the opening is known
+(see [Opening names](#opening-names)). The name also shows in a read-only *Opening* field among
+the tag fields on the left, reading `ECO: Name` — it comes from the moves, so it is shown rather
+than edited.
+
+Two switches on the *Converted PGN* tab, above the buttons that hand the file out, decide the
+rest — both on by default:
 
 - **Evals** — `[%eval 0.38]` on every move, from the engine review, written alongside the
   `%clk` comment. They appear once that review finishes; the switch says so while it is running.
 - **Comments** — the annotator's own words from the source file, kept through the conversion.
   Timing commands and bare clock readings are not comments and are always rewritten.
-- **Opening** — the `ECO` and `Opening` tags, and a read-only *Opening* field among the tag
-  fields on the left reading `ECO: Name`. It is looked up from the moves (see
-  [Opening names](#opening-names)), so it is shown rather than edited.
 
 A tag the game already carries is overwritten in place, keeping PGN's usual tag order; a tag it
 lacks is appended.

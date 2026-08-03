@@ -101,16 +101,15 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
             </p>
             <p>
               The <Ui>Include</Ui> switches above those buttons decide what else goes into the
-              file, and all three start on. <Ui>Evals</Ui> writes Stockfish's score on every move
-              as <code>{'{[%eval 0.38]}'}</code>, which appears once the review on step 2 has
-              finished. <Ui>Comments</Ui> keeps any notes your source PGN had against its moves.{' '}
-              <Ui>Opening</Ui> adds the <Ui>ECO</Ui> and <Ui>Opening</Ui> tags and shows the name
-              among the tags on the left, where it is read-only because it is worked out from the
-              moves.
+              file, and both start on. <Ui>Evals</Ui> writes Stockfish's score on every move as{' '}
+              <code>{'{[%eval 0.38]}'}</code>, which appears once the review on step 2 has
+              finished. <Ui>Comments</Ui> keeps any notes your source PGN had against its moves.
             </p>
             <p>
               Every converted game also carries an <Ui>Annotator</Ui> tag pointing back at this
-              app, so a file you pass on says where it was made.
+              app, so a file you pass on says where it was made, plus <Ui>ECO</Ui> and{' '}
+              <Ui>Opening</Ui> tags naming the opening. That name also appears among the tags on
+              the left, where it is read-only because it is worked out from the moves.
             </p>
             <p>
               If the clock times come out wrong, or you see an error about the starting clock, open{' '}

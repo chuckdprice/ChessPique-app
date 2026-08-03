@@ -125,7 +125,7 @@ export default function MoveTable({
   const evalTitle = (cell: Cell | null): string | undefined => {
     const shown = evalFor(cell)
     if (!shown || shown.depth == null) return undefined
-    return `${formatScore(shown.score)} at depth ${shown.depth}`
+    return `depth ${shown.depth}`
   }
 
   const moveCell = (cell: Cell | null) => {

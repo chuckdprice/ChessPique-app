@@ -98,7 +98,6 @@ export default function PgnFilePage({
         <TagEditor
           headers={headers}
           onChange={onHeaderChange}
-          showOpening={extras.opening}
           opening={opening}
         />
 

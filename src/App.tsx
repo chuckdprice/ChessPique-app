@@ -101,11 +101,7 @@ export default function App() {
   // What the converted PGN carries beyond the moves and clocks. On by default:
   // the switches are there to leave things out, and a file is more useful with
   // them in.
-  const [pgnExtras, setPgnExtras] = useState<PgnExtras>({
-    evals: true,
-    comments: true,
-    opening: true,
-  })
+  const [pgnExtras, setPgnExtras] = useState<PgnExtras>({ evals: true, comments: true })
   const analysisSignal = useRef<{ cancelled: boolean } | null>(null)
 
   const appearanceRef = useRef(appearance)
@@ -261,10 +257,10 @@ export default function App() {
   const convertedPgn = useMemo(() => {
     if (!game) return null
 
-    // The tags the app adds itself: where the file came from, and the opening
-    // when it is wanted and known.
+    // The tags the app adds itself: the opening whenever the book knows it, and
+    // where the file came from.
     const extras = [
-      ...(pgnExtras.opening && opening
+      ...(opening
         ? [
             { name: 'ECO', value: opening.eco },
             { name: 'Opening', value: opening.name },

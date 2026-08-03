@@ -3,9 +3,7 @@ import type { Opening } from '../lib/openings'
 interface TagEditorProps {
   headers: Array<{ name: string; value: string }>
   onChange: (index: number, value: string) => void
-  /** Show the opening field — set by the Opening switch on the Converted tab. */
-  showOpening: boolean
-  /** Named opening for that field; null until the book has loaded. */
+  /** Named opening for the read-only field; null until the book has loaded. */
   opening: Opening | null
 }
 
@@ -13,12 +11,7 @@ interface TagEditorProps {
  * Left pane of the PGN File page. Tag names come from the converted game and are
  * fixed; only their values are editable, by index.
  */
-export default function TagEditor({
-  headers,
-  onChange,
-  showOpening,
-  opening,
-}: TagEditorProps) {
+export default function TagEditor({ headers, onChange, opening }: TagEditorProps) {
   return (
     <section
       aria-label="PGN tags"
@@ -53,21 +46,19 @@ export default function TagEditor({
             ))}
             {/* Read-only: the opening is looked up from the moves, so typing
                 over it would only disagree with the game itself. */}
-            {showOpening && (
-              <label className="block">
-                <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink-mute">
-                  Opening
-                </span>
-                <input
-                  type="text"
-                  readOnly
-                  value={opening ? `${opening.eco}: ${opening.name}` : ''}
-                  placeholder="not in the opening book"
-                  title="Looked up from the moves — written to the PGN as the ECO and Opening tags"
-                  className="w-full cursor-default rounded-md border border-rule bg-buff-soft/20 px-2.5 py-1.5 text-sm text-ink-mute"
-                />
-              </label>
-            )}
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink-mute">
+                Opening
+              </span>
+              <input
+                type="text"
+                readOnly
+                value={opening ? `${opening.eco}: ${opening.name}` : ''}
+                placeholder="not in the opening book"
+                title="Looked up from the moves — written to the PGN as the ECO and Opening tags"
+                className="w-full cursor-default rounded-md border border-rule bg-buff-soft/20 px-2.5 py-1.5 text-sm text-ink-mute"
+              />
+            </label>
           </div>
         )}
       </div>

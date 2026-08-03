@@ -89,19 +89,24 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
 
           <Section title="Step 1 — PGN File">
             <p>
-              Paste your game into <Ui>Original PGN</Ui>, or use <Ui>Upload or drop a .pgn file</Ui>
-              . Dropping a file converts it straight away. Otherwise press{' '}
-              <Ui>Convert to %clk</Ui>.
+              The page is four panes stacked in the order you work through them. Each opens and
+              closes on its own, and the last three stay locked until a game has been converted.
             </p>
             <p>
-              The converted game appears on the <Ui>Converted PGN</Ui> tab, where <Ui>Copy</Ui> and{' '}
-              <Ui>Download</Ui> take the file and <Ui>Lichess</Ui> and <Ui>Chess.com</Ui> open it
-              for analysis on those sites. Edit any tag on the left and the converted text, the
-              download, and the file name all follow along.
+              <Ui>Original PGN</Ui> — paste your game in, or use{' '}
+              <Ui>Upload or drop a .pgn file</Ui>, which converts it straight away. Otherwise
+              press <Ui>Convert to %clk</Ui>. If the clock times come out wrong, or you see an
+              error about the starting clock, set the starting time and any delay or increment in
+              the box under those buttons, then convert again — normally the PGN's own
+              TimeControl tag is used and you can leave it alone.
             </p>
             <p>
-              The <Ui>Include</Ui> switches above those buttons decide what else goes into the
-              file, and all three start on. <Ui>Evals</Ui> writes Stockfish's score on every move
+              <Ui>PGN Header Editor</Ui> — the game's tags. Edit any of them and the converted
+              text, the download, and the file name all follow along.
+            </p>
+            <p>
+              <Ui>Converted PGN</Ui> — the finished text, with switches above it for what else to
+              include. All three start on. <Ui>Evals</Ui> writes Stockfish's score on every move
               as <code>{'{[%eval 0.38]}'}</code>. <Ui>Comments</Ui> keeps any notes your source
               PGN had against its moves, and adds the engine's own verdict on a weak one —{' '}
               <code>{'{Inaccuracy. Bb5 was best.}'}</code>. <Ui>Variations</Ui> writes the line
@@ -109,15 +114,14 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               <code>(5. Bb5 Nd7 6. Bxc6 bxc6)</code>. All three wait on the review from step 2.
             </p>
             <p>
-              Every converted game also carries an <Ui>Annotator</Ui> tag pointing back at this
-              app, so a file you pass on says where it was made, plus <Ui>ECO</Ui> and{' '}
-              <Ui>Opening</Ui> tags naming the opening. That name also appears among the tags on
-              the left, where it is read-only because it is worked out from the moves.
+              <Ui>Export PGN</Ui> — <Ui>Copy</Ui> and <Ui>Download</Ui> take the file;{' '}
+              <Ui>Lichess</Ui> and <Ui>Chess.com</Ui> open it for analysis on those sites.
             </p>
             <p>
-              If the clock times come out wrong, or you see an error about the starting clock, open{' '}
-              <Ui>Time control override</Ui> at the bottom and set the starting minutes plus any
-              delay or increment, then convert again.
+              Every converted game also carries an <Ui>Annotator</Ui> tag pointing back at this
+              app, so a file you pass on says where it was made, plus <Ui>ECO</Ui> and{' '}
+              <Ui>Opening</Ui> tags naming the opening. That name also appears in the header
+              editor, where it is read-only because it is worked out from the moves.
             </p>
           </Section>
 

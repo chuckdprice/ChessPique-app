@@ -4,6 +4,7 @@ import AppearanceMenu from './components/AppearanceMenu'
 import BrandMark from './components/BrandMark'
 import HelpDialog from './components/HelpDialog'
 import PgnFilePage from './components/PgnFilePage'
+import type { PgnPanes } from './components/PgnFilePage'
 import StepNav from './components/StepNav'
 import type { Page } from './components/StepNav'
 import type { PgnExtras } from './components/PgnExtrasSwitches'
@@ -91,7 +92,14 @@ export default function App() {
   const [sourceText, setSourceText] = useState('')
   const [sourceFileName, setSourceFileName] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [overridesOpen, setOverridesOpen] = useState(false)
+  // Which steps of the PGN File page are open. Held here, not in the page, so
+  // it survives a trip to the analysis page and back.
+  const [panes, setPanes] = useState<PgnPanes>({
+    original: true,
+    headers: false,
+    converted: false,
+    export: false,
+  })
   const [helpOpen, setHelpOpen] = useState(false)
   const [appearance, setAppearance] = useState<AppearanceSettings>(loadAppearance)
   const [engineSettings, setEngineSettings] = useState<EngineSettings>(loadEngineSettings)
@@ -151,6 +159,9 @@ export default function App() {
       setHeaders(result.headers)
       setPly(0)
       setError(null)
+      // The steps below the first are now worth opening, and the output is
+      // what the user came for; coming back to this page should show it.
+      setPanes((prev) => ({ ...prev, converted: true }))
       setPage('analysis')
     } catch (e) {
       setGame(null)
@@ -161,7 +172,8 @@ export default function App() {
       const message = e instanceof Error ? e.message : String(e)
       setError(message)
       setPage('pgn')
-      if (message.includes('starting clock')) setOverridesOpen(true)
+      // Whatever went wrong, it went wrong with the text in the first step.
+      setPanes((prev) => ({ ...prev, original: true }))
     }
   }
 
@@ -223,6 +235,11 @@ export default function App() {
     setDeeperEvals((prev) => withDeeperEval(prev, at, { score, depth }, reviewDepth))
   }, [])
   const handleEngineMoves = useCallback((ucis: string[]) => setEngineMoves(ucis), [])
+
+  const handlePaneChange = useCallback(
+    (id: keyof PgnPanes, open: boolean) => setPanes((prev) => ({ ...prev, [id]: open })),
+    [],
+  )
 
   const handleExtraChange = useCallback(
     (id: keyof PgnExtras, on: boolean) => setPgnExtras((prev) => ({ ...prev, [id]: on })),
@@ -497,8 +514,8 @@ export default function App() {
             onExtraChange={handleExtraChange}
             opening={opening}
             hasEvals={analysis != null}
-            overridesOpen={overridesOpen}
-            onOverridesOpenChange={setOverridesOpen}
+            panes={panes}
+            onPaneChange={handlePaneChange}
           />
         )}
 

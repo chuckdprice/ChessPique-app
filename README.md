@@ -11,11 +11,12 @@ per move, normalizes the `TimeControl` tag (for example `G70/d10` → `4200d10`)
 The app is a two-step flow shown as chevron tabs across the top — **PGN File → Game Analysis** —
 sized so a 1440×900 desktop window needs no scrolling on either step.
 
-- **PGN File**: everything file-related on one screen. PGN tags are edited on the left, where
-  changes flow live into the converted PGN, the download, and the clipboard copy. The right
-  side holds two tabs: *Original PGN*, where you paste a PGN or upload/drop the `.pgn` file
-  (uploads convert immediately), and *Converted PGN*, showing the `%clk` output with buttons
-  to download it or copy it straight to the clipboard.
+- **PGN File**: four collapsible panes stacked in the order you work through them —
+  *Original PGN* (paste or upload the file, with the time-control override beside the Convert
+  button), *PGN Header Editor* (the tags, whose edits flow live into everything downstream),
+  *Converted PGN* (the `%clk` output and the switches for what goes into it), and *Export PGN*
+  (copy, download, or open the game on Lichess or Chess.com). Each opens on its own; the last
+  three stay locked until a game has been converted, since until then they describe nothing.
 - **Game Analysis**: board, engine, move list, and charts in one screen.
 
 ### What goes into the converted PGN

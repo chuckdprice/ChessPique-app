@@ -311,3 +311,46 @@ describe('withExtraTags', () => {
     expect(headers[1].value).toBe('A00')
   })
 })
+
+describe('engine notes and variations', () => {
+  const game = convertPgn('[TimeControl "4200d10"]\n\n1. d4 {[%emt 0:00:10]} d5 2. Nf3 Nc6 *')
+
+  it('writes the note in a comment of its own, apart from the source comment', () => {
+    const pgn = buildPgn([], game.moves, game.result, {
+      comments: true,
+      notes: ['Inaccuracy. Nf3 was best.', null, null, null],
+    })
+    expect(pgn).toContain('1. d4 {[%clk 1:10:00]} {Inaccuracy. Nf3 was best.}')
+  })
+
+  it('writes the variation in parentheses after the move', () => {
+    const pgn = buildPgn([], game.moves, game.result, {
+      variations: ['1. Nf3 d5 2. d4', null, null, null],
+    })
+    expect(pgn).toContain('1. d4 {[%clk 1:10:00]} (1. Nf3 d5 2. d4)')
+  })
+
+  it("repeats the move number so Black's reply is unambiguous after a variation", () => {
+    const pgn = buildPgn([], game.moves, game.result, {
+      variations: ['1. Nf3 d5 2. d4', null, null, null],
+    })
+    expect(pgn).toContain('(1. Nf3 d5 2. d4) 1... d5')
+    // Without one, the reply stays on the same line unprefixed as before.
+    expect(buildPgn([], game.moves, game.result, {})).toContain('1. d4 {[%clk 1:10:00]} d5')
+  })
+
+  it('reads its own variations back as commentary, not as moves', () => {
+    const pgn = buildPgn([], game.moves, game.result, {
+      notes: ['Inaccuracy. Nf3 was best.', null, null, null],
+      variations: ['1. Nf3 d5 2. d4 Nf6 3. c4', null, null, null],
+      comments: true,
+    })
+    const reread = convertPgn(pgn)
+    expect(reread.moves.map((m) => m.san)).toEqual(['d4', 'd5', 'Nf3', 'Nc6'])
+  })
+
+  it('keeps a nested variation out of the move list too', () => {
+    const reread = convertPgn('1. e4 (1. d4 d5 (1... Nf6 2. c4) 2. Nf3) 1... e5 *')
+    expect(reread.moves.map((m) => m.san)).toEqual(['e4', 'e5'])
+  })
+})

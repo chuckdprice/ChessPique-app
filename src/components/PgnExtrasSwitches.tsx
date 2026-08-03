@@ -7,8 +7,13 @@
 export interface PgnExtras {
   /** `[%eval ...]` on every move, from the engine review. */
   evals: boolean
-  /** The annotator's own comments, kept from the source file. */
+  /**
+   * The annotator's own comments from the source file, and the engine's own
+   * verdict on a flagged move.
+   */
   comments: boolean
+  /** The engine's line after a flagged move, as a PGN variation. */
+  variations: boolean
 }
 
 interface PgnExtrasSwitchesProps {
@@ -25,7 +30,16 @@ interface PgnExtrasSwitchesProps {
 
 const SWITCHES: Array<{ id: keyof PgnExtras; label: string; hint: string }> = [
   { id: 'evals', label: 'Evals', hint: 'Write [%eval] on every move from the engine review' },
-  { id: 'comments', label: 'Comments', hint: "Keep the source file's own move comments" },
+  {
+    id: 'comments',
+    label: 'Comments',
+    hint: "Keep the source file's own move comments, and note each inaccuracy, mistake and blunder",
+  },
+  {
+    id: 'variations',
+    label: 'Variations',
+    hint: 'Write the engine\'s line after a flagged move, as a PGN variation',
+  },
 ]
 
 /** A small labelled switch, sized to sit in a row above the action buttons. */

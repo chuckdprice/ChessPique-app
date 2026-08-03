@@ -4,13 +4,10 @@ import {
   CLASSIFICATION_LABEL,
   CLASSIFICATION_SYMBOL,
   hasMoveMarker,
+  moveVariation,
+  NEEDS_ADVICE,
 } from '../lib/engine/analysis'
-import type {
-  Classification,
-  GameAnalysis,
-  MoveAnalysis,
-  RefinedEval,
-} from '../lib/engine/analysis'
+import type { GameAnalysis, MoveAnalysis, RefinedEval } from '../lib/engine/analysis'
 import { formatScore } from '../lib/engine/uci'
 import type { Score } from '../lib/engine/uci'
 import { classColor } from './ClassBadge'
@@ -36,9 +33,6 @@ interface Row {
   white: Cell | null
   black: Cell | null
 }
-
-/** Classifications that earn a "best move was…" note under the move. */
-const NEEDS_ADVICE: Classification[] = ['inaccuracy', 'mistake', 'blunder']
 
 export default function MoveTable({
   moves,
@@ -170,9 +164,17 @@ export default function MoveTable({
     )
   }
 
-  /** "Inaccuracy. c4 was best." shown beneath a flagged move. */
+  /**
+   * "Inaccuracy. c4 was best." beneath a flagged move, and under that the line
+   * the engine had in mind — the moves it expected to follow its own.
+   *
+   * The line is not clickable. The board follows the game, and these moves were
+   * never played in it; making them look walkable would promise a what-if board
+   * this page does not have.
+   */
   const adviceRow = (cell: Cell, info: MoveAnalysis) => {
     const color = classColor(info.classification)
+    const variation = moveVariation(info)
     return (
       <tr key={`advice-${cell.ply}`}>
         <td />
@@ -195,6 +197,11 @@ export default function MoveTable({
               </>
             ) : null}
           </button>
+          {variation && (
+            <p className="mt-0.5 pl-2 font-score text-[11px] leading-snug text-ink-mute">
+              {variation}
+            </p>
+          )}
         </td>
       </tr>
     )

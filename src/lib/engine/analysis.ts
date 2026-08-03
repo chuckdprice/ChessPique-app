@@ -77,6 +77,13 @@ export interface MoveAnalysis {
   accuracy: number
   classification: Classification
   bestMoveSan: string | null
+  /**
+   * The engine's whole line from the position before this move, in SAN, best
+   * move first — what it would have played instead, and how it saw the game
+   * continuing. Empty when the position was terminal or the search returned
+   * nothing.
+   */
+  bestLineSan: string[]
 }
 
 export interface PhaseAccuracy {
@@ -118,6 +125,52 @@ export interface GameAnalysis {
   /** 1-based ply where each phase begins (null if never reached). */
   middlegameStartPly: number | null
   endgameStartPly: number | null
+}
+
+/** Classifications that earn a "best move was…" note and a variation. */
+export const NEEDS_ADVICE: Classification[] = ['inaccuracy', 'mistake', 'blunder']
+
+/**
+ * The engine's verdict on a move as a sentence — "Inaccuracy. Bb5 was best." —
+ * or null for a move that needs no comment.
+ *
+ * Shared so the move list and the exported PGN say the same thing.
+ */
+export function moveNote(move: MoveAnalysis): string | null {
+  if (!NEEDS_ADVICE.includes(move.classification)) return null
+  const label = CLASSIFICATION_LABEL[move.classification]
+  return move.bestMoveSan ? `${label}. ${move.bestMoveSan} was best.` : `${label}.`
+}
+
+/**
+ * A SAN line written as numbered movetext — "5. Bb5 Nd7 6. Bxc6" — starting at
+ * the given move number and side.
+ *
+ * Black's first move takes the "5..." form, and only that one: once the line is
+ * under way the numbers alternate normally.
+ */
+export function formatVariation(
+  sans: string[],
+  startNumber: number,
+  startColor: 'w' | 'b',
+): string {
+  let number = startNumber
+  let white = startColor === 'w'
+  const parts: string[] = []
+  for (const [i, san] of sans.entries()) {
+    if (white) parts.push(`${number}. ${san}`)
+    else if (i === 0) parts.push(`${number}... ${san}`)
+    else parts.push(san)
+    if (!white) number += 1
+    white = !white
+  }
+  return parts.join(' ')
+}
+
+/** The engine's line for a flagged move, numbered; empty when there is none. */
+export function moveVariation(move: MoveAnalysis): string {
+  if (!NEEDS_ADVICE.includes(move.classification) || move.bestLineSan.length === 0) return ''
+  return formatVariation(move.bestLineSan, Math.ceil(move.ply / 2), move.color)
 }
 
 /** A position's evaluation together with the depth that produced it. */
@@ -278,7 +331,7 @@ export function buildGameAnalysis(
   fens: string[],
   moves: Move[],
   evals: Score[],
-  bestMoves: Array<{ uci: string | null; san: string | null }>,
+  bestMoves: Array<{ uci: string | null; san: string | null; line?: string[] }>,
   playedUcis: string[],
   /** Depth behind each eval; a gap here reads as "unknown" downstream. */
   evalDepths: number[] = [],
@@ -308,6 +361,7 @@ export function buildGameAnalysis(
       accuracy: moveAccuracy(winPctLoss),
       classification: classify(winPctLoss, playedBest),
       bestMoveSan: bestMoves[i]?.san ?? null,
+      bestLineSan: bestMoves[i]?.line ?? [],
     }
   })
 
@@ -400,7 +454,7 @@ export async function analyzeGame(
     await engine.init({ hashMb: 64, multiPv: 1 })
     const evals: Score[] = []
     const evalDepths: number[] = []
-    const bestMoves: Array<{ uci: string | null; san: string | null }> = []
+    const bestMoves: Array<{ uci: string | null; san: string | null; line: string[] }> = []
 
     for (let i = 0; i < fens.length; i++) {
       if (signal?.cancelled) return null
@@ -409,7 +463,7 @@ export async function analyzeGame(
         evals.push(terminal)
         // Nothing to search and nothing deeper to find.
         evalDepths.push(Number.POSITIVE_INFINITY)
-        bestMoves.push({ uci: null, san: null })
+        bestMoves.push({ uci: null, san: null, line: [] })
       } else {
         const result = await engine.analyze({ fen: fens[i], depth, movetimeMs, multiPv: 1 })
         const top = result.lines[0]
@@ -419,6 +473,9 @@ export async function analyzeGame(
         bestMoves.push({
           uci: result.bestMoveUci,
           san: top?.pvSan[0] ?? null,
+          // The whole line, not just its first move: the move list and the
+          // exported PGN both show what the engine would have played on.
+          line: top?.pvSan ?? [],
         })
       }
       onProgress?.(i + 1, fens.length)

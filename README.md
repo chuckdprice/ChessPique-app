@@ -26,13 +26,21 @@ gets passed around says where it was made, and `ECO` / `Opening` whenever the op
 the tag fields on the left, reading `ECO: Name` — it comes from the moves, so it is shown rather
 than edited.
 
-Two switches on the *Converted PGN* tab, above the buttons that hand the file out, decide the
-rest — both on by default:
+Three switches on the *Converted PGN* tab, above the buttons that hand the file out, decide the
+rest — all on by default, and all waiting on the engine review:
 
-- **Evals** — `[%eval 0.38]` on every move, from the engine review, written alongside the
-  `%clk` comment. They appear once that review finishes; the switch says so while it is running.
-- **Comments** — the annotator's own words from the source file, kept through the conversion.
-  Timing commands and bare clock readings are not comments and are always rewritten.
+- **Evals** — `[%eval 0.38]` on every move, written alongside the `%clk` comment. They appear
+  once the review finishes; the switch says so while it is running.
+- **Comments** — the annotator's own words from the source file, kept through the conversion,
+  plus the engine's verdict on a weak move as a comment of its own:
+  `{Inaccuracy. Bb5 was best.}`. Timing commands and bare clock readings are not comments and
+  are always rewritten.
+- **Variations** — the line the engine preferred, after the move it replaces:
+  `(5. Bb5 Nd7 6. Bxc6 bxc6)`. Black's reply then resumes as `5... e6`, so a reader coming out
+  of the brackets is never left guessing whose move it is.
+
+A converted file can be fed straight back in: the parser skips parenthesised lines, so the move
+list that comes back is the game as played.
 
 A tag the game already carries is overwritten in place, keeping PGN's usual tag order; a tag it
 lacks is appended.
@@ -48,6 +56,8 @@ On the analysis page you can:
   out, so four pawns apiece show nothing and five against four show one pawn
 - Turn the engine on to get arrows for its top lines — shaded from best to worst — with the
   move actually played highlighted in gold
+- Read the engine's verdict under every inaccuracy, mistake, and blunder in the move list, with
+  the line it would have played instead
 - Review the game with Stockfish 18: an eval bar beside the board, per-move classification
   (Best, Inaccuracy → Blunder; Good and Excellent stay unmarked) in the move list, on the board
   and as dots on the evaluation graph, and four analysis tabs — Evaluation,

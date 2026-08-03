@@ -318,12 +318,25 @@ export function parseMoves(movetext: string): {
   let currentNumber = 1
   let sideToMove: 'w' | 'b' = 'w'
   let i = 0
+  let variationDepth = 0
 
   while (i < tokens.length) {
     const token = tokens[i]
 
     if (isComment(token)) {
-      // A standalone comment that was not attached to a SAN move.
+      // A standalone comment that was not attached to a SAN move. Parentheses
+      // inside a comment are prose, so this runs before the variation check.
+      i += 1
+      continue
+    }
+
+    // Everything inside parentheses is an alternative line, not the game. The
+    // app writes these itself, so a converted file re-read here has to come
+    // back with the moves actually played and nothing else.
+    const opened = (token.match(/\(/g) ?? []).length
+    const closed = (token.match(/\)/g) ?? []).length
+    if (variationDepth > 0 || opened > 0) {
+      variationDepth = Math.max(0, variationDepth + opened - closed)
       i += 1
       continue
     }
@@ -503,6 +516,17 @@ export interface MovetextOptions {
   evals?: Array<string | null>
   /** Carry each move's own comment through to the output. */
   comments?: boolean
+  /**
+   * The engine's verdict by move index, e.g. "Inaccuracy. Bb5 was best." Written
+   * as a comment of its own, so it stays distinguishable from whatever the
+   * source file said about the same move.
+   */
+  notes?: Array<string | null>
+  /**
+   * The engine's line by move index, already numbered — "5. Bb5 Nd7 6. Bxc6" —
+   * written after the move as a PGN variation.
+   */
+  variations?: Array<string | null>
 }
 
 export function formatMovetext(
@@ -524,7 +548,16 @@ export function formatMovetext(
     // Braces inside a comment would close it early and corrupt the file.
     const prose = options.comments && move.comment ? move.comment.replace(/[{}]/g, '') : ''
     const inner = [commands.join(' '), prose].filter(Boolean).join(' ')
-    return inner ? `${move.san} {${inner}}` : move.san
+
+    const parts = [move.san]
+    if (inner) parts.push(`{${inner}}`)
+    // The engine's own words go in a comment of their own — a reader can tell
+    // them from the annotator's, and a round trip keeps them apart too.
+    const note = options.notes?.[index]
+    if (note) parts.push(`{${note.replace(/[{}]/g, '')}}`)
+    const variation = options.variations?.[index]
+    if (variation) parts.push(`(${variation.replace(/[()]/g, '')})`)
+    return parts.join(' ')
   }
 
   const rows: string[] = []
@@ -536,7 +569,11 @@ export function formatMovetext(
       row = `${move.number}. ${annotated(move, i)}`
       const next = moves[i + 1]
       if (next && next.number === move.number && next.color === 'b') {
-        row += ` ${annotated(next, i + 1)}`
+        // After a variation the move number is repeated in the "5..." form:
+        // a reader coming out of the parentheses needs telling whose move it
+        // is again, and PGN readers differ on how forgiving they are.
+        const resumes = options.variations?.[i] ? `${move.number}... ` : ''
+        row += ` ${resumes}${annotated(next, i + 1)}`
         i += 2
       } else {
         i += 1

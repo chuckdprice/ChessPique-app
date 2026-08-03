@@ -11,7 +11,14 @@ import { buildPgn, convertPgn, withExtraTags } from './lib/convert'
 import type { ConvertOptions, ConvertResult } from './lib/convert'
 import { findOpening } from './lib/openings'
 import type { Opening } from './lib/openings'
-import { analyzeGame, PLAYED_LIKE_MAE, REVIEW_DEPTH, withDeeperEval } from './lib/engine/analysis'
+import {
+  analyzeGame,
+  moveNote,
+  moveVariation,
+  PLAYED_LIKE_MAE,
+  REVIEW_DEPTH,
+  withDeeperEval,
+} from './lib/engine/analysis'
 import type { GameAnalysis, RefinedEval } from './lib/engine/analysis'
 import { formatEvalTag } from './lib/engine/uci'
 import type { Score } from './lib/engine/uci'
@@ -101,7 +108,11 @@ export default function App() {
   // What the converted PGN carries beyond the moves and clocks. On by default:
   // the switches are there to leave things out, and a file is more useful with
   // them in.
-  const [pgnExtras, setPgnExtras] = useState<PgnExtras>({ evals: true, comments: true })
+  const [pgnExtras, setPgnExtras] = useState<PgnExtras>({
+    evals: true,
+    comments: true,
+    variations: true,
+  })
   const analysisSignal = useRef<{ cancelled: boolean } | null>(null)
 
   const appearanceRef = useRef(appearance)
@@ -280,9 +291,28 @@ export default function App() {
           })
         : undefined
 
+    // The engine's verdict on a flagged move, and the line it preferred. Both
+    // come from the review, so both wait for it.
+    const notes =
+      pgnExtras.comments && analysis
+        ? game.result.moves.map((_, i) => {
+            const info = analysis.moves[i]
+            return info ? moveNote(info) : null
+          })
+        : undefined
+    const variations =
+      pgnExtras.variations && analysis
+        ? game.result.moves.map((_, i) => {
+            const info = analysis.moves[i]
+            return info ? moveVariation(info) || null : null
+          })
+        : undefined
+
     return buildPgn(withExtraTags(headers, extras), game.result.moves, game.result.result, {
       evals,
       comments: pgnExtras.comments,
+      notes,
+      variations,
     })
   }, [game, headers, opening, analysis, deeperEvals, pgnExtras])
 

@@ -49,6 +49,9 @@ export default function EnginePanel({
 }: EnginePanelProps) {
   const engineRef = useRef<Engine | null>(null)
   const [update, setUpdate] = useState<AnalyzeUpdate | null>(null)
+  // Whether a search is still running, so the depth badge can say whether the
+  // number under it is going to keep climbing.
+  const [searching, setSearching] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const lastFlush = useRef(0)
   const onTopScoreRef = useRef(onTopScore)
@@ -62,12 +65,14 @@ export default function EnginePanel({
       engineRef.current?.stop()
       onTopScoreRef.current?.(null, 0)
       onFirstMovesRef.current?.([])
+      setSearching(false)
       return
     }
     let cancelled = false
     const gameOver = new Chess(fen).isGameOver()
     if (gameOver) {
       setUpdate(null)
+      setSearching(false)
       return
     }
 
@@ -78,7 +83,8 @@ export default function EnginePanel({
       if (cancelled) return
       engine.stop()
       setUpdate(null)
-      await engine.analyze({
+      setSearching(true)
+      const final = await engine.analyze({
         fen,
         movetimeMs: settings.searchTimeSec * 1000,
         multiPv: settings.multiPv,
@@ -98,6 +104,12 @@ export default function EnginePanel({
           }
         },
       })
+      if (cancelled) return
+      // The last throttled update can be a frame behind what the search
+      // finished on, so the settled figures come from its own result.
+      setUpdate({ depth: final.depth, lines: final.lines })
+      setSearching(false)
+      onTopScoreRef.current?.(final.lines[0]?.score ?? null, final.lines[0]?.depth ?? 0)
     }
     void run()
 
@@ -145,11 +157,19 @@ export default function EnginePanel({
           {enabled && topLine ? formatScore(topLine.score) : '—'}
         </span>
 
-        {/* Search depth gets its own non-shrinking badge so it is never clipped. */}
+        {/* Search depth gets its own non-shrinking badge so it is never clipped.
+            It turns green when the search has stopped, so a number that is not
+            moving reads as finished rather than as a stalled engine. */}
         {enabled && (
           <span
-            title="Search depth reached for this position"
-            className="shrink-0 rounded bg-buff-soft px-1.5 py-0.5 font-score text-xs font-semibold tabular-nums"
+            title={
+              searching
+                ? 'Search depth reached so far — still thinking'
+                : 'Search depth reached; the engine has stopped'
+            }
+            className={`shrink-0 rounded px-1.5 py-0.5 font-score text-xs font-semibold tabular-nums ${
+              !searching && update ? 'bg-class-best text-white' : 'bg-buff-soft'
+            }`}
           >
             d{update?.depth ?? '—'}
           </span>

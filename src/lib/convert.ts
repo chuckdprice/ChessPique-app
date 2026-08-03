@@ -19,6 +19,8 @@ const TOKEN_RE = /\{[^}]*\}|\S+/g
 const EMT_RE = /%emt\s+([0-9]+:[0-9]{1,2}:[0-9]{1,2})/
 const CLK_RE = /%clk\s+([0-9]+(?::[0-9]{1,2}){1,2})/
 const BARE_CLOCK_RE = /^\s*([0-9]+(?::[0-9]{1,2}){1,2})\s*$/
+/** A PGN comment command such as [%emt 0:00:05] or [%clk 1:07:00]. */
+const COMMAND_RE = /\[%[^\]]*\]/g
 
 export interface Move {
   number: number
@@ -33,6 +35,11 @@ export interface Move {
    * at all. See deriveSpentTimes.
    */
   spentSeconds: number | null
+  /**
+   * Whatever the move's comments said once the timing commands are taken out —
+   * the annotator's own words. Null when the comments held nothing but timing.
+   */
+  comment: string | null
 }
 
 export type TimeControlMode = 'delay' | 'increment' | 'none'
@@ -282,6 +289,24 @@ function extractTimingFromComments(commentTokens: string[]): {
   return { emtSeconds, anchorClockSeconds }
 }
 
+/**
+ * What a move's comments say once the machine-readable parts are removed.
+ *
+ * Timing commands and bare clock readings are data this converter rewrites
+ * itself; anything left is the annotator's prose and is the only part worth
+ * carrying into the output. Several comments on one move are run together.
+ */
+function humanComment(commentTokens: string[]): string | null {
+  const parts: string[] = []
+  for (const token of commentTokens) {
+    const text = commentText(token)
+    if (BARE_CLOCK_RE.test(text)) continue
+    const prose = text.replace(COMMAND_RE, ' ').replace(/\s+/g, ' ').trim()
+    if (prose) parts.push(prose)
+  }
+  return parts.length > 0 ? parts.join(' ') : null
+}
+
 export function parseMoves(movetext: string): {
   moves: Move[]
   result: string | null
@@ -340,6 +365,7 @@ export function parseMoves(movetext: string): {
       anchorClockSeconds,
       clkSeconds: null,
       spentSeconds: null,
+      comment: humanComment(commentTokens),
     })
 
     if (sideToMove === 'w') {
@@ -469,12 +495,37 @@ function updateTimecontrolHeader(headerLines: string[], value: string): string[]
   return updated
 }
 
-export function formatMovetext(moves: Move[], result: string | null): string {
-  // An unclocked move is written bare rather than stamped with a made-up time.
-  const withClock = (move: Move) =>
-    move.clkSeconds == null
-      ? move.san
-      : `${move.san} {[%clk ${formatClockTime(move.clkSeconds)}]}`
+export interface MovetextOptions {
+  /**
+   * Formatted %eval values by move index — "0.25", "-1.40", "#3" — as produced
+   * by formatEvalTag. Pre-formatted so this module stays clear of the engine.
+   */
+  evals?: Array<string | null>
+  /** Carry each move's own comment through to the output. */
+  comments?: boolean
+}
+
+export function formatMovetext(
+  moves: Move[],
+  result: string | null,
+  options: MovetextOptions = {},
+): string {
+  /**
+   * A move and its comment, which holds the commands first and the prose last —
+   * the order readers and lichess both use. A move with nothing to say is
+   * written bare rather than trailing an empty comment.
+   */
+  const annotated = (move: Move, index: number) => {
+    const commands: string[] = []
+    const evalText = options.evals?.[index]
+    if (evalText) commands.push(`[%eval ${evalText}]`)
+    // An unclocked move is written bare rather than stamped with a made-up time.
+    if (move.clkSeconds != null) commands.push(`[%clk ${formatClockTime(move.clkSeconds)}]`)
+    // Braces inside a comment would close it early and corrupt the file.
+    const prose = options.comments && move.comment ? move.comment.replace(/[{}]/g, '') : ''
+    const inner = [commands.join(' '), prose].filter(Boolean).join(' ')
+    return inner ? `${move.san} {${inner}}` : move.san
+  }
 
   const rows: string[] = []
   let i = 0
@@ -482,16 +533,16 @@ export function formatMovetext(moves: Move[], result: string | null): string {
     const move = moves[i]
     let row: string
     if (move.color === 'w') {
-      row = `${move.number}. ${withClock(move)}`
+      row = `${move.number}. ${annotated(move, i)}`
       const next = moves[i + 1]
       if (next && next.number === move.number && next.color === 'b') {
-        row += ` ${withClock(next)}`
+        row += ` ${annotated(next, i + 1)}`
         i += 2
       } else {
         i += 1
       }
     } else {
-      row = `${move.number}... ${withClock(move)}`
+      row = `${move.number}... ${annotated(move, i)}`
       i += 1
     }
     rows.push(row)
@@ -513,9 +564,28 @@ export function buildPgn(
   headers: Array<{ name: string; value: string }>,
   moves: Move[],
   result: string | null,
+  options: MovetextOptions = {},
 ): string {
   const headerLines = headers.map((h) => `[${h.name} "${h.value}"]`)
-  return headerLines.join('\n') + '\n\n' + formatMovetext(moves, result) + '\n'
+  return headerLines.join('\n') + '\n\n' + formatMovetext(moves, result, options) + '\n'
+}
+
+/**
+ * Headers with generated tags folded in: a tag the game already carries is
+ * overwritten in place, keeping PGN's conventional order, and a new one is
+ * appended at the end of the list.
+ */
+export function withExtraTags(
+  headers: Array<{ name: string; value: string }>,
+  extras: Array<{ name: string; value: string }>,
+): Array<{ name: string; value: string }> {
+  const merged = headers.map((header) => ({ ...header }))
+  for (const extra of extras) {
+    const existing = merged.find((header) => header.name === extra.name)
+    if (existing) existing.value = extra.value
+    else merged.push({ ...extra })
+  }
+  return merged
 }
 
 export function convertPgn(text: string, options: ConvertOptions = {}): ConvertResult {

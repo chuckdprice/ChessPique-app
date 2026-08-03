@@ -1,6 +1,9 @@
 import { useRef, useState } from 'react'
 import type { ConvertOptions } from '../lib/convert'
+import type { Opening } from '../lib/openings'
 import PgnActions from './PgnActions'
+import PgnExtrasSwitches from './PgnExtrasSwitches'
+import type { PgnExtras } from './PgnExtrasSwitches'
 import TagEditor from './TagEditor'
 
 interface PgnFilePageProps {
@@ -17,6 +20,11 @@ interface PgnFilePageProps {
   /** PGN tags for the left pane; empty until a game has been converted. */
   headers: Array<{ name: string; value: string }>
   onHeaderChange: (index: number, value: string) => void
+  /** What the converted PGN carries beyond moves and clocks. */
+  extras: PgnExtras
+  onExtraChange: (id: keyof PgnExtras, on: boolean) => void
+  opening: Opening | null
+  hasEvals: boolean
   /** Open the time-control override fields (set when auto-detection fails). */
   overridesOpen: boolean
   onOverridesOpenChange: (open: boolean) => void
@@ -48,6 +56,10 @@ export default function PgnFilePage({
   downloadName,
   headers,
   onHeaderChange,
+  extras,
+  onExtraChange,
+  opening,
+  hasEvals,
   overridesOpen,
   onOverridesOpenChange,
 }: PgnFilePageProps) {
@@ -83,7 +95,12 @@ export default function PgnFilePage({
   return (
     <section aria-label="PGN file" className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-2">
-        <TagEditor headers={headers} onChange={onHeaderChange} />
+        <TagEditor
+          headers={headers}
+          onChange={onHeaderChange}
+          showOpening={extras.opening}
+          opening={opening}
+        />
 
         <section
           aria-label="PGN text"
@@ -169,6 +186,15 @@ export default function PgnFilePage({
 
             {tab === 'converted' && (
               <>
+                {convertedPgn && (
+                  <div className="mb-2.5">
+                    <PgnExtrasSwitches
+                      extras={extras}
+                      onChange={onExtraChange}
+                      hasEvals={hasEvals}
+                    />
+                  </div>
+                )}
                 <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2">
                   {convertedPgn ? (
                     <>

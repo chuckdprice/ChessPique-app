@@ -6,10 +6,14 @@ import HelpDialog from './components/HelpDialog'
 import PgnFilePage from './components/PgnFilePage'
 import StepNav from './components/StepNav'
 import type { Page } from './components/StepNav'
-import { buildPgn, convertPgn } from './lib/convert'
+import type { PgnExtras } from './components/PgnExtrasSwitches'
+import { buildPgn, convertPgn, withExtraTags } from './lib/convert'
 import type { ConvertOptions, ConvertResult } from './lib/convert'
-import { analyzeGame, PLAYED_LIKE_MAE } from './lib/engine/analysis'
-import type { GameAnalysis } from './lib/engine/analysis'
+import { findOpening } from './lib/openings'
+import type { Opening } from './lib/openings'
+import { analyzeGame, PLAYED_LIKE_MAE, REVIEW_DEPTH, withDeeperEval } from './lib/engine/analysis'
+import type { GameAnalysis, RefinedEval } from './lib/engine/analysis'
+import { formatEvalTag } from './lib/engine/uci'
 import type { Score } from './lib/engine/uci'
 import { buildChartRows, replayGame } from './lib/gameModel'
 import type { ReplayedGame } from './lib/gameModel'
@@ -49,6 +53,28 @@ const ENGINE_ARROW_ALPHA = [0.95, 0.7, 0.52, 0.4, 0.3]
 const ENGINE_ARROW_RGB = '38, 122, 255'
 const NEXT_MOVE_ARROW = 'rgba(244, 130, 32, 0.95)'
 
+/** Credited in every converted PGN, so a shared file says where it came from. */
+const ANNOTATOR_URL = 'https://chessnoter.vercel.app/'
+
+/** The game's opening, once the book has loaded; null until then and if unnamed. */
+function useOpening(fens: string[] | null): Opening | null {
+  const [opening, setOpening] = useState<Opening | null>(null)
+
+  useEffect(() => {
+    setOpening(null)
+    if (!fens) return
+    let current = true
+    findOpening(fens).then((found) => {
+      if (current) setOpening(found)
+    })
+    return () => {
+      current = false
+    }
+  }, [fens])
+
+  return opening
+}
+
 export default function App() {
   const [game, setGame] = useState<LoadedGame | null>(null)
   const [headers, setHeaders] = useState<Array<{ name: string; value: string }>>([])
@@ -70,6 +96,16 @@ export default function App() {
     null,
   )
   const [analysisError, setAnalysisError] = useState<string | null>(null)
+  // Positions the live engine has out-searched the review on, keyed by ply.
+  const [deeperEvals, setDeeperEvals] = useState<Map<number, RefinedEval>>(new Map())
+  // What the converted PGN carries beyond the moves and clocks. On by default:
+  // the switches are there to leave things out, and a file is more useful with
+  // them in.
+  const [pgnExtras, setPgnExtras] = useState<PgnExtras>({
+    evals: true,
+    comments: true,
+    opening: true,
+  })
   const analysisSignal = useRef<{ cancelled: boolean } | null>(null)
 
   const appearanceRef = useRef(appearance)
@@ -129,6 +165,7 @@ export default function App() {
     setAnalysisProgress(null)
     setAnalysisError(null)
     setLiveScore(null)
+    setDeeperEvals(new Map())
     if (!game) return
 
     const signal = { cancelled: false }
@@ -160,8 +197,30 @@ export default function App() {
     setHeaders((prev) => prev.map((h, i) => (i === index ? { ...h, value } : h)))
   }, [])
 
-  const handleTopScore = useCallback((score: Score | null) => setLiveScore(score), [])
+  // The engine reports against whatever position it is on, which is always the
+  // current one; read through refs so the handler itself never changes and the
+  // panel's search is not restarted by a new callback identity.
+  const plyRef = useRef(ply)
+  plyRef.current = ply
+  const analysisRef = useRef(analysis)
+  analysisRef.current = analysis
+
+  const handleTopScore = useCallback((score: Score | null, depth: number) => {
+    setLiveScore(score)
+    if (!score) return
+    const at = plyRef.current
+    // Terminal positions carry Infinity and are never beaten; a position the
+    // review has not reached yet is assumed to have had its full depth, which
+    // is the conservative guess.
+    const reviewDepth = analysisRef.current?.evalDepths[at] ?? REVIEW_DEPTH
+    setDeeperEvals((prev) => withDeeperEval(prev, at, { score, depth }, reviewDepth))
+  }, [])
   const handleEngineMoves = useCallback((ucis: string[]) => setEngineMoves(ucis), [])
+
+  const handleExtraChange = useCallback(
+    (id: keyof PgnExtras, on: boolean) => setPgnExtras((prev) => ({ ...prev, [id]: on })),
+    [],
+  )
 
   // Arrow-key navigation on the analysis page, except while typing in a field.
   useEffect(() => {
@@ -197,10 +256,39 @@ export default function App() {
 
   const chartRows = useMemo(() => (game ? buildChartRows(game.result.moves) : []), [game])
 
-  const convertedPgn = useMemo(
-    () => (game ? buildPgn(headers, game.result.moves, game.result.result) : null),
-    [game, headers],
-  )
+  const opening = useOpening(game?.replay.fens ?? null)
+
+  const convertedPgn = useMemo(() => {
+    if (!game) return null
+
+    // The tags the app adds itself: where the file came from, and the opening
+    // when it is wanted and known.
+    const extras = [
+      ...(pgnExtras.opening && opening
+        ? [
+            { name: 'ECO', value: opening.eco },
+            { name: 'Opening', value: opening.name },
+          ]
+        : []),
+      { name: 'Annotator', value: ANNOTATOR_URL },
+    ]
+
+    // evals[i] is the position *after* ply i, so move i takes evals[i + 1] —
+    // the evaluation of what it led to, which is where a reader expects it.
+    // The live engine's deeper answers are preferred, as in the move list.
+    const evals =
+      pgnExtras.evals && analysis
+        ? game.result.moves.map((_, i) => {
+            const score = deeperEvals.get(i + 1)?.score ?? analysis.evals[i + 1]
+            return score ? formatEvalTag(score) : null
+          })
+        : undefined
+
+    return buildPgn(withExtraTags(headers, extras), game.result.moves, game.result.result, {
+      evals,
+      comments: pgnExtras.comments,
+    })
+  }, [game, headers, opening, analysis, deeperEvals, pgnExtras])
 
   const downloadName = useMemo(() => {
     const white = findHeader(headers, 'White') ?? 'White'
@@ -218,7 +306,11 @@ export default function App() {
   const whiteElo = (game && findHeader(headers, 'WhiteElo')) || null
   const blackElo = (game && findHeader(headers, 'BlackElo')) || null
 
-  const evalScore: Score | null = analysis ? (analysis.evals[ply] ?? null) : liveScore
+  // The bar shows the same number as the move list does for this position, so
+  // a deepened eval has to reach both or the two would disagree on screen.
+  const evalScore: Score | null = analysis
+    ? (deeperEvals.get(ply)?.score ?? analysis.evals[ply] ?? null)
+    : liveScore
 
   // Engine candidates fade best→worst, then the game's own next move is drawn
   // on top. The move already on the board gets no arrow — the highlighted
@@ -375,6 +467,10 @@ export default function App() {
             downloadName={downloadName}
             headers={headers}
             onHeaderChange={handleHeaderChange}
+            extras={pgnExtras}
+            onExtraChange={handleExtraChange}
+            opening={opening}
+            hasEvals={analysis != null}
             overridesOpen={overridesOpen}
             onOverridesOpenChange={setOverridesOpen}
           />
@@ -399,6 +495,8 @@ export default function App() {
               ply={ply}
               onPlyChange={setPly}
               analysis={analysis}
+              deeperEvals={deeperEvals}
+              opening={opening}
               analysisProgress={analysisProgress}
               analysisError={analysisError}
               chartRows={chartRows}

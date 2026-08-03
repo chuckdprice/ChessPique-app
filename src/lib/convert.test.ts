@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
+  buildPgn,
   ConvertError,
   convertPgn,
   formatClockTime,
   parseClockTime,
   parseTimecontrolHeader,
+  withExtraTags,
 } from './convert'
 import { buildChartRows, clockAtPly, replayGame } from './gameModel'
 
@@ -234,5 +236,78 @@ describe('PGNs with no timing at all', () => {
 
   it('still refuses a bare %emt game with no starting clock', () => {
     expect(() => convertPgn('1. e4 {[%emt 0:00:30]} *')).toThrow(ConvertError)
+  })
+})
+
+describe('move comments', () => {
+  const annotated =
+    '[TimeControl "4200d10"]\n\n' +
+    '1. d4 {[%emt 0:00:10]} d5 {[%emt 0:00:12] a solid reply} ' +
+    '2. Nf3 {2:00:00} Nc6 {[%emt 0:00:08]} *'
+
+  it('keeps the prose and drops the timing commands around it', () => {
+    const { moves } = convertPgn(annotated)
+    expect(moves[1].comment).toBe('a solid reply')
+    expect(moves[0].comment).toBeNull()
+  })
+
+  it('reads a bare clock as timing, not as a comment', () => {
+    const { moves } = convertPgn(annotated)
+    expect(moves[2].comment).toBeNull()
+    expect(moves[2].clkSeconds).toBe(2 * 3600)
+  })
+
+  it('leaves comments out unless they are asked for', () => {
+    const { moves, result, pgn } = convertPgn(annotated)
+    expect(pgn).not.toContain('a solid reply')
+    const withComments = buildPgn([], moves, result, { comments: true })
+    expect(withComments).toContain('{[%clk 1:09:48] a solid reply}')
+  })
+
+  it('strips a stray brace that would corrupt the comment it is written into', () => {
+    const { moves, result } = convertPgn('1. e4 {a {curly comment} *')
+    expect(buildPgn([], moves, result, { comments: true })).toContain('1. e4 {a curly comment}')
+  })
+})
+
+describe('eval comments', () => {
+  it('writes the eval ahead of the clock on the move it belongs to', () => {
+    const { moves, result } = convertPgn('[TimeControl "4200d10"]\n\n1. d4 {[%emt 0:00:10]} d5 *')
+    const pgn = buildPgn([], moves, result, { evals: ['0.25', '#-3'] })
+    expect(pgn).toContain('1. d4 {[%eval 0.25] [%clk 1:10:00]}')
+    expect(pgn).toContain('d5 {[%eval #-3] [%clk 1:10:00]}')
+  })
+
+  it('leaves a move bare when it has neither an eval nor a clock', () => {
+    const { moves, result } = convertPgn('1. d4 d5 *')
+    expect(buildPgn([], moves, result, { evals: [null, null] })).toContain('1. d4 d5')
+  })
+})
+
+describe('withExtraTags', () => {
+  const headers = [
+    { name: 'Event', value: 'Club night' },
+    { name: 'ECO', value: 'A00' },
+  ]
+
+  it('appends a tag the game does not have, at the end', () => {
+    const merged = withExtraTags(headers, [{ name: 'Annotator', value: 'https://example.com/' }])
+    expect(merged[merged.length - 1]).toEqual({
+      name: 'Annotator',
+      value: 'https://example.com/',
+    })
+  })
+
+  it('overwrites a tag the game already has, in place', () => {
+    const merged = withExtraTags(headers, [{ name: 'ECO', value: 'D02' }])
+    expect(merged).toEqual([
+      { name: 'Event', value: 'Club night' },
+      { name: 'ECO', value: 'D02' },
+    ])
+  })
+
+  it('leaves the headers it was given untouched', () => {
+    withExtraTags(headers, [{ name: 'ECO', value: 'D02' }])
+    expect(headers[1].value).toBe('A00')
   })
 })

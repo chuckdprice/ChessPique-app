@@ -16,8 +16,9 @@ import {
   PLAYED_LIKE_MAE,
   scoreCp,
   winPct,
+  withDeeperEval,
 } from './analysis'
-import type { Classification } from './analysis'
+import type { Classification, RefinedEval } from './analysis'
 
 describe('winPct', () => {
   it('is 50 for an equal position', () => {
@@ -200,5 +201,41 @@ describe('buildGameAnalysis', () => {
       Object.values(c.counts).reduce((a, b) => a + b, 0)
     expect(total(analysis.white)).toBe(1)
     expect(total(analysis.black)).toBe(1)
+  })
+})
+
+describe('withDeeperEval', () => {
+  const empty = () => new Map<number, RefinedEval>()
+
+  it('ignores a search no deeper than the review', () => {
+    const refined = empty()
+    expect(withDeeperEval(refined, 7, { score: { cp: 40 }, depth: 20 }, 20)).toBe(refined)
+    expect(withDeeperEval(refined, 7, { score: { cp: 40 }, depth: 12 }, 20)).toBe(refined)
+  })
+
+  it('takes a deeper search, leaving other plies alone', () => {
+    const next = withDeeperEval(empty(), 7, { score: { cp: 40 }, depth: 26 }, 20)
+    expect(next.get(7)).toEqual({ score: { cp: 40 }, depth: 26 })
+    expect(next.get(8)).toBeUndefined()
+  })
+
+  it('compares against the deepest result so far, not the review', () => {
+    const once = withDeeperEval(empty(), 7, { score: { cp: 40 }, depth: 26 }, 20)
+    // Deeper than the review but shallower than what is already displayed.
+    expect(withDeeperEval(once, 7, { score: { cp: 90 }, depth: 22 }, 20)).toBe(once)
+    const twice = withDeeperEval(once, 7, { score: { cp: 90 }, depth: 30 }, 20)
+    expect(twice.get(7)).toEqual({ score: { cp: 90 }, depth: 30 })
+  })
+
+  it('never replaces a terminal position, which is exact', () => {
+    const refined = empty()
+    const mate = { score: { mate: 1 }, depth: 99 }
+    expect(withDeeperEval(refined, 58, mate, Number.POSITIVE_INFINITY)).toBe(refined)
+  })
+
+  it('keeps a review that outran the target depth', () => {
+    // The review reached 22 here; a live depth-21 answer is not an improvement.
+    const refined = empty()
+    expect(withDeeperEval(refined, 3, { score: { cp: 15 }, depth: 21 }, 22)).toBe(refined)
   })
 })

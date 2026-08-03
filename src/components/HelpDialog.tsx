@@ -94,9 +94,23 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               <Ui>Convert to %clk</Ui>.
             </p>
             <p>
-              The converted game appears on the <Ui>Converted PGN</Ui> tab, where you can copy it to
-              the clipboard or download it. Edit any tag on the left and the converted text, the
+              The converted game appears on the <Ui>Converted PGN</Ui> tab, where <Ui>Copy</Ui> and{' '}
+              <Ui>Download</Ui> take the file and <Ui>Lichess</Ui> and <Ui>Chess.com</Ui> open it
+              for analysis on those sites. Edit any tag on the left and the converted text, the
               download, and the file name all follow along.
+            </p>
+            <p>
+              The <Ui>Include</Ui> switches above those buttons decide what else goes into the
+              file, and all three start on. <Ui>Evals</Ui> writes Stockfish's score on every move
+              as <code>{'{[%eval 0.38]}'}</code>, which appears once the review on step 2 has
+              finished. <Ui>Comments</Ui> keeps any notes your source PGN had against its moves.{' '}
+              <Ui>Opening</Ui> adds the <Ui>ECO</Ui> and <Ui>Opening</Ui> tags and shows the name
+              among the tags on the left, where it is read-only because it is worked out from the
+              moves.
+            </p>
+            <p>
+              Every converted game also carries an <Ui>Annotator</Ui> tag pointing back at this
+              app, so a file you pass on says where it was made.
             </p>
             <p>
               If the clock times come out wrong, or you see an error about the starting clock, open{' '}
@@ -114,19 +128,26 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
             <p>
               Step through the game with the buttons under the board, by clicking a move in the
               list, or with the keyboard. The bar beside the board shows who stands better, and the
-              strip beside it shows captured material.
+              strip beside it shows the material one side is up — an even trade cancels out, so
+              four pawns apiece show nothing and five against four show one pawn.
             </p>
             <p>
               Turn on <Ui>SF 18</Ui> for a live engine on the current position: its best lines are
               drawn as blue arrows, shaded from best to worst, with the move actually played in
               orange. The gear beside it sets search time, number of lines, and memory.
             </p>
+            <p>
+              Leaving the engine running on a move lets it search deeper than the whole-game
+              review did, and when it does, that move's number in the list is replaced with the
+              better one. Hovering a move or its number tells you the depth behind the figure.
+            </p>
           </Section>
 
           <Section title="The four analysis tabs">
             <p>
               <Ui>Evaluation</Ui> — how the advantage swung, with a dot on each notable move.
-              Click the chart to jump to that point in the game.
+              Click the chart to jump to that point in the game. The opening played is named in
+              the top-left corner, matched by position so a transposition still counts.
             </p>
             <p>
               <Ui>Phase Accuracy</Ui> — each player's accuracy in the opening, middlegame, and
@@ -137,7 +158,9 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               their rating and an estimated "played like" rating.
             </p>
             <p>
-              <Ui>Move Times</Ui> — lines for time remaining, bars for time spent per move.
+              <Ui>Move Times</Ui> — lines for time remaining, bars for time spent per move. This
+              chart jumps the board too: the left half of a move is White's, the right half
+              Black's.
             </p>
           </Section>
 

@@ -5,8 +5,14 @@ import {
   CLASSIFICATION_SYMBOL,
   hasMoveMarker,
 } from '../lib/engine/analysis'
-import type { Classification, GameAnalysis, MoveAnalysis } from '../lib/engine/analysis'
+import type {
+  Classification,
+  GameAnalysis,
+  MoveAnalysis,
+  RefinedEval,
+} from '../lib/engine/analysis'
 import { formatScore } from '../lib/engine/uci'
+import type { Score } from '../lib/engine/uci'
 import { classColor } from './ClassBadge'
 
 interface MoveTableProps {
@@ -16,6 +22,8 @@ interface MoveTableProps {
   ply: number
   onPlyChange: (ply: number) => void
   analysis: GameAnalysis | null
+  /** Evals the live engine has searched deeper than the review did, by ply. */
+  deeperEvals: Map<number, RefinedEval>
 }
 
 interface Cell {
@@ -38,6 +46,7 @@ export default function MoveTable({
   ply,
   onPlyChange,
   analysis,
+  deeperEvals,
 }: MoveTableProps) {
   const listRef = useRef<HTMLDivElement>(null)
   const currentRef = useRef<HTMLButtonElement>(null)
@@ -88,6 +97,37 @@ export default function MoveTable({
   const analysisFor = (cell: Cell | null): MoveAnalysis | null =>
     cell ? (analysis?.moves[cell.ply - 1] ?? null) : null
 
+  /**
+   * The evaluation to print after a move, and the depth behind it.
+   *
+   * The live engine's number wins where it has one: standing on a position with
+   * the engine on out-searches the review's fixed depth within seconds, and
+   * leaving the shallower number here would have the move list contradicting
+   * the engine panel directly above it.
+   */
+  const evalFor = (cell: Cell | null): { score: Score; depth: number | null } | null => {
+    if (!cell) return null
+    const deeper = deeperEvals.get(cell.ply)
+    const score = deeper?.score ?? analysisFor(cell)?.scoreAfter
+    if (!score) return null
+    // Infinity marks a terminal position, which was never searched at all.
+    const depth = deeper?.depth ?? analysis?.evalDepths[cell.ply]
+    return { score, depth: depth != null && Number.isFinite(depth) ? depth : null }
+  }
+
+  /**
+   * Hover text carried by *both* halves of a move — the move itself and its
+   * number — so a number that changes under you can explain itself.
+   *
+   * On the number alone it was a 48px target in an 850px row, and the move
+   * beside it is what anyone points at.
+   */
+  const evalTitle = (cell: Cell | null): string | undefined => {
+    const shown = evalFor(cell)
+    if (!shown || shown.depth == null) return undefined
+    return `${formatScore(shown.score)} at depth ${shown.depth}`
+  }
+
   const moveCell = (cell: Cell | null) => {
     if (!cell) return <td className="px-2 text-ink-mute">…</td>
     const current = cell.ply === ply
@@ -100,6 +140,7 @@ export default function MoveTable({
           ref={current ? currentRef : undefined}
           onClick={() => onPlyChange(cell.ply)}
           aria-current={current ? 'true' : undefined}
+          title={evalTitle(cell)}
           className={`w-full rounded px-2 py-0.5 text-left font-score text-sm transition-colors ${
             current ? 'bg-felt text-buff' : 'hover:bg-buff-soft'
           }`}
@@ -118,10 +159,13 @@ export default function MoveTable({
 
   /** Evaluation after the move, in one muted colour regardless of value. */
   const evalCell = (cell: Cell | null) => {
-    const info = analysisFor(cell)
+    const shown = evalFor(cell)
     return (
-      <td className="py-0.5 pr-2 text-right font-score text-xs text-ink-mute tabular-nums">
-        {info ? formatScore(info.scoreAfter) : ''}
+      <td
+        title={evalTitle(cell)}
+        className="py-0.5 pr-2 text-right font-score text-xs text-ink-mute tabular-nums"
+      >
+        {shown ? formatScore(shown.score) : ''}
       </td>
     )
   }

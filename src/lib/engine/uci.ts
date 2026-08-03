@@ -228,6 +228,16 @@ function parseInfoLine(line: string, whiteToMove: boolean, fen: string): EngineL
   return { multipv, depth, score, pvUci, pvSan: uciToSanLine(fen, pvUci) }
 }
 
+/**
+ * Format a white-POV score for a PGN `[%eval ...]` comment: pawns to two
+ * decimals, or `#n` for mate in n — the notation lichess and chess.com write
+ * and read. Unlike the on-screen form this takes no leading `+`.
+ */
+export function formatEvalTag(score: Score): string {
+  if (score.mate != null) return `#${score.mate}`
+  return ((score.cp ?? 0) / 100).toFixed(2)
+}
+
 /** Format a white-POV score for display, e.g. "+1.3", "-0.4", "M5", "-M2". */
 export function formatScore(score: Score): string {
   if (score.mate != null) {

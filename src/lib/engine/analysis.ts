@@ -102,12 +102,53 @@ export interface PlayerSummary {
 export interface GameAnalysis {
   /** evals[i] = eval of fens[i] (white POV). Length = fens.length. */
   evals: Score[]
+  /**
+   * evalDepths[i] = depth actually reached for evals[i], Infinity for a
+   * terminal position (mate or draw, which is exact and cannot be improved).
+   *
+   * The review aims for REVIEW_DEPTH but stops early at the movetime cap, so a
+   * knotty middlegame can come in below it. Recorded because the live engine
+   * only overrides an eval it has genuinely out-searched, and against a flat
+   * assumed depth that comparison would be wrong in both directions.
+   */
+  evalDepths: number[]
   moves: MoveAnalysis[]
   white: PlayerSummary
   black: PlayerSummary
   /** 1-based ply where each phase begins (null if never reached). */
   middlegameStartPly: number | null
   endgameStartPly: number | null
+}
+
+/** A position's evaluation together with the depth that produced it. */
+export interface RefinedEval {
+  score: Score
+  depth: number
+}
+
+/**
+ * Fold a live engine result into the deepened evaluations, keyed by ply.
+ *
+ * The whole-game review runs at a fixed depth, but the live engine is left to
+ * think for as long as the user stands on a position and routinely passes it.
+ * When it does, its number is the better one and replaces what the move list
+ * shows — otherwise the move list and the engine panel sit side by side
+ * disagreeing about the same position.
+ *
+ * Shallower or equal results are dropped, and the map is returned unchanged so
+ * a re-render costs nothing.
+ */
+export function withDeeperEval(
+  refined: Map<number, RefinedEval>,
+  ply: number,
+  candidate: RefinedEval,
+  reviewDepth: number,
+): Map<number, RefinedEval> {
+  const shown = refined.get(ply)?.depth ?? reviewDepth
+  if (!(candidate.depth > shown)) return refined
+  const next = new Map(refined)
+  next.set(ply, candidate)
+  return next
 }
 
 // ---------------------------------------------------------------------------
@@ -239,6 +280,8 @@ export function buildGameAnalysis(
   evals: Score[],
   bestMoves: Array<{ uci: string | null; san: string | null }>,
   playedUcis: string[],
+  /** Depth behind each eval; a gap here reads as "unknown" downstream. */
+  evalDepths: number[] = [],
 ): GameAnalysis {
   const phases = findPhases(fens)
   const moveAnalyses: MoveAnalysis[] = moves.map((move, i) => {
@@ -302,6 +345,7 @@ export function buildGameAnalysis(
 
   return {
     evals,
+    evalDepths,
     moves: moveAnalyses,
     white: summarize('w'),
     black: summarize('b'),
@@ -355,6 +399,7 @@ export async function analyzeGame(
   try {
     await engine.init({ hashMb: 64, multiPv: 1 })
     const evals: Score[] = []
+    const evalDepths: number[] = []
     const bestMoves: Array<{ uci: string | null; san: string | null }> = []
 
     for (let i = 0; i < fens.length; i++) {
@@ -362,11 +407,15 @@ export async function analyzeGame(
       const terminal = terminalScore(fens[i])
       if (terminal) {
         evals.push(terminal)
+        // Nothing to search and nothing deeper to find.
+        evalDepths.push(Number.POSITIVE_INFINITY)
         bestMoves.push({ uci: null, san: null })
       } else {
         const result = await engine.analyze({ fen: fens[i], depth, movetimeMs, multiPv: 1 })
         const top = result.lines[0]
         evals.push(top?.score ?? { cp: 0 })
+        // The depth reached, which the movetime cap can hold below `depth`.
+        evalDepths.push(top?.depth ?? 0)
         bestMoves.push({
           uci: result.bestMoveUci,
           san: top?.pvSan[0] ?? null,
@@ -376,7 +425,7 @@ export async function analyzeGame(
     }
 
     if (signal?.cancelled) return null
-    return buildGameAnalysis(fens, moves, evals, bestMoves, playedUcis)
+    return buildGameAnalysis(fens, moves, evals, bestMoves, playedUcis, evalDepths)
   } finally {
     engine.destroy()
   }

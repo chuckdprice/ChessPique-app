@@ -12,8 +12,12 @@ interface EnginePanelProps {
   onEnabledChange: (enabled: boolean) => void
   settings: EngineSettings
   onSettingsChange: (next: EngineSettings) => void
-  /** Latest top-line score (white POV) for the eval bar; null when idle. */
-  onTopScore?: (score: import('../lib/engine/uci').Score | null) => void
+  /**
+   * Latest top-line score (white POV) and the depth that produced it; null
+   * when idle. The depth lets the caller tell a deeper answer from a shallower
+   * one for the same position.
+   */
+  onTopScore?: (score: import('../lib/engine/uci').Score | null, depth: number) => void
   /** First UCI move of each line, best first — drives the board arrows. */
   onFirstMoves?: (ucis: string[]) => void
 }
@@ -56,7 +60,7 @@ export default function EnginePanel({
   useEffect(() => {
     if (!enabled) {
       engineRef.current?.stop()
-      onTopScoreRef.current?.(null)
+      onTopScoreRef.current?.(null, 0)
       onFirstMovesRef.current?.([])
       return
     }
@@ -85,7 +89,9 @@ export default function EnginePanel({
           if (now - lastFlush.current > 120 || u.depth < 8) {
             lastFlush.current = now
             setUpdate(u)
-            onTopScoreRef.current?.(u.lines[0]?.score ?? null)
+            // The top line's own depth, not the search's: it is the depth that
+            // produced the score being handed over.
+            onTopScoreRef.current?.(u.lines[0]?.score ?? null, u.lines[0]?.depth ?? 0)
             onFirstMovesRef.current?.(
               u.lines.map((line) => line.pvUci[0]).filter((uci): uci is string => !!uci),
             )

@@ -1,13 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { Arrow } from 'react-chessboard'
 import type { ConvertResult, Move } from '../lib/convert'
-import type { GameAnalysis } from '../lib/engine/analysis'
+import type { GameAnalysis, RefinedEval } from '../lib/engine/analysis'
 import type { Score } from '../lib/engine/uci'
 import type { EngineSettings } from '../lib/settings'
 import type { ChartRow, ReplayedGame } from '../lib/gameModel'
 import { clockAtPly } from '../lib/gameModel'
 import type { Opening } from '../lib/openings'
-import { findOpening } from '../lib/openings'
 import AnalysisProgress from './AnalysisProgress'
 import AnalysisTabs from './AnalysisTabs'
 import BoardViewer, { BoardNav, PlayerPlateRow } from './BoardViewer'
@@ -24,6 +23,10 @@ interface AnalysisPageProps {
   ply: number
   onPlyChange: (ply: number) => void
   analysis: GameAnalysis | null
+  /** Evals the live engine has searched deeper than the review did, by ply. */
+  deeperEvals: Map<number, RefinedEval>
+  /** Named opening for the evaluation chart's caption; null while it loads. */
+  opening: Opening | null
   analysisProgress: { done: number; total: number } | null
   analysisError: string | null
   chartRows: ChartRow[]
@@ -39,27 +42,9 @@ interface AnalysisPageProps {
   onEngineOnChange: (on: boolean) => void
   engineSettings: EngineSettings
   onEngineSettingsChange: (next: EngineSettings) => void
-  onTopScore: (score: Score | null) => void
+  onTopScore: (score: Score | null, depth: number) => void
   onEngineMoves: (ucis: string[]) => void
   arrows: Arrow[]
-}
-
-/** The game's opening, once the book has loaded; null until then and if unnamed. */
-function useOpening(fens: string[]): Opening | null {
-  const [opening, setOpening] = useState<Opening | null>(null)
-
-  useEffect(() => {
-    let current = true
-    setOpening(null)
-    findOpening(fens).then((found) => {
-      if (current) setOpening(found)
-    })
-    return () => {
-      current = false
-    }
-  }, [fens])
-
-  return opening
 }
 
 /**
@@ -75,6 +60,8 @@ export default function AnalysisPage({
   ply,
   onPlyChange,
   analysis,
+  deeperEvals,
+  opening,
   analysisProgress,
   analysisError,
   chartRows,
@@ -94,7 +81,6 @@ export default function AnalysisPage({
   arrows,
 }: AnalysisPageProps) {
   const [orientation, setOrientation] = useState<'white' | 'black'>('white')
-  const opening = useOpening(replay.fens)
   const lastPly = replay.fens.length - 1
   // A game with no clocks anywhere shows none: falling back to the time control
   // would pin a full starting clock beside both players for every move.
@@ -172,6 +158,7 @@ export default function AnalysisPage({
             ply={ply}
             onPlyChange={onPlyChange}
             analysis={analysis}
+            deeperEvals={deeperEvals}
           />
         </div>
 

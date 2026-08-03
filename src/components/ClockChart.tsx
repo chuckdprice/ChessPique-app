@@ -17,6 +17,8 @@ interface ClockChartProps {
   startSeconds: number | null
   whiteName: string
   blackName: string
+  /** Jump the board to a move, as clicking the evaluation chart does. */
+  onPlyChange?: (ply: number) => void
   /** Render without the outer card chrome (for use inside the analysis tabs). */
   embedded?: boolean
 }
@@ -40,6 +42,40 @@ function clockTicks(maxSeconds: number): number[] {
   // Label the domain top (the full time control) even when it is off-step.
   if (ticks[ticks.length - 1] !== maxSeconds) ticks.push(maxSeconds)
   return ticks
+}
+
+// Shared with the click handler, which has to know where the plot area starts
+// and ends to work out which move was clicked. Kept as constants so the two
+// cannot drift apart.
+const CHART_MARGIN = { top: 8, right: 8, bottom: 4, left: 12 }
+const CLOCK_AXIS_WIDTH = 58
+const SPENT_AXIS_WIDTH = 48
+
+/**
+ * The ply a click at `clientX` picked, or null for a click outside the plot.
+ *
+ * Worked out from the geometry rather than from recharts' active-tooltip state,
+ * which is only populated by hovering: a tap that never moves a pointer first —
+ * every touch tap, and any click a test or assistive tech synthesises — arrives
+ * with no active move at all, and reading it would silently jump to move 1.
+ *
+ * The x axis is a band scale, so the plot divides evenly into one band per move
+ * and the pointer's offset along it gives the index outright. Each band holds
+ * both of the move's plies, White's bar left of the tick and Black's right, so
+ * which half of the band was clicked is which side was meant.
+ */
+function plyForClick(rows: ChartRow[], plot: DOMRect, clientX: number): number | null {
+  const left = plot.left + CHART_MARGIN.left + CLOCK_AXIS_WIDTH
+  const right = plot.right - CHART_MARGIN.right - SPENT_AXIS_WIDTH
+  const band = (right - left) / rows.length
+  if (!(band > 0) || clientX < left || clientX > right) return null
+
+  const offset = (clientX - left) / band
+  const row = rows[Math.min(Math.floor(offset), rows.length - 1)]
+  if (!row) return null
+
+  const black = offset % 1 >= 0.5
+  return (black ? (row.blackPly ?? row.whitePly) : (row.whitePly ?? row.blackPly)) ?? null
 }
 
 interface TooltipContentProps {
@@ -87,6 +123,7 @@ export default function ClockChart({
   startSeconds,
   whiteName,
   blackName,
+  onPlyChange,
   embedded = false,
 }: ClockChartProps) {
   const hasClocks = rows.some((r) => r.whiteClk != null || r.blackClk != null)
@@ -159,7 +196,16 @@ export default function ClockChart({
       </div>
       <div className={embedded ? 'px-2 pt-1' : 'px-2 py-4'}>
         <ResponsiveContainer width="100%" height={150}>
-          <ComposedChart data={rows} margin={{ top: 8, right: 8, bottom: 4, left: 12 }}>
+          <ComposedChart
+            data={rows}
+            margin={CHART_MARGIN}
+            style={onPlyChange ? { cursor: 'pointer' } : undefined}
+            onClick={(_state, event) => {
+              if (!onPlyChange) return
+              const ply = plyForClick(rows, event.currentTarget.getBoundingClientRect(), event.clientX)
+              if (ply != null) onPlyChange(ply)
+            }}
+          >
             <CartesianGrid stroke="var(--chart-grid)" vertical={false} />
             <XAxis
               dataKey="moveNumber"
@@ -183,7 +229,7 @@ export default function ClockChart({
               tick={{ fontSize: 11, fill: 'var(--chart-tick)' }}
               tickLine={false}
               axisLine={false}
-              width={58}
+              width={CLOCK_AXIS_WIDTH}
               label={{
                 value: 'Time remaining',
                 angle: -90,
@@ -201,7 +247,7 @@ export default function ClockChart({
               tick={{ fontSize: 11, fill: 'var(--chart-tick)' }}
               tickLine={false}
               axisLine={false}
-              width={48}
+              width={SPENT_AXIS_WIDTH}
               label={{
                 value: 'Time per move',
                 angle: 90,

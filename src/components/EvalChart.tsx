@@ -11,6 +11,7 @@ import {
 import type { Classification, GameAnalysis } from '../lib/engine/analysis'
 import { formatScore } from '../lib/engine/uci'
 import type { Move } from '../lib/convert'
+import type { Opening } from '../lib/openings'
 import { classColor } from './ClassBadge'
 
 interface EvalChartProps {
@@ -18,6 +19,8 @@ interface EvalChartProps {
   moves: Move[]
   ply: number
   onPlyChange: (ply: number) => void
+  /** Named opening, captioned over the chart; null while the book loads. */
+  opening: Opening | null
 }
 
 interface EvalRow {
@@ -94,7 +97,7 @@ function EvalTooltip({
   )
 }
 
-export default function EvalChart({ analysis, moves, ply, onPlyChange }: EvalChartProps) {
+export default function EvalChart({ analysis, moves, ply, onPlyChange, opening }: EvalChartProps) {
   const rows: EvalRow[] = analysis.evals.map((score, i) => {
     const pawns =
       score.mate != null ? (score.mate > 0 ? 10 : -10) : Math.max(-10, Math.min(10, (score.cp ?? 0) / 100))
@@ -111,7 +114,21 @@ export default function EvalChart({ analysis, moves, ply, onPlyChange }: EvalCha
   })
 
   return (
-    <div>
+    <div className="relative">
+      {/*
+        Sits inside the plot rather than above it: the chart pane is short, and
+        the top-left corner is quiet in all but a game White wins outright.
+        Clear of the y-axis labels, and click-through so it never eats a click
+        meant for the chart underneath.
+      */}
+      {opening && (
+        <p
+          title={`${opening.name} — through move ${Math.ceil(opening.ply / 2)}`}
+          className="pointer-events-none absolute left-11 top-1 z-10 max-w-[calc(100%-4rem)] truncate rounded bg-card/80 px-1.5 py-0.5 text-[11px] font-medium text-ink-mute"
+        >
+          <span className="font-score text-ink">{opening.eco}</span>: {opening.name}
+        </p>
+      )}
       <ResponsiveContainer width="100%" height={150}>
         <AreaChart
           data={rows}

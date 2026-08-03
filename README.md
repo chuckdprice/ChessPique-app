@@ -32,6 +32,9 @@ On the analysis page you can:
   (Best, Inaccuracy → Blunder; Good and Excellent stay unmarked) in the move list, on the board
   and as dots on the evaluation graph, and four analysis tabs — Evaluation,
   Phase Accuracy, Move Classification, and Move Times
+- See which opening was played, named over the evaluation chart as `ECO: Name`
+- Click either chart to jump the board to that move — on the Move Times chart, the left half
+  of a move is White's and the right half is Black's
 - Turn on the live engine panel for a continuously updating evaluation of the current
   position, with configurable search time, number of lines, and memory
 - Download the converted PGN with your edited tags
@@ -100,6 +103,21 @@ engine time again. Two limits are inherent to the approach and worth stating pla
   is therefore rounded to the nearest 100, prefixed with `~`, and explained on hover — treat it
   as a rough indicator, not a measurement. Accuracy and move classification are on much firmer
   ground.
+
+## Opening names
+
+The name over the evaluation chart comes from the **lichess opening book**
+([lichess-org/chess-openings](https://github.com/lichess-org/chess-openings), CC0-1.0) —
+about 3,800 named lines. It is baked into `src/lib/openings.data.ts` by
+`scripts/build-openings.mjs`, so nothing is fetched at build time or at run time:
+
+```bash
+node scripts/build-openings.mjs
+```
+
+The book is keyed by **position**, not by move order, so a transposition is still named
+correctly — 1.Nf3 d5 2.d4 and 1.d4 d5 2.Nf3 are one opening. A game is named by the deepest
+book position it reached. The data is ~420 kB, so it loads on demand rather than with the app.
 
 ## Appearance
 

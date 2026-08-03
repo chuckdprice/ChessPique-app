@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Move } from '../lib/convert'
 import type { GameAnalysis } from '../lib/engine/analysis'
 import type { ChartRow } from '../lib/gameModel'
+import type { Opening } from '../lib/openings'
 import ClassificationTable from './ClassificationTable'
 import ClockChart from './ClockChart'
 import EvalChart from './EvalChart'
@@ -18,6 +19,8 @@ interface AnalysisTabsProps {
   onPlyChange: (ply: number) => void
   chartRows: ChartRow[]
   startSeconds: number | null
+  /** Named opening for the evaluation chart's caption; null while it loads. */
+  opening: Opening | null
   whiteName: string
   blackName: string
   whiteElo: string | null
@@ -88,6 +91,7 @@ export default function AnalysisTabs({
   onPlyChange,
   chartRows,
   startSeconds,
+  opening,
   whiteName,
   blackName,
   whiteElo,
@@ -175,7 +179,13 @@ export default function AnalysisTabs({
       <div className="min-h-0 flex-1 overflow-y-auto py-2">
         {tab === 'evaluation' &&
           (analysis ? (
-            <EvalChart analysis={analysis} moves={moves} ply={ply} onPlyChange={onPlyChange} />
+            <EvalChart
+              analysis={analysis}
+              moves={moves}
+              ply={ply}
+              onPlyChange={onPlyChange}
+              opening={opening}
+            />
           ) : (
             <AnalysisPending progress={progress} error={analysisError} />
           ))}
@@ -208,6 +218,7 @@ export default function AnalysisTabs({
             startSeconds={startSeconds}
             whiteName={whiteName}
             blackName={blackName}
+            onPlyChange={onPlyChange}
             embedded
           />
         )}

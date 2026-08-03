@@ -109,12 +109,19 @@ export interface ChartRow {
   /** Time spent on the move — from %emt, or reconstructed from the clock. */
   whiteSpent: number | null
   blackSpent: number | null
+  /**
+   * Ply each half of the row stands for, so a click on the chart can jump the
+   * board there. Carried rather than derived: 2n-1 only holds for a game that
+   * starts at move 1 with White to play.
+   */
+  whitePly: number | null
+  blackPly: number | null
 }
 
 /** Group per-ply timing data into one row per integer move number. */
 export function buildChartRows(moves: Move[]): ChartRow[] {
   const byNumber = new Map<number, ChartRow>()
-  for (const move of moves) {
+  moves.forEach((move, i) => {
     let row = byNumber.get(move.number)
     if (!row) {
       row = {
@@ -125,6 +132,8 @@ export function buildChartRows(moves: Move[]): ChartRow[] {
         blackClk: null,
         whiteSpent: null,
         blackSpent: null,
+        whitePly: null,
+        blackPly: null,
       }
       byNumber.set(move.number, row)
     }
@@ -132,11 +141,13 @@ export function buildChartRows(moves: Move[]): ChartRow[] {
       row.whiteSan = move.san
       row.whiteClk = move.clkSeconds
       row.whiteSpent = move.spentSeconds
+      row.whitePly = i + 1
     } else {
       row.blackSan = move.san
       row.blackClk = move.clkSeconds
       row.blackSpent = move.spentSeconds
+      row.blackPly = i + 1
     }
-  }
+  })
   return [...byNumber.values()].sort((a, b) => a.moveNumber - b.moveNumber)
 }

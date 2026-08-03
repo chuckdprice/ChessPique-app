@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Arrow } from 'react-chessboard'
 import type { ConvertResult, Move } from '../lib/convert'
 import type { GameAnalysis } from '../lib/engine/analysis'
@@ -6,6 +6,8 @@ import type { Score } from '../lib/engine/uci'
 import type { EngineSettings } from '../lib/settings'
 import type { ChartRow, ReplayedGame } from '../lib/gameModel'
 import { clockAtPly } from '../lib/gameModel'
+import type { Opening } from '../lib/openings'
+import { findOpening } from '../lib/openings'
 import AnalysisProgress from './AnalysisProgress'
 import AnalysisTabs from './AnalysisTabs'
 import BoardViewer, { BoardNav, PlayerPlateRow } from './BoardViewer'
@@ -42,6 +44,24 @@ interface AnalysisPageProps {
   arrows: Arrow[]
 }
 
+/** The game's opening, once the book has loaded; null until then and if unnamed. */
+function useOpening(fens: string[]): Opening | null {
+  const [opening, setOpening] = useState<Opening | null>(null)
+
+  useEffect(() => {
+    let current = true
+    setOpening(null)
+    findOpening(fens).then((found) => {
+      if (current) setOpening(found)
+    })
+    return () => {
+      current = false
+    }
+  }, [fens])
+
+  return opening
+}
+
 /**
  * The whole review in one screen. A single grid drives the alignment:
  * the right column occupies only the board's row, so the engine panel's top
@@ -74,6 +94,7 @@ export default function AnalysisPage({
   arrows,
 }: AnalysisPageProps) {
   const [orientation, setOrientation] = useState<'white' | 'black'>('white')
+  const opening = useOpening(replay.fens)
   const lastPly = replay.fens.length - 1
   // A game with no clocks anywhere shows none: falling back to the time control
   // would pin a full starting clock beside both players for every move.
@@ -184,6 +205,7 @@ export default function AnalysisPage({
             onPlyChange={onPlyChange}
             chartRows={chartRows}
             startSeconds={startSeconds}
+            opening={opening}
             whiteName={whiteName}
             blackName={blackName}
             whiteElo={whiteElo}

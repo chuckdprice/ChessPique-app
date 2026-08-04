@@ -23,8 +23,14 @@ import {
 import type { GameAnalysis, RefinedEval } from './lib/engine/analysis'
 import { formatEvalTag } from './lib/engine/uci'
 import type { Score } from './lib/engine/uci'
-import { buildChartRows, replayGame } from './lib/gameModel'
-import type { ReplayedGame } from './lib/gameModel'
+import {
+  buildChartRows,
+  playExploredMove,
+  replayGame,
+  startExploration,
+  takeBackExploredMove,
+} from './lib/gameModel'
+import type { Exploration, ReplayedGame } from './lib/gameModel'
 import {
   applyAppearance,
   loadAppearance,
@@ -113,6 +119,8 @@ export default function App() {
   const [analysisError, setAnalysisError] = useState<string | null>(null)
   // Positions the live engine has out-searched the review on, keyed by ply.
   const [deeperEvals, setDeeperEvals] = useState<Map<number, RefinedEval>>(new Map())
+  // A line the user is playing out by hand from some position in the game.
+  const [exploration, setExploration] = useState<Exploration | null>(null)
   // What the converted PGN carries beyond the moves and clocks. On by default:
   // the switches are there to leave things out, and a file is more useful with
   // them in.
@@ -155,6 +163,7 @@ export default function App() {
       setAnalysisError(null)
       setLiveScore(null)
       setEngineMoves([])
+      setExploration(null)
       setGame({ result, replay })
       setHeaders(result.headers)
       setPly(0)
@@ -196,7 +205,12 @@ export default function App() {
       },
     })
       .then((result) => {
-        if (!signal.cancelled && result) setAnalysis(result)
+        if (signal.cancelled || !result) return
+        setAnalysis(result)
+        // The review is what the converted PGN was waiting on — its evals,
+        // notes and variations only exist now — so the PGN File page swaps to
+        // showing the finished output rather than the text it started from.
+        setPanes((prev) => ({ ...prev, original: false, converted: true }))
       })
       .catch((e) => {
         if (!signal.cancelled) {
@@ -223,10 +237,16 @@ export default function App() {
   plyRef.current = ply
   const analysisRef = useRef(analysis)
   analysisRef.current = analysis
+  const explorationRef = useRef(exploration)
+  explorationRef.current = exploration
+  const gameRef = useRef(game)
+  gameRef.current = game
 
   const handleTopScore = useCallback((score: Score | null, depth: number) => {
     setLiveScore(score)
-    if (!score) return
+    // A score for a position reached by hand is not this ply's, and recording
+    // it would quietly rewrite the game's own evaluation.
+    if (!score || explorationRef.current) return
     const at = plyRef.current
     // Terminal positions carry Infinity and are never beaten; a position the
     // review has not reached yet is assumed to have had its full depth, which
@@ -235,6 +255,33 @@ export default function App() {
     setDeeperEvals((prev) => withDeeperEval(prev, at, { score, depth }, reviewDepth))
   }, [])
   const handleEngineMoves = useCallback((ucis: string[]) => setEngineMoves(ucis), [])
+
+  /**
+   * Stepping through the game leaves any hand-played line behind. The line
+   * hangs off a ply, so moving to another one would strand it, and a user
+   * pressing the arrow keys means "show me the game".
+   */
+  const handlePlyChange = useCallback((next: number) => {
+    setExploration(null)
+    setPly(next)
+  }, [])
+
+  const handlePieceMove = useCallback(
+    (from: string, to: string) => {
+      const current =
+        explorationRef.current ??
+        startExploration(gameRef.current?.replay.fens[plyRef.current] ?? '', plyRef.current)
+      const next = playExploredMove(current, from, to)
+      if (!next) return false
+      setExploration(next)
+      return true
+    },
+    [],
+  )
+
+  const handleExplorationTakeBack = useCallback(() => {
+    setExploration((prev) => (prev ? takeBackExploredMove(prev) : null))
+  }, [])
 
   const handlePaneChange = useCallback(
     (id: keyof PgnPanes, open: boolean) => setPanes((prev) => ({ ...prev, [id]: open })),
@@ -250,6 +297,12 @@ export default function App() {
   useEffect(() => {
     if (!game || page !== 'analysis' || helpOpen) return
     const lastPly = game.replay.fens.length - 1
+    // Keyboard navigation is navigation: it leaves any hand-played line, the
+    // same as the buttons and the move list do.
+    const step = (next: (p: number) => number) => {
+      setExploration(null)
+      setPly(next)
+    }
     const onKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement
       if (
@@ -262,16 +315,16 @@ export default function App() {
       }
       if (e.key === 'ArrowLeft') {
         e.preventDefault()
-        setPly((p) => Math.max(0, p - 1))
+        step((p) => Math.max(0, p - 1))
       } else if (e.key === 'ArrowRight') {
         e.preventDefault()
-        setPly((p) => Math.min(lastPly, p + 1))
+        step((p) => Math.min(lastPly, p + 1))
       } else if (e.key === 'Home') {
         e.preventDefault()
-        setPly(0)
+        step(() => 0)
       } else if (e.key === 'End') {
         e.preventDefault()
-        setPly(lastPly)
+        step(() => lastPly)
       }
     }
     window.addEventListener('keydown', onKeyDown)
@@ -351,9 +404,10 @@ export default function App() {
 
   // The bar shows the same number as the move list does for this position, so
   // a deepened eval has to reach both or the two would disagree on screen.
-  const evalScore: Score | null = analysis
-    ? (deeperEvals.get(ply)?.score ?? analysis.evals[ply] ?? null)
-    : liveScore
+  const evalScore: Score | null =
+    exploration || !analysis
+      ? liveScore
+      : (deeperEvals.get(ply)?.score ?? analysis.evals[ply] ?? null)
 
   // Engine candidates fade best→worst, then the game's own next move is drawn
   // on top. The move already on the board gets no arrow — the highlighted
@@ -361,8 +415,10 @@ export default function App() {
   const arrows: Arrow[] = useMemo(() => {
     if (!engineOn || !game) return []
     // lastMoveSquares[ply + 1] is the move played *from* this position, so it
-    // is by the same side the engine is thinking for. Only that one.
-    const nextMove = game.replay.lastMoveSquares[ply + 1]
+    // is by the same side the engine is thinking for. Only that one — and only
+    // when the board is showing the game, since a position reached by hand has
+    // no move that came next.
+    const nextMove = exploration ? null : game.replay.lastMoveSquares[ply + 1]
     const nextKey = nextMove ? `${nextMove[0]}${nextMove[1]}` : null
 
     // The board keys arrows by from-to, so every square pair may appear once.
@@ -536,10 +592,14 @@ export default function App() {
               replay={game.replay}
               moves={game.result.moves}
               ply={ply}
-              onPlyChange={setPly}
+              onPlyChange={handlePlyChange}
               analysis={analysis}
               deeperEvals={deeperEvals}
               opening={opening}
+              exploration={exploration}
+              onPieceMove={handlePieceMove}
+              onExplorationTakeBack={handleExplorationTakeBack}
+              onExplorationExit={() => setExploration(null)}
               analysisProgress={analysisProgress}
               analysisError={analysisError}
               chartRows={chartRows}

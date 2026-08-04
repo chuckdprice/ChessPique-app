@@ -15,8 +15,9 @@ sized so a 1440×900 desktop window needs no scrolling on either step.
   *Original PGN* (paste or upload the file, with the time-control override beside the Convert
   button), *PGN Header Editor* (the tags, whose edits flow live into everything downstream),
   *Converted PGN* (the `%clk` output and the switches for what goes into it), and *Export PGN*
-  (copy, download, or open the game on Lichess or Chess.com). Each opens on its own; the last
-  three stay locked until a game has been converted, since until then they describe nothing.
+  (copy, download, open the game on Lichess or Chess.com, or save it into a Lichess study).
+  Each opens on its own; the last three stay locked until a game has been converted, since
+  until then they describe nothing.
 - **Game Analysis**: board, engine, move list, and charts in one screen.
 
 ### What goes into the converted PGN
@@ -66,6 +67,10 @@ On the analysis page you can:
 - See which opening was played, named over the evaluation chart as `ECO: Name`
 - Click either chart to jump the board to that move — on the Move Times chart, the left half
   of a move is White's and the right half is Black's
+- Try a line by hand: drag the pieces and the board leaves the game to follow you, with the
+  engine evaluating each position as you reach it. *Take back* unplays a move, *Back to game*
+  returns, and so does any use of the navigation. Nothing played this way touches the game —
+  the move list, the accuracies, and the exported PGN still describe the moves actually played
 - Turn on the live engine panel for a continuously updating evaluation of the current
   position, with configurable search time, number of lines, and memory
 - Download the converted PGN with your edited tags
@@ -134,6 +139,28 @@ engine time again. Two limits are inherent to the approach and worth stating pla
   is therefore rounded to the nearest 100, prefixed with `~`, and explained on hover — treat it
   as a rough indicator, not a measurement. Accuracy and move classification are on much firmer
   ground.
+
+## Saving to a Lichess study
+
+*Export PGN → Lichess Study* adds the converted game to one of your own studies as a new
+chapter, using the [Studies API](https://lichess.org/api#tag/studies).
+
+Sign-in is **OAuth 2 with PKCE**, entirely in the browser. There is no server here to hold a
+client secret, which is the case PKCE exists for: the app generates a random verifier per
+attempt, sends only its SHA-256 hash to Lichess, and proves ownership when redeeming the code.
+Lichess requires no registration for a public client — the `client_id` is just a name.
+
+- **Scopes**: `study:read study:write` — the whole Studies API and nothing else. No games, no
+  messages, no preferences.
+- **The pop-up**: sign-in opens in a window of its own rather than redirecting this page. A
+  top-level redirect would reload the app and discard the converted game and its engine review
+  — the very thing being saved. The pop-up posts its code back to the opener and closes.
+- **The token** lives in `localStorage` until it expires or you sign out, which also revokes it
+  at Lichess (`DELETE /api/token`). A rejected token is dropped and the sign-in offered again.
+- **Endpoints**: `GET /api/account` for the username, `GET /api/study/by/{username}` for the
+  study list (newline-delimited JSON), and `POST /api/study/{studyId}/import-pgn` to add the
+  chapter. All three send `Access-Control-Allow-Origin: *`, so the browser can call them
+  directly.
 
 ## Opening names
 

@@ -2,9 +2,10 @@ import { Chessboard, defaultArrowOptions } from 'react-chessboard'
 import type { Arrow } from 'react-chessboard'
 import { formatClockTime } from '../lib/convert'
 import type { Move } from '../lib/convert'
-import { hasMoveMarker } from '../lib/engine/analysis'
+import { formatVariation, hasMoveMarker } from '../lib/engine/analysis'
 import type { GameAnalysis } from '../lib/engine/analysis'
-import type { ReplayedGame } from '../lib/gameModel'
+import { explorationFen } from '../lib/gameModel'
+import type { Exploration, ReplayedGame } from '../lib/gameModel'
 import ClassBadge from './ClassBadge'
 
 export interface PlayerPlate {
@@ -21,6 +22,10 @@ interface BoardViewerProps {
   orientation: 'white' | 'black'
   analysis: GameAnalysis | null
   arrows: Arrow[]
+  /** The line being played out by hand, if any; it owns the board while set. */
+  exploration: Exploration | null
+  /** Play a move by hand. Returning false snaps the piece back. */
+  onPieceMove: (from: string, to: string) => boolean
 }
 
 /** Top-right-corner position of a square as percentages, given orientation. */
@@ -74,9 +79,14 @@ export default function BoardViewer({
   orientation,
   analysis,
   arrows,
+  exploration,
+  onPieceMove,
 }: BoardViewerProps) {
-  const highlight = replay.lastMoveSquares[ply]
-  const moveAnalysis = ply > 0 ? (analysis?.moves[ply - 1] ?? null) : null
+  const highlight = exploration ? exploration.lastMoveSquares : replay.lastMoveSquares[ply]
+  // The badge grades a move that was actually played, so it has nothing to say
+  // about a position reached by hand.
+  const moveAnalysis =
+    !exploration && ply > 0 ? (analysis?.moves[ply - 1] ?? null) : null
   const showBadge = moveAnalysis != null && hasMoveMarker(moveAnalysis.classification)
   const badgeSquare = showBadge && highlight ? highlight[1] : null
   const badgePos = badgeSquare ? squareCorner(badgeSquare, orientation) : null
@@ -92,9 +102,11 @@ export default function BoardViewer({
     <div className="relative size-(--board-size) overflow-hidden rounded-lg shadow-md">
       <Chessboard
         options={{
-          position: replay.fens[ply],
+          position: exploration ? explorationFen(exploration) : replay.fens[ply],
           boardOrientation: orientation,
-          allowDragging: false,
+          allowDragging: true,
+          onPieceDrop: ({ sourceSquare, targetSquare }) =>
+            targetSquare != null && onPieceMove(sourceSquare, targetSquare),
           allowDrawingArrows: false,
           animationDurationInMs: 150,
           squareStyles,
@@ -121,6 +133,58 @@ export default function BoardViewer({
           <ClassBadge classification={moveAnalysis.classification} size={20} />
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * The strip that appears while a line is being tried out by hand.
+ *
+ * Navigation stays where it is: pressing it leaves the line, which is a normal
+ * way to finish with one. What this adds is the line so far, unplaying its last
+ * move, and a way back that does not move the game on.
+ */
+export function ExploreBar({
+  exploration,
+  onTakeBack,
+  onExit,
+}: {
+  exploration: Exploration
+  onTakeBack: () => void
+  onExit: () => void
+}) {
+  const button =
+    'shrink-0 rounded-md border border-rule bg-card px-2.5 py-1.5 text-xs leading-none text-ink transition-colors hover:bg-buff-soft disabled:cursor-not-allowed disabled:opacity-30'
+  const line = formatVariation(
+    exploration.sans,
+    exploration.branchNumber,
+    exploration.branchColor,
+  )
+
+  return (
+    <div
+      className="flex w-full items-center gap-2 rounded-md border border-accent-bright/40 bg-accent-bright/10 px-2 py-1"
+      role="group"
+      aria-label="Trying a line"
+    >
+      <span className="shrink-0 text-xs font-medium text-ink">Trying a line</span>
+      <span
+        title={line || undefined}
+        className="min-w-0 flex-1 truncate font-score text-xs text-ink-mute"
+      >
+        {line || 'drag a piece to try a move — the engine follows the board'}
+      </span>
+      <button
+        type="button"
+        className={button}
+        onClick={onTakeBack}
+        disabled={exploration.sans.length === 0}
+      >
+        Take back
+      </button>
+      <button type="button" className={button} onClick={onExit}>
+        Back to game
+      </button>
     </div>
   )
 }

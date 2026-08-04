@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import type { ConvertOptions } from '../lib/convert'
 import type { Opening } from '../lib/openings'
+import LichessStudyDialog from './LichessStudyDialog'
 import Pane from './Pane'
 import PgnActions from './PgnActions'
 import PgnExtrasSwitches from './PgnExtrasSwitches'
@@ -63,6 +64,7 @@ export default function PgnFilePage({
   onPaneChange,
 }: PgnFilePageProps) {
   const [dragOver, setDragOver] = useState(false)
+  const [studyOpen, setStudyOpen] = useState(false)
   const [startMinutes, setStartMinutes] = useState('')
   const [mode, setMode] = useState<OverrideMode>('auto')
   const [amount, setAmount] = useState('')
@@ -246,8 +248,40 @@ export default function PgnFilePage({
         locked={locked}
         lockedHint={lockedHint}
       >
-        {convertedPgn && <PgnActions pgn={convertedPgn} fileName={downloadName} compact />}
+        {convertedPgn && (
+          <div className="flex flex-wrap items-center gap-2">
+            <PgnActions pgn={convertedPgn} fileName={downloadName} compact />
+            <button
+              type="button"
+              onClick={() => setStudyOpen(true)}
+              className="flex items-center gap-1.5 rounded-lg bg-felt px-3 py-1.5 text-sm font-medium text-buff shadow-sm transition-colors hover:bg-felt-deep"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                className="size-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H18v16H5.5A1.5 1.5 0 0 1 4 18.5Z" />
+                <path d="M8 8h6M8 12h6" />
+              </svg>
+              Lichess Study
+            </button>
+          </div>
+        )}
       </Pane>
+
+      {studyOpen && convertedPgn && (
+        <LichessStudyDialog
+          pgn={convertedPgn}
+          defaultChapterName={downloadName.replace(/\.pgn$/i, '')}
+          onClose={() => setStudyOpen(false)}
+        />
+      )}
 
       {error && (
         <div role="alert" className="shrink-0">

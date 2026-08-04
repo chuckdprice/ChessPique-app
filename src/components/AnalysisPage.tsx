@@ -5,11 +5,12 @@ import type { GameAnalysis, RefinedEval } from '../lib/engine/analysis'
 import type { Score } from '../lib/engine/uci'
 import type { EngineSettings } from '../lib/settings'
 import type { ChartRow, ReplayedGame } from '../lib/gameModel'
-import { clockAtPly } from '../lib/gameModel'
+import { clockAtPly, explorationFen } from '../lib/gameModel'
+import type { Exploration } from '../lib/gameModel'
 import type { Opening } from '../lib/openings'
 import AnalysisProgress from './AnalysisProgress'
 import AnalysisTabs from './AnalysisTabs'
-import BoardViewer, { BoardNav, PlayerPlateRow } from './BoardViewer'
+import BoardViewer, { BoardNav, ExploreBar, PlayerPlateRow } from './BoardViewer'
 import type { PlayerPlate } from './BoardViewer'
 import CapturedStrip from './CapturedStrip'
 import EnginePanel from './EnginePanel'
@@ -27,6 +28,11 @@ interface AnalysisPageProps {
   deeperEvals: Map<number, RefinedEval>
   /** Named opening for the evaluation chart's caption; null while it loads. */
   opening: Opening | null
+  /** A line being tried out by hand; it owns the board and the engine while set. */
+  exploration: Exploration | null
+  onPieceMove: (from: string, to: string) => boolean
+  onExplorationTakeBack: () => void
+  onExplorationExit: () => void
   analysisProgress: { done: number; total: number } | null
   analysisError: string | null
   chartRows: ChartRow[]
@@ -62,6 +68,10 @@ export default function AnalysisPage({
   analysis,
   deeperEvals,
   opening,
+  exploration,
+  onPieceMove,
+  onExplorationTakeBack,
+  onExplorationExit,
   analysisProgress,
   analysisError,
   chartRows,
@@ -82,6 +92,9 @@ export default function AnalysisPage({
 }: AnalysisPageProps) {
   const [orientation, setOrientation] = useState<'white' | 'black'>('white')
   const lastPly = replay.fens.length - 1
+  // One position drives the board, the engine and the captured strip, whether
+  // it came from the game or from the line being tried.
+  const shownFen = exploration ? explorationFen(exploration) : replay.fens[ply]
   // A game with no clocks anywhere shows none: falling back to the time control
   // would pin a full starting clock beside both players for every move.
   const hasClocks = moves.some((m) => m.clkSeconds != null)
@@ -112,6 +125,16 @@ export default function AnalysisPage({
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       {reviewing && <AnalysisProgress progress={analysisProgress} error={analysisError} />}
 
+      {/* Full width, above the grid: the nav column is only as wide as the
+          board, which left the line itself no room to be read. */}
+      {exploration && (
+        <ExploreBar
+          exploration={exploration}
+          onTakeBack={onExplorationTakeBack}
+          onExit={onExplorationExit}
+        />
+      )}
+
       {/* Shape lives in .analysis-grid in index.css so it can change at lg. */}
       <div className="analysis-grid min-h-0 lg:flex-1">
         <div className="area-plate-top min-w-0">
@@ -129,11 +152,13 @@ export default function AnalysisPage({
             orientation={orientation}
             analysis={analysis}
             arrows={arrows}
+            exploration={exploration}
+            onPieceMove={onPieceMove}
           />
         </div>
 
         <div className="area-captured">
-          <CapturedStrip fen={replay.fens[ply]} orientation={orientation} />
+          <CapturedStrip fen={shownFen} orientation={orientation} />
         </div>
 
         {/* On lg this spans rows 1-3, so the engine pane's top lines up with the
@@ -144,7 +169,7 @@ export default function AnalysisPage({
             around a 180px board with the nav pushed off the bottom. */}
         <div className="area-side flex min-h-0 flex-col gap-2 sm:overflow-hidden">
           <EnginePanel
-            fen={replay.fens[ply]}
+            fen={shownFen}
             enabled={engineOn}
             onEnabledChange={onEngineOnChange}
             settings={engineSettings}

@@ -118,6 +118,18 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               <Ui>Lichess</Ui> and <Ui>Chess.com</Ui> open it for analysis on those sites.
             </p>
             <p>
+              <Ui>Lichess Study</Ui> saves the game into one of your own studies as a new
+              chapter. The first use signs you in to Lichess in a pop-up window, which asks you
+              to grant <span className="font-score text-ink">study:read study:write</span> —
+              enough to list your studies and add a chapter, and nothing else on your account.
+              Then pick the study, name the chapter, and send it.
+            </p>
+            <p>
+              The sign-in and the upload go straight from your browser to Lichess; this app has
+              no server for them to pass through. Your access token is kept in this browser
+              until it expires or you press <Ui>Sign out</Ui>, which also revokes it at Lichess.
+            </p>
+            <p>
               Every converted game also carries an <Ui>Annotator</Ui> tag pointing back at this
               app, so a file you pass on says where it was made, plus <Ui>ECO</Ui> and{' '}
               <Ui>Opening</Ui> tags naming the opening. That name also appears in the header
@@ -148,6 +160,18 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               better one. Hovering a move or its number tells you the depth behind the figure.
               The depth badge beside the score turns green when the search has stopped, so a
               number that has settled is not mistaken for one that is stuck.
+            </p>
+            <p>
+              You can also move the pieces yourself: drag one and the board leaves the game to
+              follow your line, with the engine analysing each position as you reach it. A strip
+              above the board shows the moves so far, with <Ui>Take back</Ui> to unplay the last
+              one and <Ui>Back to game</Ui> to return. Any move of the navigation — a button, the
+              move list, or an arrow key — returns as well. Illegal moves snap back, and a pawn
+              reaching the last rank always becomes a queen.
+            </p>
+            <p>
+              Nothing you play this way touches the game: the move list, the accuracies, and the
+              PGN you export all still describe the moves that were actually played.
             </p>
             <p>
               Under every inaccuracy, mistake, and blunder the list gives the engine's verdict

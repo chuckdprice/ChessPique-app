@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import type { ConvertOptions } from '../lib/convert'
 import type { Opening } from '../lib/openings'
+import { loadSession, openSignInWindow } from '../lib/lichess/oauth'
 import LichessStudyDialog from './LichessStudyDialog'
 import Pane from './Pane'
 import PgnActions from './PgnActions'
@@ -65,6 +66,7 @@ export default function PgnFilePage({
 }: PgnFilePageProps) {
   const [dragOver, setDragOver] = useState(false)
   const [studyOpen, setStudyOpen] = useState(false)
+  const [signInWindow, setSignInWindow] = useState<Window | null>(null)
   const [startMinutes, setStartMinutes] = useState('')
   const [mode, setMode] = useState<OverrideMode>('auto')
   const [amount, setAmount] = useState('')
@@ -253,7 +255,13 @@ export default function PgnFilePage({
             <PgnActions pgn={convertedPgn} fileName={downloadName} compact />
             <button
               type="button"
-              onClick={() => setStudyOpen(true)}
+              onClick={() => {
+                // Opened here, in the click itself, because a pop-up asked for
+                // any later than this is one the browser may refuse. Already
+                // signed in, nothing needs opening.
+                setSignInWindow(loadSession() ? null : openSignInWindow())
+                setStudyOpen(true)
+              }}
               className="flex items-center gap-1.5 rounded-lg bg-felt px-3 py-1.5 text-sm font-medium text-buff shadow-sm transition-colors hover:bg-felt-deep"
             >
               <svg
@@ -279,6 +287,7 @@ export default function PgnFilePage({
         <LichessStudyDialog
           pgn={convertedPgn}
           defaultChapterName={downloadName.replace(/\.pgn$/i, '')}
+          signInWindow={signInWindow}
           onClose={() => setStudyOpen(false)}
         />
       )}

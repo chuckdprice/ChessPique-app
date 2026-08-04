@@ -168,14 +168,28 @@ function awaitPopup(popup: Window, state: string): Promise<string> {
 }
 
 /**
+ * Open the sign-in window, blank for now.
+ *
+ * Separate from the sign-in itself so a caller can open it in the click that
+ * asked for it. A browser only allows a pop-up while it can still see the
+ * gesture that caused it, and everything else here — hashing the verifier,
+ * waiting on Lichess — happens after an await.
+ */
+export function openSignInWindow(): Window | null {
+  return window.open('about:blank', 'lichess-login', 'width=520,height=720')
+}
+
+/**
  * Run the whole sign-in and return the token.
  *
- * The popup is opened before anything is awaited — a browser only allows one
- * in direct response to a click, and hashing the verifier first would put an
- * await in between and get it blocked.
+ * @param opened A window already opened by the click that started this. When
+ *   absent one is opened here, which is safe only if this call is itself
+ *   synchronous within that click.
  */
-export async function signIn(): Promise<{ token: string; expiresAt: number }> {
-  const popup = window.open('about:blank', 'lichess-login', 'width=520,height=720')
+export async function signIn(
+  opened?: Window | null,
+): Promise<{ token: string; expiresAt: number }> {
+  const popup = opened ?? openSignInWindow()
   if (!popup) {
     throw new LichessAuthError(
       'The Lichess sign-in window was blocked. Allow pop-ups for this site and try again.',

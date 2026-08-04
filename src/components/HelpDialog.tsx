@@ -119,10 +119,10 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
             </p>
             <p>
               <Ui>Lichess Study</Ui> saves the game into one of your own studies as a new
-              chapter. The first use signs you in to Lichess in a pop-up window, which asks you
-              to grant <span className="font-score text-ink">study:read study:write</span> —
-              enough to list your studies and add a chapter, and nothing else on your account.
-              Then pick the study, name the chapter, and send it.
+              chapter. Pressing it goes straight to Lichess: the first time, a pop-up asks you to
+              grant <span className="font-score text-ink">study:read study:write</span> — enough
+              to list your studies and add a chapter, and nothing else on your account — and
+              after that it opens on your studies. Pick one, name the chapter, and send it.
             </p>
             <p>
               The sign-in and the upload go straight from your browser to Lichess; this app has

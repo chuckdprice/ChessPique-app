@@ -4,7 +4,6 @@ import AppearanceMenu from './components/AppearanceMenu'
 import BrandMark from './components/BrandMark'
 import HelpDialog from './components/HelpDialog'
 import PgnFilePage from './components/PgnFilePage'
-import type { PgnPanes } from './components/PgnFilePage'
 import StepNav from './components/StepNav'
 import type { Page } from './components/StepNav'
 import type { PgnExtras } from './components/PgnExtrasSwitches'
@@ -98,14 +97,6 @@ export default function App() {
   const [sourceText, setSourceText] = useState('')
   const [sourceFileName, setSourceFileName] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  // Which steps of the PGN File page are open. Held here, not in the page, so
-  // it survives a trip to the analysis page and back.
-  const [panes, setPanes] = useState<PgnPanes>({
-    original: true,
-    headers: false,
-    converted: false,
-    export: false,
-  })
   const [helpOpen, setHelpOpen] = useState(false)
   const [appearance, setAppearance] = useState<AppearanceSettings>(loadAppearance)
   const [engineSettings, setEngineSettings] = useState<EngineSettings>(loadEngineSettings)
@@ -125,6 +116,7 @@ export default function App() {
   // the switches are there to leave things out, and a file is more useful with
   // them in.
   const [pgnExtras, setPgnExtras] = useState<PgnExtras>({
+    clocks: true,
     evals: true,
     comments: true,
     variations: true,
@@ -168,9 +160,6 @@ export default function App() {
       setHeaders(result.headers)
       setPly(0)
       setError(null)
-      // The steps below the first are now worth opening, and the output is
-      // what the user came for; coming back to this page should show it.
-      setPanes((prev) => ({ ...prev, converted: true }))
       setPage('analysis')
     } catch (e) {
       setGame(null)
@@ -181,8 +170,6 @@ export default function App() {
       const message = e instanceof Error ? e.message : String(e)
       setError(message)
       setPage('pgn')
-      // Whatever went wrong, it went wrong with the text in the first step.
-      setPanes((prev) => ({ ...prev, original: true }))
     }
   }
 
@@ -205,12 +192,7 @@ export default function App() {
       },
     })
       .then((result) => {
-        if (signal.cancelled || !result) return
-        setAnalysis(result)
-        // The review is what the converted PGN was waiting on — its evals,
-        // notes and variations only exist now — so the PGN File page swaps to
-        // showing the finished output rather than the text it started from.
-        setPanes((prev) => ({ ...prev, original: false, converted: true }))
+        if (!signal.cancelled && result) setAnalysis(result)
       })
       .catch((e) => {
         if (!signal.cancelled) {
@@ -282,11 +264,6 @@ export default function App() {
   const handleExplorationTakeBack = useCallback(() => {
     setExploration((prev) => (prev ? takeBackExploredMove(prev) : null))
   }, [])
-
-  const handlePaneChange = useCallback(
-    (id: keyof PgnPanes, open: boolean) => setPanes((prev) => ({ ...prev, [id]: open })),
-    [],
-  )
 
   const handleExtraChange = useCallback(
     (id: keyof PgnExtras, on: boolean) => setPgnExtras((prev) => ({ ...prev, [id]: on })),
@@ -380,6 +357,7 @@ export default function App() {
 
     return buildPgn(withExtraTags(headers, extras), game.result.moves, game.result.result, {
       evals,
+      clocks: pgnExtras.clocks,
       comments: pgnExtras.comments,
       notes,
       variations,
@@ -570,8 +548,6 @@ export default function App() {
             onExtraChange={handleExtraChange}
             opening={opening}
             hasEvals={analysis != null}
-            panes={panes}
-            onPaneChange={handlePaneChange}
           />
         )}
 

@@ -11,13 +11,11 @@ per move, normalizes the `TimeControl` tag (for example `G70/d10` → `4200d10`)
 The app is a two-step flow shown as chevron tabs across the top — **PGN File → Game Analysis** —
 sized so a 1440×900 desktop window needs no scrolling on either step.
 
-- **PGN File**: four collapsible panes stacked in the order you work through them —
-  *Original PGN* (paste or upload the file, with the time-control override beside the Convert
-  button), *PGN Header Editor* (the tags, whose edits flow live into everything downstream),
-  *Converted PGN* (the `%clk` output and the switches for what goes into it), and *Export PGN*
-  (copy, download, open the game on Lichess or Chess.com, or save it into a Lichess study).
-  Each opens on its own; the last three stay locked until a game has been converted, since
-  until then they describe nothing.
+- **PGN File**: two panes. The left holds the game coming in, under two tabs — *Original PGN*
+  (a prominent drop zone, the time-control override, the paste box and Convert) and
+  *PGN Header Editor* (the tags, whose edits flow live into everything downstream). The right
+  holds the `%clk` output with the switches for what goes into it above, and beneath it the
+  ways out: copy, download, open on Lichess or Chess.com, or save into a Lichess study.
 - **Game Analysis**: board, engine, move list, and charts in one screen.
 
 ### What goes into the converted PGN
@@ -28,9 +26,10 @@ gets passed around says where it was made, and `ECO` / `Opening` whenever the op
 the tag fields on the left, reading `ECO: Name` — it comes from the moves, so it is shown rather
 than edited.
 
-Three switches on the *Converted PGN* tab, above the buttons that hand the file out, decide the
-rest — all on by default, and all waiting on the engine review:
+Four switches above the converted text decide the rest — all on by default:
 
+- **Clocks** — the `{[%clk 0:29:50]}` comments the conversion exists to produce. Off leaves the
+  moves and everything else, which is occasionally what a reader wants.
 - **Evals** — `[%eval 0.38]` on every move, written alongside the `%clk` comment. They appear
   once the review finishes; the switch says so while it is running.
 - **Comments** — the annotator's own words from the source file, kept through the conversion,

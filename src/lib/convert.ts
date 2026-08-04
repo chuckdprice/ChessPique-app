@@ -517,6 +517,12 @@ export interface MovetextOptions {
   /** Carry each move's own comment through to the output. */
   comments?: boolean
   /**
+   * Write the `[%clk ...]` comments. Default true — they are what the
+   * conversion exists to produce — but a reader who only wants the moves can
+   * have them left out.
+   */
+  clocks?: boolean
+  /**
    * The engine's verdict by move index, e.g. "Inaccuracy. Bb5 was best." Written
    * as a comment of its own, so it stays distinguishable from whatever the
    * source file said about the same move.
@@ -544,7 +550,9 @@ export function formatMovetext(
     const evalText = options.evals?.[index]
     if (evalText) commands.push(`[%eval ${evalText}]`)
     // An unclocked move is written bare rather than stamped with a made-up time.
-    if (move.clkSeconds != null) commands.push(`[%clk ${formatClockTime(move.clkSeconds)}]`)
+    if (options.clocks !== false && move.clkSeconds != null) {
+      commands.push(`[%clk ${formatClockTime(move.clkSeconds)}]`)
+    }
     // Braces inside a comment would close it early and corrupt the file.
     const prose = options.comments && move.comment ? move.comment.replace(/[{}]/g, '') : ''
     const inner = [commands.join(' '), prose].filter(Boolean).join(' ')

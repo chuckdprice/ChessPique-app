@@ -354,3 +354,27 @@ describe('engine notes and variations', () => {
     expect(reread.moves.map((m) => m.san)).toEqual(['e4', 'e5'])
   })
 })
+
+describe('the clock switch', () => {
+  const game = convertPgn('[TimeControl "4200d10"]\n\n1. d4 {[%emt 0:00:10]} d5 {[%emt 0:00:12] solid} *')
+
+  it('writes the clocks by default', () => {
+    expect(buildPgn([], game.moves, game.result)).toContain('1. d4 {[%clk 1:10:00]}')
+  })
+
+  it('leaves them out when asked, keeping everything else', () => {
+    const pgn = buildPgn([], game.moves, game.result, {
+      clocks: false,
+      comments: true,
+      evals: ['0.25', null],
+    })
+    expect(pgn).not.toContain('%clk')
+    expect(pgn).toContain('1. d4 {[%eval 0.25]}')
+    expect(pgn).toContain('solid')
+  })
+
+  it('writes a bare move when the clock was all it had', () => {
+    const pgn = buildPgn([], game.moves, game.result, { clocks: false })
+    expect(pgn).toContain('1. d4 d5')
+  })
+})

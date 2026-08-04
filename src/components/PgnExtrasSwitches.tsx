@@ -5,6 +5,8 @@
  * when the game's opening is known, as the Annotator tag always is.
  */
 export interface PgnExtras {
+  /** `[%clk ...]` on every move — what the conversion is for. */
+  clocks: boolean
   /** `[%eval ...]` on every move, from the engine review. */
   evals: boolean
   /**
@@ -29,6 +31,7 @@ interface PgnExtrasSwitchesProps {
 }
 
 const SWITCHES: Array<{ id: keyof PgnExtras; label: string; hint: string }> = [
+  { id: 'clocks', label: 'Clocks', hint: 'Write [%clk] on every move — the converted clock times' },
   { id: 'evals', label: 'Evals', hint: 'Write [%eval] on every move from the engine review' },
   {
     id: 'comments',

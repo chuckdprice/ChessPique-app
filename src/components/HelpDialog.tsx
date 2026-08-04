@@ -89,32 +89,35 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
 
           <Section title="Step 1 — PGN File">
             <p>
-              The page is four panes stacked in the order you work through them. Each opens and
-              closes on its own, and the last three stay locked until a game has been converted.
+              The page is two panes. On the left, where the game comes in, under two tabs; on the
+              right, the file it turns into and the ways of taking it elsewhere.
             </p>
             <p>
               <Ui>Original PGN</Ui> — paste your game in, or use{' '}
               <Ui>Upload or drop a .pgn file</Ui>, which converts it straight away. Otherwise
               press <Ui>Convert to %clk</Ui>. If the clock times come out wrong, or you see an
               error about the starting clock, set the starting time and any delay or increment in
-              the box under those buttons, then convert again — normally the PGN's own
-              TimeControl tag is used and you can leave it alone.
+              the box under that button, then convert again — normally the PGN's own TimeControl
+              tag is used and you can leave it alone.
             </p>
             <p>
-              <Ui>PGN Header Editor</Ui> — the game's tags. Edit any of them and the converted
-              text, the download, and the file name all follow along.
+              <Ui>PGN Header Editor</Ui> — the game's tags, on the second tab. Edit any of them
+              and the converted text, the download, and the file name all follow along.
             </p>
             <p>
-              <Ui>Converted PGN</Ui> — the finished text, with switches above it for what else to
-              include. All three start on. <Ui>Evals</Ui> writes Stockfish's score on every move
+              <Ui>Converted PGN</Ui> — the finished text on the right, with switches above it for
+              what goes in. All four start on. <Ui>Clocks</Ui> writes the converted times as{' '}
+              <code>{'{[%clk 0:29:50]}'}</code> — the point of the whole exercise, but you can
+              have the moves without them. <Ui>Evals</Ui> writes Stockfish's score on every move
               as <code>{'{[%eval 0.38]}'}</code>. <Ui>Comments</Ui> keeps any notes your source
               PGN had against its moves, and adds the engine's own verdict on a weak one —{' '}
               <code>{'{Inaccuracy. Bb5 was best.}'}</code>. <Ui>Variations</Ui> writes the line
               the engine preferred, in brackets after the move:{' '}
-              <code>(5. Bb5 Nd7 6. Bxc6 bxc6)</code>. All three wait on the review from step 2.
+              <code>(5. Bb5 Nd7 6. Bxc6 bxc6)</code>. The last three wait on the review from
+              step 2.
             </p>
             <p>
-              <Ui>Export PGN</Ui> — <Ui>Copy</Ui> and <Ui>Download</Ui> take the file;{' '}
+              Under the text: <Ui>Copy</Ui> and <Ui>Download</Ui> take the file;{' '}
               <Ui>Lichess</Ui> and <Ui>Chess.com</Ui> open it for analysis on those sites.
             </p>
             <p>

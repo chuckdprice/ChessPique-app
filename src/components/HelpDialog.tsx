@@ -95,7 +95,7 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
             <p>
               <Ui>Original PGN</Ui> — paste your game in, or use{' '}
               <Ui>Upload or drop a .pgn file</Ui>, which converts it straight away. Otherwise
-              press <Ui>Convert to %clk</Ui>. If the clock times come out wrong, or you see an
+              press <Ui>Analyze Game</Ui>. If the clock times come out wrong, or you see an
               error about the starting clock, set the starting time and any delay or increment in
               the box under that button, then convert again — normally the PGN's own TimeControl
               tag is used and you can leave it alone.

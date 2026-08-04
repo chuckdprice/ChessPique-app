@@ -233,7 +233,7 @@ export default function PgnFilePage({
                   disabled={text.trim() === ''}
                   className="mt-3 shrink-0 self-end rounded-lg bg-felt px-5 py-2 font-medium text-buff shadow-sm transition-colors hover:bg-felt-deep disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  Convert to %clk
+                  Analyze Game
                 </button>
               </>
             )}

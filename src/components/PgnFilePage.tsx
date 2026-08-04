@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ConvertOptions } from '../lib/convert'
 import type { Opening } from '../lib/openings'
 import { loadSession, openSignInWindow, saveSession, signIn } from '../lib/lichess/oauth'
@@ -60,10 +60,20 @@ export default function PgnFilePage({
   // Distinguishes this sign-in attempt from an abandoned earlier one, so a
   // stale failure cannot pop an error over a fresh attempt.
   const authAttempt = useRef(0)
+  const [overridesOpen, setOverridesOpen] = useState(false)
   const [startMinutes, setStartMinutes] = useState('')
   const [mode, setMode] = useState<OverrideMode>('auto')
   const [amount, setAmount] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  /**
+   * A conversion that fails for want of a starting clock is fixed in this box,
+   * so the error opens it. Left closed, the message would be pointing at a
+   * control that is not on screen.
+   */
+  useEffect(() => {
+    if (error?.includes('starting clock')) setOverridesOpen(true)
+  }, [error])
 
   const buildOptions = (): ConvertOptions => {
     const options: ConvertOptions = {}
@@ -166,52 +176,68 @@ export default function PgnFilePage({
                   </span>
                 </button>
 
-                <div className="mb-3 flex shrink-0 flex-wrap items-end gap-4 rounded-lg border border-rule bg-buff-soft/20 px-3 py-2.5">
-                  <label className="block text-sm">
-                    <span className="mb-1 block text-xs text-ink-mute">
-                      Starting time (minutes)
-                    </span>
-                    <input
-                      type="number"
-                      min={1}
-                      value={startMinutes}
-                      onChange={(e) => setStartMinutes(e.target.value)}
-                      placeholder="auto"
-                      className="w-32 rounded-md border border-rule bg-card px-3 py-1.5"
-                    />
-                  </label>
-                  <label className="block text-sm">
-                    <span className="mb-1 block text-xs text-ink-mute">Delay or increment</span>
-                    <select
-                      value={mode}
-                      onChange={(e) => setMode(e.target.value as OverrideMode)}
-                      className="w-36 rounded-md border border-rule bg-card px-3 py-1.5"
-                    >
-                      <option value="auto">Auto-detect</option>
-                      <option value="none">None</option>
-                      <option value="delay">Delay</option>
-                      <option value="increment">Increment</option>
-                    </select>
-                  </label>
-                  {(mode === 'delay' || mode === 'increment') && (
-                    <label className="block text-sm">
-                      <span className="mb-1 block text-xs text-ink-mute">Seconds per move</span>
-                      <input
-                        type="number"
-                        min={0}
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        placeholder="10"
-                        className="w-28 rounded-md border border-rule bg-card px-3 py-1.5"
-                      />
-                    </label>
-                  )}
-                  <p className="basis-full text-xs text-ink-mute">
-                    Time control: normally the TimeControl tag (like G70/d10) is read from the
-                    PGN. Fill these in only when that tag is missing or wrong, then convert
-                    again.
-                  </p>
-                </div>
+                <details
+                  open={overridesOpen}
+                  onToggle={(e) => setOverridesOpen(e.currentTarget.open)}
+                  className="mb-3 shrink-0 rounded-lg border border-rule bg-buff-soft/20 px-3 py-2"
+                >
+                  <summary className="cursor-pointer select-none text-sm font-medium text-ink-mute hover:text-ink">
+                    Time control override
+                  </summary>
+                  {/*
+                    A plain block wraps the flex row rather than carrying the
+                    flex itself: a closed <details> hides its content through
+                    the UA stylesheet, and an author `display` on the direct
+                    child can win that fight and leave the controls on show.
+                  */}
+                  <div className="mt-3 pb-1">
+                    <div className="flex flex-wrap items-end gap-4">
+                      <label className="block text-sm">
+                        <span className="mb-1 block text-xs text-ink-mute">
+                          Starting time (minutes)
+                        </span>
+                        <input
+                          type="number"
+                          min={1}
+                          value={startMinutes}
+                          onChange={(e) => setStartMinutes(e.target.value)}
+                          placeholder="auto"
+                          className="w-32 rounded-md border border-rule bg-card px-3 py-1.5"
+                        />
+                      </label>
+                      <label className="block text-sm">
+                        <span className="mb-1 block text-xs text-ink-mute">Delay or increment</span>
+                        <select
+                          value={mode}
+                          onChange={(e) => setMode(e.target.value as OverrideMode)}
+                          className="w-36 rounded-md border border-rule bg-card px-3 py-1.5"
+                        >
+                          <option value="auto">Auto-detect</option>
+                          <option value="none">None</option>
+                          <option value="delay">Delay</option>
+                          <option value="increment">Increment</option>
+                        </select>
+                      </label>
+                      {(mode === 'delay' || mode === 'increment') && (
+                        <label className="block text-sm">
+                          <span className="mb-1 block text-xs text-ink-mute">Seconds per move</span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={amount}
+                            onChange={(e) => setAmount(e.target.value)}
+                            placeholder="10"
+                            className="w-28 rounded-md border border-rule bg-card px-3 py-1.5"
+                          />
+                        </label>
+                      )}
+                      <p className="basis-full text-xs text-ink-mute">
+                        Normally the TimeControl tag (like G70/d10) is read from the PGN. Fill
+                        these in only when that tag is missing or wrong, then analyze again.
+                      </p>
+                    </div>
+                  </div>
+                </details>
 
                 <p className="mb-2 shrink-0 truncate text-xs text-ink-mute">
                   {sourceFileName ?? 'or paste below'}

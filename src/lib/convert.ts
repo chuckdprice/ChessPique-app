@@ -225,7 +225,7 @@ function resolveTimecontrol(
     if (requireStart) {
       throw new ConvertError(
         'Could not determine the starting clock time from the TimeControl header. ' +
-          'Set the starting time above the PGN, then convert again.',
+          'Open Time control override above the PGN, set the starting time, then analyze again.',
       )
     }
     return null

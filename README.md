@@ -158,6 +158,11 @@ Lichess requires no registration for a public client — the `client_id` is just
   a `localStorage` event as fallback) and closes itself. Not `window.opener`: the browser can
   sever that link during the round trip to Lichess, leaving the opener seeing a phantom-closed
   window and the pop-up with no one to report to — so nothing here depends on it.
+- **Recognising the return**: Lichess *replaces* the redirect URI's query rather than adding to
+  it (lila, `Protocol.scala`: `value.withQuery(s"code=...&state=...")`), so no marker can be
+  carried on the URL. The returning document identifies itself by matching the `state` it was
+  sent against the sign-in recorded as in flight; without one it treats the link as stale and
+  simply boots the app.
 - **The token** lives in `localStorage` until it expires or you sign out, which also revokes it
   at Lichess (`DELETE /api/token`). A rejected token is dropped and the sign-in offered again.
 - **Endpoints**: `GET /api/account` for the username, `GET /api/study/by/{username}` for the

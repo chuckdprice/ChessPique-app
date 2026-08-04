@@ -37,6 +37,16 @@ const STORAGE_KEY = 'chessnoter.lichess'
  */
 const RESULT_CHANNEL = 'chessnoter.lichess-oauth'
 const RESULT_KEY = 'chessnoter.lichess-oauth-result'
+/**
+ * The state of a sign-in currently in flight, written before the pop-up is
+ * sent to Lichess. It is what tells the returning document that it is a
+ * pop-up: no marker can be carried on the URL, because Lichess *replaces* the
+ * redirect URI's query with `code` and `state` rather than adding to it
+ * (lila, Protocol.scala: `value.withQuery(s"code=...&state=...")`).
+ */
+const PENDING_KEY = 'chessnoter.lichess-oauth-pending'
+/** A sign-in older than this was abandoned; its code is no longer expected. */
+const PENDING_TTL_MS = 10 * 60 * 1000
 
 interface AuthResult {
   code: string | null
@@ -69,13 +79,39 @@ async function codeChallenge(verifier: string): Promise<string> {
 }
 
 /**
- * Where Lichess sends the pop-up back to: this app, carrying a marker so the
- * returning document knows it is an OAuth return. The marker has to ride the
- * URL — the pop-up cannot be told apart by `window.opener`, which the browser
- * may have severed by the time it returns.
+ * Where Lichess sends the pop-up back to: this app, and nothing else. Anything
+ * added here would be discarded — Lichess overwrites the query — and the token
+ * request has to repeat this string exactly.
  */
 function redirectUri(): string {
-  return `${window.location.origin}${window.location.pathname}?lichess-auth=1`
+  return `${window.location.origin}${window.location.pathname}`
+}
+
+/**
+ * The state of a sign-in in flight, or null when none is.
+ *
+ * `undefined` means storage could not be read at all, which the caller treats
+ * as "cannot rule it out" rather than as "no".
+ */
+function pendingState(): string | null | undefined {
+  try {
+    const raw = localStorage.getItem(PENDING_KEY)
+    if (!raw) return null
+    const pending = JSON.parse(raw) as { state?: string; at?: number }
+    if (!pending.state || Date.now() - (pending.at ?? 0) > PENDING_TTL_MS) return null
+    return pending.state
+  } catch {
+    return undefined
+  }
+}
+
+function setPendingState(state: string | null): void {
+  try {
+    if (state) localStorage.setItem(PENDING_KEY, JSON.stringify({ state, at: Date.now() }))
+    else localStorage.removeItem(PENDING_KEY)
+  } catch {
+    // Detection falls back to the parameters alone; see isOAuthReturn.
+  }
 }
 
 export function loadSession(): LichessSession | null {
@@ -114,7 +150,13 @@ export function clearSession(): void {
  */
 export function isOAuthReturn(): boolean {
   const params = new URLSearchParams(window.location.search)
-  return params.has('lichess-auth') && (params.has('code') || params.has('error'))
+  const state = params.get('state')
+  if (!state || (!params.has('code') && !params.has('error'))) return false
+  const pending = pendingState()
+  // No sign-in in flight means this is an old link someone kept, not a
+  // pop-up: boot the app rather than trying to close their window. When
+  // storage cannot be read the parameters are taken at face value.
+  return pending === undefined || pending === state
 }
 
 /** Broadcast the result to the app's other windows, then close this one. */
@@ -151,7 +193,7 @@ export function completeOAuthReturn(): void {
  */
 export function stripOAuthParams(): void {
   const url = new URL(window.location.href)
-  const spent = ['code', 'state', 'error', 'error_description', 'lichess-auth']
+  const spent = ['code', 'state', 'error', 'error_description']
   if (!spent.some((key) => url.searchParams.has(key))) return
   for (const key of spent) url.searchParams.delete(key)
   window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
@@ -254,6 +296,9 @@ export async function signIn(
     url.searchParams.set('code_challenge_method', 'S256')
     url.searchParams.set('code_challenge', await codeChallenge(verifier))
     url.searchParams.set('state', state)
+    // Recorded before the pop-up leaves, because it is what the returning
+    // document checks itself against.
+    setPendingState(state)
     // Listen before navigating, so no window exists in which the pop-up could
     // answer into silence.
     const answer = awaitAuthorization(state)
@@ -282,6 +327,7 @@ export async function signIn(
       expiresAt: Date.now() + (token.expires_in ?? 3600) * 1000,
     }
   } finally {
+    setPendingState(null)
     // Best effort: after a severing this handle cannot reach the window, and
     // the pop-up closes itself on return anyway.
     try {

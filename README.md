@@ -170,6 +170,23 @@ Lichess requires no registration for a public client — the `client_id` is just
   chapter. All three send `Access-Control-Allow-Origin: *`, so the browser can call them
   directly.
 
+### Choosing the study
+
+The list is read from the response body **as it streams**, not after it finishes: Lichess
+throttles it to 50 studies a second (lila, `Study.scala`: `.throttle(if isMe then 50 else 20,
+1.second)`), so a large account takes seconds to send. Studies appear in batches as they land,
+behind skeleton cards until the first arrives.
+
+Everything after that is local to the browser — search, sort, date filter, paging — so one
+request serves the whole session and every interaction is instant. The list pages in as you
+scroll rather than rendering hundreds of cards at once, in grid or compact-list view.
+
+The sidebar filters by **when a study was last updated**, because that is all there is to
+filter on: the endpoint returns `id`, `name`, `createdAt` and `updatedAt` and nothing else
+(lila, `JsonView.metadata`). Topics, chapter counts and public/unlisted status are not part of
+it, and finding them out would mean a separate request per study — the rate-limit problem this
+design is avoiding.
+
 ## Opening names
 
 The name over the evaluation chart comes from the **lichess opening book**

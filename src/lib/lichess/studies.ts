@@ -60,26 +60,62 @@ export async function fetchAccount(token: string): Promise<{ username: string }>
   return { username }
 }
 
+function parseLine(line: string): StudyMetadata | null {
+  if (!line.trim()) return null
+  try {
+    return JSON.parse(line) as StudyMetadata
+  } catch {
+    // One malformed line should not lose the rest of the list.
+    return null
+  }
+}
+
 /**
- * The user's studies, most recently updated first.
+ * The user's studies, handed over in batches as they arrive.
  *
- * Streamed as newline-delimited JSON. The whole list is small enough to read in
- * one go, so it is parsed after the fact rather than incrementally.
+ * Newline-delimited JSON, read from the response body as it streams rather
+ * than after it finishes. Lichess throttles this to 50 studies a second
+ * (lila, Study.scala: `.throttle(if isMe then 50 else 20, 1.second)`), so an
+ * account with hundreds spends several seconds sending them — long enough
+ * that showing the first ones straight away is the difference between a list
+ * that fills in and a window that sits blank.
+ *
+ * Batched rather than one at a time so a fast stream costs a handful of
+ * renders instead of one per study.
  */
-export async function fetchStudies(token: string, username: string): Promise<StudyMetadata[]> {
+export async function streamStudies(
+  token: string,
+  username: string,
+  onBatch: (studies: StudyMetadata[]) => void,
+  signal?: AbortSignal,
+): Promise<void> {
   const response = await call(`/api/study/by/${encodeURIComponent(username)}`, token, {
     headers: { Accept: 'application/x-ndjson' },
+    signal,
   })
-  const studies: StudyMetadata[] = []
-  for (const line of (await response.text()).split('\n')) {
-    if (!line.trim()) continue
-    try {
-      studies.push(JSON.parse(line) as StudyMetadata)
-    } catch {
-      // One malformed line should not lose the rest of the list.
-    }
+
+  const reader = response.body?.getReader()
+  if (!reader) {
+    // No streaming body available: take the whole thing and hand it over once.
+    const all = (await response.text()).split('\n').map(parseLine).filter((s) => s != null)
+    if (all.length > 0) onBatch(all)
+    return
   }
-  return studies.sort((a, b) => b.updatedAt - a.updatedAt)
+
+  const decoder = new TextDecoder()
+  let buffer = ''
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    // The last piece may be half a line; it waits for the next chunk.
+    buffer = lines.pop() ?? ''
+    const batch = lines.map(parseLine).filter((s) => s != null)
+    if (batch.length > 0) onBatch(batch)
+  }
+  const last = parseLine(buffer + decoder.decode())
+  if (last) onBatch([last])
 }
 
 /**

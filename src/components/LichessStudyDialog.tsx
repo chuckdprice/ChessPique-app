@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { clearSession, loadSession, saveSession, signIn, signOut } from '../lib/lichess/oauth'
 import type { LichessSession } from '../lib/lichess/oauth'
-import { fetchAccount, fetchStudies, importPgn, LichessApiError } from '../lib/lichess/studies'
+import { fetchAccount, importPgn, LichessApiError, streamStudies } from '../lib/lichess/studies'
 import type { ImportedChapter, StudyMetadata } from '../lib/lichess/studies'
+import LichessStudyPicker from './LichessStudyPicker'
 
 interface LichessStudyDialogProps {
   pgn: string
@@ -32,10 +33,12 @@ export default function LichessStudyDialog({
   onClose,
 }: LichessStudyDialogProps) {
   const [session, setSession] = useState<LichessSession | null>(() => loadSession())
-  const [studies, setStudies] = useState<StudyMetadata[] | null>(null)
+  const [studies, setStudies] = useState<StudyMetadata[]>([])
+  const [streaming, setStreaming] = useState(false)
+  const [loaded, setLoaded] = useState(false)
   const [studyId, setStudyId] = useState('')
   const [chapterName, setChapterName] = useState(defaultChapterName)
-  const [busy, setBusy] = useState<'signin' | 'studies' | 'import' | null>(null)
+  const [busy, setBusy] = useState<'signin' | 'import' | null>(null)
   const [error, setError] = useState<string | null>(initialError)
   const [imported, setImported] = useState<ImportedChapter[] | null>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
@@ -54,32 +57,55 @@ export default function LichessStudyDialog({
     if (e instanceof LichessApiError && e.unauthorized) {
       clearSession()
       setSession(null)
-      setStudies(null)
     }
     setError(e instanceof Error ? e.message : String(e))
   }, [])
 
-  const loadStudies = useCallback(
-    async (active: LichessSession) => {
-      setBusy('studies')
-      setError(null)
-      try {
-        const list = await fetchStudies(active.token, active.username)
-        setStudies(list)
-        setStudyId((current) => current || (list[0]?.id ?? ''))
-      } catch (e) {
-        handleFailure(e)
-      } finally {
-        setBusy(null)
-      }
-    },
-    [handleFailure],
-  )
-
-  // Studies are fetched once per session, and again after signing in.
+  /**
+   * Read the study stream, showing each batch as it lands.
+   *
+   * Arrivals are appended rather than replacing the list, so what is on screen
+   * only ever grows while the stream runs.
+   */
   useEffect(() => {
-    if (session && studies == null && busy == null) void loadStudies(session)
-  }, [session, studies, busy, loadStudies])
+    if (!session || loaded) return
+    const controller = new AbortController()
+    let live = true
+    setStreaming(true)
+    setStudies([])
+
+    streamStudies(
+      session.token,
+      session.username,
+      (batch) => {
+        if (!live) return
+        setStudies((current) => {
+          const next = [...current, ...batch]
+          // Pre-select the first study to arrive, so the common case needs no
+          // choice at all; a later arrival never moves the selection.
+          setStudyId((chosen) => chosen || next[0]?.id || '')
+          return next
+        })
+      },
+      controller.signal,
+    )
+      .then(() => {
+        if (live) setLoaded(true)
+      })
+      .catch((e) => {
+        if (!live || controller.signal.aborted) return
+        setLoaded(true)
+        handleFailure(e)
+      })
+      .finally(() => {
+        if (live) setStreaming(false)
+      })
+
+    return () => {
+      live = false
+      controller.abort()
+    }
+  }, [session, loaded, handleFailure])
 
   const handleSignIn = async () => {
     setBusy('signin')
@@ -90,7 +116,7 @@ export default function LichessStudyDialog({
       const next = { token, expiresAt, username }
       saveSession(next)
       setSession(next)
-      setStudies(null)
+      setLoaded(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -101,7 +127,8 @@ export default function LichessStudyDialog({
   const handleSignOut = async () => {
     if (session) await signOut(session.token)
     setSession(null)
-    setStudies(null)
+    setStudies([])
+    setLoaded(false)
     setStudyId('')
     setImported(null)
   }
@@ -123,7 +150,7 @@ export default function LichessStudyDialog({
     }
   }
 
-  const study = studies?.find((s) => s.id === studyId)
+  const study = studies.find((s) => s.id === studyId)
 
   return (
     <div
@@ -136,9 +163,9 @@ export default function LichessStudyDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="lichess-study-title"
-        className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-xl border border-rule bg-card text-ink shadow-lg"
+        className="flex h-[85vh] w-full max-w-4xl flex-col rounded-xl border border-rule bg-card text-ink shadow-lg"
       >
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-rule px-6 py-4">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-rule px-6 py-3">
           <div>
             <h2 id="lichess-study-title" className="font-display text-lg font-semibold">
               Save to a Lichess study
@@ -162,12 +189,10 @@ export default function LichessStudyDialog({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5 text-sm">
-          {!session &&
-            (busy === 'signin' ? (
-              <p className="text-ink-mute">
-                A Lichess window has opened — finish signing in there.
-              </p>
+        {!session && (
+          <div className="space-y-4 px-6 py-5 text-sm">
+            {busy === 'signin' ? (
+              <p className="text-ink-mute">A Lichess window has opened — finish signing in there.</p>
             ) : (
               // This dialog only shows signed out when an attempt failed. A
               // press here is a fresh gesture, and signIn opens its window
@@ -175,45 +200,48 @@ export default function LichessStudyDialog({
               <button type="button" onClick={() => void handleSignIn()} className={PRIMARY}>
                 Try signing in again
               </button>
-            ))}
+            )}
+          </div>
+        )}
 
-          {session && !imported && (
-            <>
-              <label className="block">
-                <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink-mute">
-                  Study
-                </span>
-                {busy === 'studies' ? (
-                  <p className="text-ink-mute">Loading your studies…</p>
-                ) : studies && studies.length > 0 ? (
-                  <select
-                    value={studyId}
-                    onChange={(e) => setStudyId(e.target.value)}
-                    className="w-full rounded-md border border-rule bg-card px-3 py-1.5"
+        {session && !imported && (
+          <LichessStudyPicker
+            studies={studies}
+            loading={streaming}
+            selectedId={studyId}
+            onSelect={setStudyId}
+          />
+        )}
+
+        {session && imported && (
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-6 py-5 text-sm">
+            <p>
+              Added to <span className="font-medium">{study?.name ?? 'your study'}</span>.
+            </p>
+            <ul className="space-y-1">
+              {imported.map((chapter) => (
+                <li key={chapter.id}>
+                  <a
+                    href={chapter.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium underline"
                   >
-                    {studies.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <p className="text-ink-mute">
-                    No studies found on your account.{' '}
-                    <a
-                      href="https://lichess.org/study"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline"
-                    >
-                      Create one on Lichess
-                    </a>
-                    , then reload the list.
-                  </p>
-                )}
-              </label>
+                    Open {chapter.name} on Lichess
+                  </a>
+                </li>
+              ))}
+            </ul>
+            <button type="button" onClick={() => setImported(null)} className={BUTTON}>
+              Add another chapter
+            </button>
+          </div>
+        )}
 
-              <label className="block">
+        {session && !imported && (
+          <div className="shrink-0 border-t border-rule px-6 py-3">
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="min-w-48 flex-1">
                 <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink-mute">
                   Chapter name
                 </span>
@@ -222,70 +250,35 @@ export default function LichessStudyDialog({
                   value={chapterName}
                   maxLength={100}
                   onChange={(e) => setChapterName(e.target.value)}
-                  className="w-full rounded-md border border-rule bg-buff-soft/50 px-3 py-1.5"
+                  className="w-full rounded-md border border-rule bg-buff-soft/50 px-3 py-1.5 text-sm"
                 />
               </label>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleImport}
-                  disabled={busy != null || !studyId}
-                  className={PRIMARY}
-                >
-                  {busy === 'import' ? 'Sending…' : 'Add chapter'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void loadStudies(session)}
-                  disabled={busy != null}
-                  className={BUTTON}
-                >
-                  Reload studies
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSignOut}
-                  disabled={busy != null}
-                  className={`${BUTTON} ml-auto`}
-                >
-                  Sign out
-                </button>
-              </div>
-            </>
-          )}
-
-          {imported && (
-            <div className="space-y-3">
-              <p>
-                Added to <span className="font-medium">{study?.name ?? 'your study'}</span>.
-              </p>
-              <ul className="space-y-1">
-                {imported.map((chapter) => (
-                  <li key={chapter.id}>
-                    <a
-                      href={chapter.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-medium underline"
-                    >
-                      Open {chapter.name} on Lichess
-                    </a>
-                  </li>
-                ))}
-              </ul>
-              <button type="button" onClick={() => setImported(null)} className={BUTTON}>
-                Add another chapter
+              <button
+                type="button"
+                onClick={() => void handleImport()}
+                disabled={busy != null || !studyId}
+                className={PRIMARY}
+                title={study ? `Add a chapter to ${study.name}` : undefined}
+              >
+                {busy === 'import' ? 'Sending…' : 'Add chapter'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleSignOut()}
+                disabled={busy != null}
+                className={BUTTON}
+              >
+                Sign out
               </button>
             </div>
-          )}
+          </div>
+        )}
 
-          {error && (
-            <p role="alert" className="rounded-lg bg-danger-bg px-3 py-2 text-danger-text">
-              {error}
-            </p>
-          )}
-        </div>
+        {error && (
+          <p role="alert" className="shrink-0 border-t border-rule px-6 py-2 text-sm text-danger-text">
+            {error}
+          </p>
+        )}
       </div>
     </div>
   )

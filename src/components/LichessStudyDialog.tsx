@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { clearSession, loadSession, saveSession, signIn, signOut } from '../lib/lichess/oauth'
 import type { LichessSession } from '../lib/lichess/oauth'
 import { fetchAccount, fetchStudies, importPgn, LichessApiError } from '../lib/lichess/studies'
@@ -8,11 +8,8 @@ interface LichessStudyDialogProps {
   pgn: string
   /** Default chapter name — the players, as the rest of the app names the game. */
   defaultChapterName: string
-  /**
-   * A blank window the opening click already opened, for the sign-in to use.
-   * Null when a session is already in hand and none was needed.
-   */
-  signInWindow: Window | null
+  /** Why sign-in has not happened yet, when the opener's attempt failed. */
+  initialError: string | null
   onClose: () => void
 }
 
@@ -31,7 +28,7 @@ const PRIMARY =
 export default function LichessStudyDialog({
   pgn,
   defaultChapterName,
-  signInWindow,
+  initialError,
   onClose,
 }: LichessStudyDialogProps) {
   const [session, setSession] = useState<LichessSession | null>(() => loadSession())
@@ -39,7 +36,7 @@ export default function LichessStudyDialog({
   const [studyId, setStudyId] = useState('')
   const [chapterName, setChapterName] = useState(defaultChapterName)
   const [busy, setBusy] = useState<'signin' | 'studies' | 'import' | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(initialError)
   const [imported, setImported] = useState<ImportedChapter[] | null>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
 
@@ -84,11 +81,11 @@ export default function LichessStudyDialog({
     if (session && studies == null && busy == null) void loadStudies(session)
   }, [session, studies, busy, loadStudies])
 
-  const handleSignIn = async (opened?: Window | null) => {
+  const handleSignIn = async () => {
     setBusy('signin')
     setError(null)
     try {
-      const { token, expiresAt } = await signIn(opened)
+      const { token, expiresAt } = await signIn()
       const { username } = await fetchAccount(token)
       const next = { token, expiresAt, username }
       saveSession(next)
@@ -100,23 +97,6 @@ export default function LichessStudyDialog({
       setBusy(null)
     }
   }
-
-  /**
-   * With no session, signing in starts the moment the dialog opens — there is
-   * nothing to ask the user first.
-   *
-   * The window it drives was opened by the click that opened this dialog: no
-   * effect of any kind runs early enough to count as that gesture, so opening
-   * one here would be at the mercy of the pop-up blocker.
-   */
-  const started = useRef(false)
-  useLayoutEffect(() => {
-    if (started.current || session) return
-    started.current = true
-    void handleSignIn(signInWindow)
-    // Only ever on the first render, hence the empty list.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   const handleSignOut = async () => {
     if (session) await signOut(session.token)
@@ -189,11 +169,11 @@ export default function LichessStudyDialog({
                 A Lichess window has opened — finish signing in there.
               </p>
             ) : (
-              // Only reached when the automatic attempt did not get through.
-              // This press is a fresh gesture, and signIn opens its window
+              // This dialog only shows signed out when an attempt failed. A
+              // press here is a fresh gesture, and signIn opens its window
               // before it awaits anything, so this one is never blocked.
               <button type="button" onClick={() => void handleSignIn()} className={PRIMARY}>
-                Sign in with Lichess
+                Try signing in again
               </button>
             ))}
 

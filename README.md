@@ -154,7 +154,10 @@ Lichess requires no registration for a public client — the `client_id` is just
   messages, no preferences.
 - **The pop-up**: sign-in opens in a window of its own rather than redirecting this page. A
   top-level redirect would reload the app and discard the converted game and its engine review
-  — the very thing being saved. The pop-up posts its code back to the opener and closes.
+  — the very thing being saved. The pop-up hands its code back over a `BroadcastChannel` (with
+  a `localStorage` event as fallback) and closes itself. Not `window.opener`: the browser can
+  sever that link during the round trip to Lichess, leaving the opener seeing a phantom-closed
+  window and the pop-up with no one to report to — so nothing here depends on it.
 - **The token** lives in `localStorage` until it expires or you sign out, which also revokes it
   at Lichess (`DELETE /api/token`). A rejected token is dropped and the sign-in offered again.
 - **Endpoints**: `GET /api/account` for the username, `GET /api/study/by/{username}` for the

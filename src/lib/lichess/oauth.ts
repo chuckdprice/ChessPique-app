@@ -24,8 +24,25 @@ export const SCOPES = 'study:read study:write'
 const AUTHORIZE_URL = 'https://lichess.org/oauth'
 const TOKEN_URL = 'https://lichess.org/api/token'
 const STORAGE_KEY = 'chessnoter.lichess'
-/** Marks the popup's message so a stray postMessage cannot be mistaken for it. */
-const MESSAGE_TYPE = 'lichess-oauth'
+/**
+ * How the pop-up hands its result back: a BroadcastChannel, with localStorage
+ * as the fallback (writing fires a `storage` event in every other window).
+ *
+ * Not window.opener/postMessage. In practice the browser can sever the opener
+ * link during the trip out to Lichess and back — at which point the opener
+ * sees `popup.closed === true` while the window is plainly open, and the
+ * returning pop-up finds `window.opener` null and has no one to report to.
+ * Both were observed in the field. These two channels only need the windows
+ * to share an origin, which they always do.
+ */
+const RESULT_CHANNEL = 'chessnoter.lichess-oauth'
+const RESULT_KEY = 'chessnoter.lichess-oauth-result'
+
+interface AuthResult {
+  code: string | null
+  state: string | null
+  error: string | null
+}
 
 export interface LichessSession {
   token: string
@@ -51,9 +68,14 @@ async function codeChallenge(verifier: string): Promise<string> {
   return base64url(new Uint8Array(digest))
 }
 
-/** Where Lichess sends the popup back to: this app, with no path of its own. */
+/**
+ * Where Lichess sends the pop-up back to: this app, carrying a marker so the
+ * returning document knows it is an OAuth return. The marker has to ride the
+ * URL — the pop-up cannot be told apart by `window.opener`, which the browser
+ * may have severed by the time it returns.
+ */
 function redirectUri(): string {
-  return `${window.location.origin}${window.location.pathname}`
+  return `${window.location.origin}${window.location.pathname}?lichess-auth=1`
 }
 
 export function loadSession(): LichessSession | null {
@@ -85,29 +107,39 @@ export function clearSession(): void {
 }
 
 /**
- * Whether this document is the sign-in popup coming back from Lichess.
+ * Whether this document is the sign-in pop-up coming back from Lichess.
  *
- * Called before React mounts: the popup should hand its code to the opener and
+ * Called before React mounts: the pop-up should hand its result over and
  * close, not boot a second copy of the app.
  */
-export function isOAuthPopup(): boolean {
+export function isOAuthReturn(): boolean {
   const params = new URLSearchParams(window.location.search)
-  return window.opener != null && (params.has('code') || params.has('error'))
+  return params.has('lichess-auth') && (params.has('code') || params.has('error'))
 }
 
-/** Pass the result back to the window that opened this one, then close. */
-export function completeOAuthPopup(): void {
+/** Broadcast the result to the app's other windows, then close this one. */
+export function completeOAuthReturn(): void {
   const params = new URLSearchParams(window.location.search)
-  window.opener?.postMessage(
-    {
-      type: MESSAGE_TYPE,
-      code: params.get('code'),
-      state: params.get('state'),
-      error: params.get('error_description') ?? params.get('error'),
-    },
-    window.location.origin,
-  )
+  const result: AuthResult = {
+    code: params.get('code'),
+    state: params.get('state'),
+    error: params.get('error_description') ?? params.get('error'),
+  }
+  try {
+    const channel = new BroadcastChannel(RESULT_CHANNEL)
+    channel.postMessage(result)
+    channel.close()
+  } catch {
+    // Fall through to storage, which every supported browser has.
+  }
+  try {
+    localStorage.setItem(RESULT_KEY, JSON.stringify(result))
+  } catch {
+    // With both channels unavailable the waiter's timeout will explain.
+  }
   window.close()
+  // A pop-up the browser refuses to close should say why it is still here.
+  document.body.textContent = 'Signed in — you can close this window.'
 }
 
 /**
@@ -119,51 +151,66 @@ export function completeOAuthPopup(): void {
  */
 export function stripOAuthParams(): void {
   const url = new URL(window.location.href)
-  const spent = ['code', 'state', 'error', 'error_description']
+  const spent = ['code', 'state', 'error', 'error_description', 'lichess-auth']
   if (!spent.some((key) => url.searchParams.has(key))) return
   for (const key of spent) url.searchParams.delete(key)
   window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
 }
 
-/** Wait for the popup to report back, or for the user to give up on it. */
-function awaitPopup(popup: Window, state: string): Promise<string> {
+/**
+ * Wait for the pop-up to report back.
+ *
+ * There is deliberately no watch on `popup.closed`: the browser can sever the
+ * two windows during the round trip to Lichess, after which `closed` reads
+ * true while the window is open on screen, and acting on it cancelled live
+ * sign-ins. Lichess redirects back on denial as well as success, so the only
+ * silent case is the user closing the window by hand — covered by the timeout.
+ *
+ * A result whose state is not this attempt's is ignored, not fatal: it is a
+ * straggler from an earlier attempt, and this waiter's own answer may still
+ * be coming.
+ */
+function awaitAuthorization(state: string): Promise<string> {
   return new Promise((resolve, reject) => {
+    let channel: BroadcastChannel | null = null
     const finish = (fn: () => void) => {
-      window.removeEventListener('message', onMessage)
-      clearInterval(closedTimer)
+      channel?.close()
+      window.removeEventListener('storage', onStorage)
       clearTimeout(deadline)
       fn()
     }
 
-    const onMessage = (event: MessageEvent) => {
-      // Only this app's own popup may speak here.
-      if (event.origin !== window.location.origin) return
-      const data = event.data as { type?: string; code?: string; state?: string; error?: string }
-      if (data?.type !== MESSAGE_TYPE) return
-      if (data.state !== state) {
-        finish(() => reject(new LichessAuthError('Sign-in came back with the wrong state.')))
+    const onResult = (result: AuthResult) => {
+      if (result.state !== state) return
+      if (result.error || !result.code) {
+        finish(() => reject(new LichessAuthError(result.error || 'Lichess did not send a code.')))
         return
       }
-      if (data.error || !data.code) {
-        finish(() => reject(new LichessAuthError(data.error || 'Lichess did not send a code.')))
-        return
-      }
-      const code = data.code
+      const code = result.code
       finish(() => resolve(code))
     }
 
-    const closedTimer = setInterval(() => {
-      if (popup.closed) {
-        finish(() => reject(new LichessAuthError('The Lichess sign-in window was closed.')))
+    try {
+      channel = new BroadcastChannel(RESULT_CHANNEL)
+      channel.onmessage = (event) => onResult(event.data as AuthResult)
+    } catch {
+      channel = null
+    }
+
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== RESULT_KEY || !event.newValue) return
+      try {
+        onResult(JSON.parse(event.newValue) as AuthResult)
+      } catch {
+        // Not this feature's write; ignore.
       }
-    }, 500)
+    }
+    window.addEventListener('storage', onStorage)
 
     const deadline = setTimeout(
       () => finish(() => reject(new LichessAuthError('Signing in to Lichess timed out.'))),
       5 * 60 * 1000,
     )
-
-    window.addEventListener('message', onMessage)
   })
 }
 
@@ -207,9 +254,12 @@ export async function signIn(
     url.searchParams.set('code_challenge_method', 'S256')
     url.searchParams.set('code_challenge', await codeChallenge(verifier))
     url.searchParams.set('state', state)
+    // Listen before navigating, so no window exists in which the pop-up could
+    // answer into silence.
+    const answer = awaitAuthorization(state)
     popup.location.href = url.toString()
 
-    const code = await awaitPopup(popup, state)
+    const code = await answer
 
     const response = await fetch(TOKEN_URL, {
       method: 'POST',
@@ -232,7 +282,13 @@ export async function signIn(
       expiresAt: Date.now() + (token.expires_in ?? 3600) * 1000,
     }
   } finally {
-    if (!popup.closed) popup.close()
+    // Best effort: after a severing this handle cannot reach the window, and
+    // the pop-up closes itself on return anyway.
+    try {
+      if (!popup.closed) popup.close()
+    } catch {
+      // Unreachable handle; nothing to clean up from here.
+    }
   }
 }
 

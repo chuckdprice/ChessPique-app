@@ -4,14 +4,14 @@ import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/react'
 import './index.css'
 import App from './App.tsx'
-import { completeOAuthPopup, isOAuthPopup, stripOAuthParams } from './lib/lichess/oauth.ts'
+import { completeOAuthReturn, isOAuthReturn, stripOAuthParams } from './lib/lichess/oauth.ts'
 import { applyAppearance, loadAppearance } from './lib/settings.ts'
 
-// Lichess sends its sign-in popup back here. Hand the code to the window that
-// opened it and close, rather than booting a second copy of the app in a
+// Lichess sends its sign-in pop-up back here. Hand the result to the app's
+// other windows and close, rather than booting a second copy of the app in a
 // window that is about to disappear.
-if (isOAuthPopup()) {
-  completeOAuthPopup()
+if (isOAuthReturn()) {
+  completeOAuthReturn()
 } else {
   // A code that reaches the top window has nowhere to go — the sign-in that
   // asked for it lives in the popup's opener. Take it out of the address bar

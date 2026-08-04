@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
 import type { ConvertOptions } from '../lib/convert'
 import type { Opening } from '../lib/openings'
-import { loadSession, openSignInWindow } from '../lib/lichess/oauth'
+import { loadSession, openSignInWindow, saveSession, signIn } from '../lib/lichess/oauth'
+import { fetchAccount } from '../lib/lichess/studies'
 import LichessStudyDialog from './LichessStudyDialog'
 import Pane from './Pane'
 import PgnActions from './PgnActions'
@@ -66,7 +67,11 @@ export default function PgnFilePage({
 }: PgnFilePageProps) {
   const [dragOver, setDragOver] = useState(false)
   const [studyOpen, setStudyOpen] = useState(false)
-  const [signInWindow, setSignInWindow] = useState<Window | null>(null)
+  const [authBusy, setAuthBusy] = useState(false)
+  const [authError, setAuthError] = useState<string | null>(null)
+  // Distinguishes this sign-in attempt from an abandoned earlier one, so a
+  // stale failure cannot pop an error over a fresh attempt.
+  const authAttempt = useRef(0)
   const [startMinutes, setStartMinutes] = useState('')
   const [mode, setMode] = useState<OverrideMode>('auto')
   const [amount, setAmount] = useState('')
@@ -256,11 +261,35 @@ export default function PgnFilePage({
             <button
               type="button"
               onClick={() => {
-                // Opened here, in the click itself, because a pop-up asked for
-                // any later than this is one the browser may refuse. Already
-                // signed in, nothing needs opening.
-                setSignInWindow(loadSession() ? null : openSignInWindow())
-                setStudyOpen(true)
+                // Already signed in: straight to the studies. Otherwise the
+                // Lichess window opens here, in the click itself — a pop-up
+                // asked for any later is one the browser may refuse — and the
+                // dialog stays out of the way until there is something to
+                // show: the studies on success, the error otherwise.
+                if (loadSession()) {
+                  setAuthError(null)
+                  setStudyOpen(true)
+                  return
+                }
+                const attempt = ++authAttempt.current
+                const opened = openSignInWindow()
+                setAuthBusy(true)
+                void (async () => {
+                  try {
+                    const { token, expiresAt } = await signIn(opened)
+                    const { username } = await fetchAccount(token)
+                    saveSession({ token, expiresAt, username })
+                    if (attempt !== authAttempt.current) return
+                    setAuthError(null)
+                    setStudyOpen(true)
+                  } catch (e) {
+                    if (attempt !== authAttempt.current) return
+                    setAuthError(e instanceof Error ? e.message : String(e))
+                    setStudyOpen(true)
+                  } finally {
+                    if (attempt === authAttempt.current) setAuthBusy(false)
+                  }
+                })()
               }}
               className="flex items-center gap-1.5 rounded-lg bg-felt px-3 py-1.5 text-sm font-medium text-buff shadow-sm transition-colors hover:bg-felt-deep"
             >
@@ -277,7 +306,7 @@ export default function PgnFilePage({
                 <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H18v16H5.5A1.5 1.5 0 0 1 4 18.5Z" />
                 <path d="M8 8h6M8 12h6" />
               </svg>
-              Lichess Study
+              {authBusy ? 'Waiting for Lichess…' : 'Lichess Study'}
             </button>
           </div>
         )}
@@ -287,7 +316,7 @@ export default function PgnFilePage({
         <LichessStudyDialog
           pgn={convertedPgn}
           defaultChapterName={downloadName.replace(/\.pgn$/i, '')}
-          signInWindow={signInWindow}
+          initialError={authError}
           onClose={() => setStudyOpen(false)}
         />
       )}

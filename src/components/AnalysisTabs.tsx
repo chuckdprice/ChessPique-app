@@ -5,10 +5,11 @@ import type { ChartRow } from '../lib/gameModel'
 import type { Opening } from '../lib/openings'
 import ClassificationTable from './ClassificationTable'
 import ClockChart from './ClockChart'
+import CommentEditor from './CommentEditor'
 import EvalChart from './EvalChart'
 import PhaseAccuracyTable from './PhaseAccuracyTable'
 
-type Tab = 'evaluation' | 'phases' | 'classification' | 'times'
+type Tab = 'evaluation' | 'phases' | 'classification' | 'times' | 'comments'
 
 interface AnalysisTabsProps {
   analysis: GameAnalysis | null
@@ -26,13 +27,63 @@ interface AnalysisTabsProps {
   whiteElo: string | null
   blackElo: string | null
   playedLikeTooltip: string
+  onCommentChange: (ply: number, comment: string) => void
 }
 
-const TABS: Array<{ id: Tab; label: string }> = [
-  { id: 'evaluation', label: 'Evaluation' },
-  { id: 'phases', label: 'Phase Accuracy' },
-  { id: 'classification', label: 'Move Classification' },
-  { id: 'times', label: 'Move Times' },
+/**
+ * Tabs are icons with their name on hover.
+ *
+ * Five labels ran wider than the pane on anything but a desktop, so the strip
+ * scrolled and a tab could sit off-screen unseen. Icons fit at any width; the
+ * name is one hover, and always the accessible name.
+ */
+const TABS: Array<{ id: Tab; label: string; icon: React.ReactNode }> = [
+  {
+    id: 'evaluation',
+    label: 'Evaluation',
+    // Axes with a line climbing across them.
+    icon: <path d="M4 4v15a1 1 0 0 0 1 1h15M7 15l4-5 3 3 5-7" />,
+  },
+  {
+    id: 'phases',
+    label: 'Phase Accuracy',
+    // Bullseye.
+    icon: (
+      <>
+        <circle cx="12" cy="12" r="8" />
+        <circle cx="12" cy="12" r="4" />
+        <circle cx="12" cy="12" r="0.6" fill="currentColor" />
+      </>
+    ),
+  },
+  {
+    id: 'classification',
+    label: 'Move Classification',
+    // A tally: each line ticked off, which is what the tab counts.
+    icon: (
+      <>
+        <path d="m3 6 2 2 3-3M3 13l2 2 3-3M3 20l2 2 3-3" />
+        <path d="M12 6h9M12 14h9M12 21h9" />
+      </>
+    ),
+  },
+  {
+    id: 'times',
+    label: 'Move Times',
+    // Clock.
+    icon: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 2" />
+      </>
+    ),
+  },
+  {
+    id: 'comments',
+    label: 'Comments',
+    // Speech bubble.
+    icon: <path d="M21 12a8 8 0 0 1-8 8H8l-5 3 1.5-4.5A8 8 0 1 1 21 12Z" />,
+  },
 ]
 
 /** Chevron over a fade, marking a direction the tab strip can still scroll. */
@@ -97,6 +148,7 @@ export default function AnalysisTabs({
   whiteElo,
   blackElo,
   playedLikeTooltip,
+  onCommentChange,
 }: AnalysisTabsProps) {
   const [tab, setTab] = useState<Tab>('evaluation')
   const stripRef = useRef<HTMLDivElement>(null)
@@ -155,14 +207,29 @@ export default function AnalysisTabs({
               type="button"
               role="tab"
               aria-selected={tab === t.id}
+              // Both, deliberately: the title is the hover tooltip, the
+              // aria-label is what the tab is called to anyone not seeing it.
+              title={t.label}
+              aria-label={t.label}
               onClick={() => setTab(t.id)}
-              className={`shrink-0 whitespace-nowrap rounded-t-lg border-b-2 px-4 py-1.5 text-sm font-medium transition-colors ${
+              className={`shrink-0 rounded-t-lg border-b-2 px-4 py-1.5 transition-colors ${
                 tab === t.id
                   ? 'border-buff text-buff'
                   : 'border-transparent text-buff/60 hover:text-buff'
               }`}
             >
-              {t.label}
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                className="size-5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                {t.icon}
+              </svg>
             </button>
           ))}
         </div>
@@ -212,6 +279,9 @@ export default function AnalysisTabs({
           ) : (
             <AnalysisPending progress={progress} error={analysisError} />
           ))}
+        {tab === 'comments' && (
+          <CommentEditor moves={moves} ply={ply} onCommentChange={onCommentChange} />
+        )}
         {tab === 'times' && (
           <ClockChart
             rows={chartRows}

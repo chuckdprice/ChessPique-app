@@ -48,6 +48,7 @@ interface AnalysisPageProps {
   onEngineSettingsChange: (next: EngineSettings) => void
   onTopScore: (score: Score | null, depth: number) => void
   onEngineMoves: (ucis: string[]) => void
+  onCommentChange: (ply: number, comment: string) => void
   arrows: Arrow[]
 }
 
@@ -85,6 +86,7 @@ export default function AnalysisPage({
   onEngineSettingsChange,
   onTopScore,
   onEngineMoves,
+  onCommentChange,
   arrows,
 }: AnalysisPageProps) {
   const [orientation, setOrientation] = useState<'white' | 'black'>('white')
@@ -214,6 +216,7 @@ export default function AnalysisPage({
             whiteElo={whiteElo}
             blackElo={blackElo}
             playedLikeTooltip={playedLikeTooltip}
+            onCommentChange={onCommentChange}
           />
         </div>
       </div>

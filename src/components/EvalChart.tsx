@@ -163,28 +163,28 @@ export default function EvalChart({ analysis, moves, ply, onPlyChange, opening }
           {analysis.middlegameStartPly != null && (
             <ReferenceLine
               x={analysis.middlegameStartPly}
-              stroke="var(--class-inaccuracy)"
+              stroke="var(--phase-middlegame)"
               strokeDasharray="4 3"
               label={{
                 value: 'Middlegame',
                 angle: -90,
                 position: 'insideBottomLeft',
                 fontSize: 10,
-                fill: 'var(--class-inaccuracy)',
+                fill: 'var(--phase-middlegame)',
               }}
             />
           )}
           {analysis.endgameStartPly != null && (
             <ReferenceLine
               x={analysis.endgameStartPly}
-              stroke="var(--class-blunder)"
+              stroke="var(--phase-endgame)"
               strokeDasharray="4 3"
               label={{
                 value: 'Endgame',
                 angle: -90,
                 position: 'insideBottomLeft',
                 fontSize: 10,
-                fill: 'var(--class-blunder)',
+                fill: 'var(--phase-endgame)',
               }}
             />
           )}

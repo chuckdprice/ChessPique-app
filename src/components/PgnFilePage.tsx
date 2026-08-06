@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { copyText } from '../lib/clipboard'
 import type { ConvertOptions } from '../lib/convert'
 import type { Opening } from '../lib/openings'
 import { loadSession, openSignInWindow, saveSession, signIn } from '../lib/lichess/oauth'
@@ -60,11 +61,19 @@ export default function PgnFilePage({
   // Distinguishes this sign-in attempt from an abandoned earlier one, so a
   // stale failure cannot pop an error over a fresh attempt.
   const authAttempt = useRef(0)
+  const [sourceCopied, setSourceCopied] = useState(false)
   const [overridesOpen, setOverridesOpen] = useState(false)
   const [startMinutes, setStartMinutes] = useState('')
   const [mode, setMode] = useState<OverrideMode>('auto')
   const [amount, setAmount] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // The "Copied" confirmation goes back to reading "Copy" on its own.
+  useEffect(() => {
+    if (!sourceCopied) return
+    const timer = setTimeout(() => setSourceCopied(false), 1800)
+    return () => clearTimeout(timer)
+  }, [sourceCopied])
 
   /**
    * A conversion that fails for want of a starting clock is fixed in this box,
@@ -253,14 +262,26 @@ export default function PgnFilePage({
                   placeholder={'[Event "..."]\n[TimeControl "G70/d10"]\n\n1. d4 {[%emt 0:00:00]} d5 {[%emt 0:00:05]} ...'}
                   className={PANE_CLASS}
                 />
-                <button
-                  type="button"
-                  onClick={() => onConvert(text, buildOptions())}
-                  disabled={text.trim() === ''}
-                  className="mt-3 shrink-0 self-end rounded-lg bg-felt px-5 py-2 font-medium text-buff shadow-sm transition-colors hover:bg-felt-deep disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Analyze Game
-                </button>
+                <div className="mt-3 flex shrink-0 items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void (async () => {
+                      if (await copyText(text)) setSourceCopied(true)
+                    })()}
+                    disabled={text.trim() === ''}
+                    className="rounded-lg border border-rule px-4 py-2 font-medium text-ink transition-colors hover:bg-buff-soft disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {sourceCopied ? 'Copied' : 'Copy'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onConvert(text, buildOptions())}
+                    disabled={text.trim() === ''}
+                    className="rounded-lg bg-felt px-5 py-2 font-medium text-buff shadow-sm transition-colors hover:bg-felt-deep disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Analyze Game
+                  </button>
+                </div>
               </>
             )}
 

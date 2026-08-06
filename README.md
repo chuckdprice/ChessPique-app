@@ -62,8 +62,11 @@ On the analysis page you can:
   the line it would have played instead
 - Review the game with Stockfish 18: an eval bar beside the board, per-move classification
   (Best, Inaccuracy → Blunder; Good and Excellent stay unmarked) in the move list, on the board
-  and as dots on the evaluation graph, and four analysis tabs — Evaluation,
-  Phase Accuracy, Move Classification, and Move Times
+  and as dots on the evaluation graph, and five analysis tabs shown as icons that name
+  themselves on hover — Evaluation, Phase Accuracy, Move Classification, Move Times and
+  Comments. Only marked classifications are coloured in the move list (best green,
+  inaccuracies blue, mistakes and blunders warmer); Good and Excellent are left plain so the
+  moves worth finding stand out
 - See which opening was played, named over the evaluation chart as `ECO: Name`
 - Click either chart to jump the board to that move — on the Move Times chart, the left half
   of a move is White's and the right half is Black's
@@ -73,6 +76,8 @@ On the analysis page you can:
   the move list, the accuracies, and the exported PGN still describe the moves actually played
 - Turn on the live engine panel for a continuously updating evaluation of the current
   position, with configurable search time, number of lines, and memory
+- Write a note against any move on the *Comments* tab: the move list follows as you type, and
+  the text is what the converted PGN carries in braces
 - Download the converted PGN with your edited tags
 
 Everything — conversion and engine analysis alike — runs entirely in the browser; games are

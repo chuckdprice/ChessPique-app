@@ -126,7 +126,11 @@ export default function MoveTable({
     if (!cell) return <td className="px-2 text-ink-mute">…</td>
     const current = cell.ply === ply
     const info = analysisFor(cell)
-    const color = info ? classColor(info.classification) : undefined
+    // Only a classification that earns a marker earns a colour. Good and
+    // Excellent cover most of a game between them, and colouring those left
+    // the few moves worth finding competing with a wall of green.
+    const color =
+      info && hasMoveMarker(info.classification) ? classColor(info.classification) : undefined
     return (
       <td className="py-0.5 pr-1">
         <button
@@ -163,6 +167,22 @@ export default function MoveTable({
       </td>
     )
   }
+
+  /** The annotator's own words for a move, shown under it. */
+  const commentRow = (cell: Cell, comment: string) => (
+    <tr key={`comment-${cell.ply}`}>
+      <td />
+      <td colSpan={4} className="pb-1 pr-2">
+        <button
+          type="button"
+          onClick={() => onPlyChange(cell.ply)}
+          className="block w-full rounded-r border-l-[3px] border-rule bg-buff-soft/40 px-2 py-0.5 text-left text-[11px] italic text-ink-mute transition-opacity hover:opacity-80"
+        >
+          {comment}
+        </button>
+      </td>
+    </tr>
+  )
 
   /**
    * "Inaccuracy. c4 was best." beneath a flagged move, and under that the line
@@ -226,9 +246,18 @@ export default function MoveTable({
               const whiteInfo = analysisFor(row.white)
               const blackInfo = analysisFor(row.black)
               const advice: React.ReactNode[] = []
+              const commentFor = (cell: Cell | null) =>
+                cell ? (moves[cell.ply - 1]?.comment ?? null) : null
+              // The annotator's words first, then the engine's verdict on the
+              // same move: whoever wrote the note said it about the move, not
+              // about the engine's opinion of it.
+              const whiteComment = commentFor(row.white)
+              if (row.white && whiteComment) advice.push(commentRow(row.white, whiteComment))
               if (row.white && whiteInfo && NEEDS_ADVICE.includes(whiteInfo.classification)) {
                 advice.push(adviceRow(row.white, whiteInfo))
               }
+              const blackComment = commentFor(row.black)
+              if (row.black && blackComment) advice.push(commentRow(row.black, blackComment))
               if (row.black && blackInfo && NEEDS_ADVICE.includes(blackInfo.classification)) {
                 advice.push(adviceRow(row.black, blackInfo))
               }

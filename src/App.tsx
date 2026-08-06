@@ -112,6 +112,14 @@ export default function App() {
   const [deeperEvals, setDeeperEvals] = useState<Map<number, RefinedEval>>(new Map())
   // A line the user is playing out by hand from some position in the game.
   const [exploration, setExploration] = useState<Exploration | null>(null)
+  /**
+   * Comments the user has written or changed, by ply.
+   *
+   * Kept apart from `game` rather than written into its moves: the whole-game
+   * review runs off `game`, so editing a comment there would restart a
+   * minute of Stockfish every keystroke.
+   */
+  const [commentEdits, setCommentEdits] = useState<Map<number, string>>(new Map())
   // What the converted PGN carries beyond the moves and clocks. On by default:
   // the switches are there to leave things out, and a file is more useful with
   // them in.
@@ -156,6 +164,7 @@ export default function App() {
       setLiveScore(null)
       setEngineMoves([])
       setExploration(null)
+      setCommentEdits(new Map())
       setGame({ result, replay })
       setHeaders(result.headers)
       setPly(0)
@@ -261,6 +270,10 @@ export default function App() {
     [],
   )
 
+  const handleCommentChange = useCallback((ply: number, comment: string) => {
+    setCommentEdits((prev) => new Map(prev).set(ply, comment))
+  }, [])
+
   const handleExplorationTakeBack = useCallback(() => {
     setExploration((prev) => (prev ? takeBackExploredMove(prev) : null))
   }, [])
@@ -310,6 +323,21 @@ export default function App() {
 
   const chartRows = useMemo(() => (game ? buildChartRows(game.result.moves) : []), [game])
 
+  /**
+   * The game's moves as everything downstream should see them: the move list,
+   * the comment editor and the exported PGN all read the edited comment where
+   * there is one, and the file's own otherwise. An empty edit is a deletion.
+   */
+  const moves = useMemo(() => {
+    if (!game) return []
+    if (commentEdits.size === 0) return game.result.moves
+    return game.result.moves.map((move, i) => {
+      const edited = commentEdits.get(i + 1)
+      if (edited === undefined) return move
+      return { ...move, comment: edited.trim() === '' ? null : edited }
+    })
+  }, [game, commentEdits])
+
   const opening = useOpening(game?.replay.fens ?? null)
 
   const convertedPgn = useMemo(() => {
@@ -332,7 +360,7 @@ export default function App() {
     // The live engine's deeper answers are preferred, as in the move list.
     const evals =
       pgnExtras.evals && analysis
-        ? game.result.moves.map((_, i) => {
+        ? moves.map((_, i) => {
             const score = deeperEvals.get(i + 1)?.score ?? analysis.evals[i + 1]
             return score ? formatEvalTag(score) : null
           })
@@ -342,27 +370,27 @@ export default function App() {
     // come from the review, so both wait for it.
     const notes =
       pgnExtras.comments && analysis
-        ? game.result.moves.map((_, i) => {
+        ? moves.map((_, i) => {
             const info = analysis.moves[i]
             return info ? moveNote(info) : null
           })
         : undefined
     const variations =
       pgnExtras.variations && analysis
-        ? game.result.moves.map((_, i) => {
+        ? moves.map((_, i) => {
             const info = analysis.moves[i]
             return info ? moveVariation(info) || null : null
           })
         : undefined
 
-    return buildPgn(withExtraTags(headers, extras), game.result.moves, game.result.result, {
+    return buildPgn(withExtraTags(headers, extras), moves, game.result.result, {
       evals,
       clocks: pgnExtras.clocks,
       comments: pgnExtras.comments,
       notes,
       variations,
     })
-  }, [game, headers, opening, analysis, deeperEvals, pgnExtras])
+  }, [game, moves, headers, opening, analysis, deeperEvals, pgnExtras])
 
   const downloadName = useMemo(() => {
     const white = findHeader(headers, 'White') ?? 'White'
@@ -562,7 +590,7 @@ export default function App() {
             <AnalysisPage
               result={game.result}
               replay={game.replay}
-              moves={game.result.moves}
+              moves={moves}
               ply={ply}
               onPlyChange={handlePlyChange}
               analysis={analysis}
@@ -587,6 +615,7 @@ export default function App() {
               onEngineSettingsChange={setEngineSettings}
               onTopScore={handleTopScore}
               onEngineMoves={handleEngineMoves}
+              onCommentChange={handleCommentChange}
               arrows={arrows}
             />
           </Suspense>

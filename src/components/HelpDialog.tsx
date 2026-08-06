@@ -178,13 +178,21 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               PGN you export all still describe the moves that were actually played.
             </p>
             <p>
+              Moves the engine had nothing to say about are left uncoloured, so the ones that
+              are marked — best in green, inaccuracies in blue, mistakes and blunders warmer —
+              stand out rather than competing with a wall of colour.
+            </p>
+            <p>
               Under every inaccuracy, mistake, and blunder the list gives the engine's verdict
               and, below it, the line it would have played instead. Those moves are shown rather
               than clickable — they were never played, and the board follows the game.
             </p>
           </Section>
 
-          <Section title="The four analysis tabs">
+          <Section title="The analysis tabs">
+            <p>
+              The row of icons under the board names each tab on hover.
+            </p>
             <p>
               <Ui>Evaluation</Ui> — how the advantage swung, with a dot on each notable move.
               Click the chart to jump to that point in the game. The opening played is named in
@@ -202,6 +210,12 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               <Ui>Move Times</Ui> — lines for time remaining, bars for time spent per move. This
               chart jumps the board too: the left half of a move is White's, the right half
               Black's.
+            </p>
+            <p>
+              <Ui>Comments</Ui> — a note on the move the board is showing. Write, change or
+              delete it and the move list follows as you type; it is the same text the converted
+              PGN carries in braces while its <Ui>Comments</Ui> switch is on. Comments already in
+              the file you loaded appear here to be edited.
             </p>
           </Section>
 

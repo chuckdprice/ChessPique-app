@@ -38,9 +38,11 @@
   --class-best: #0ca30c;
   --class-excellent: #0ca30c;
   --class-good: #7a9a10;
-  --class-inaccuracy: #c98500;
+  --class-inaccuracy: #2b7fd4;
   --class-mistake: #d96a34;
   --class-blunder: #d03b3b;
+  --phase-middlegame: #c98500;
+  --phase-endgame: #d03b3b;
 
   /* ---- Accent: tournament green (default) ---- */
   --accent: #1e5943;
@@ -96,9 +98,11 @@
   --class-best: #35c435;
   --class-excellent: #35c435;
   --class-good: #a3c022;
-  --class-inaccuracy: #e9a92a;
+  --class-inaccuracy: #5ba9f5;
   --class-mistake: #ee7f47;
   --class-blunder: #ef5350;
+  --phase-middlegame: #e9a92a;
+  --phase-endgame: #ef5350;
 }
 
 /* Slightly brighter accents on the dark surface */

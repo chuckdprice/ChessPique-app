@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { copyText } from '../lib/clipboard'
 
 interface PgnActionsProps {
   /** The converted PGN, already rebuilt from the current tag values. */
@@ -111,26 +112,7 @@ export default function PgnActions({ pgn, fileName, compact = false }: PgnAction
   }
 
   const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(pgn)
-      setCopied(true)
-    } catch {
-      // Clipboard API needs a secure context and permission; fall back to a
-      // hidden textarea so the button still works on plain http.
-      try {
-        const area = document.createElement('textarea')
-        area.value = pgn
-        area.style.position = 'fixed'
-        area.style.opacity = '0'
-        document.body.appendChild(area)
-        area.select()
-        document.execCommand('copy')
-        document.body.removeChild(area)
-        setCopied(true)
-      } catch {
-        /* leave the button unconfirmed rather than claiming success */
-      }
-    }
+    if (await copyText(pgn)) setCopied(true)
   }
 
   const openLichess = async () => {

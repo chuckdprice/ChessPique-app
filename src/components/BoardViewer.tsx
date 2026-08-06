@@ -5,15 +5,18 @@ import type { Move } from '../lib/convert'
 import { formatVariation, hasMoveMarker } from '../lib/engine/analysis'
 import type { GameAnalysis } from '../lib/engine/analysis'
 import { explorationFen } from '../lib/gameModel'
-import type { Exploration, ReplayedGame } from '../lib/gameModel'
+import type { CapturedKind, Exploration, ReplayedGame } from '../lib/gameModel'
+import CapturedPieces from './CapturedPieces'
 import ClassBadge from './ClassBadge'
 
 export interface PlayerPlate {
   name: string
-  /** Overall game accuracy, ready to print — e.g. "(87.3%)". */
-  accuracy: string | null
   /** Remaining clock, or null when the PGN has no clock times. */
   clock: number | null
+  /** The pieces this player is up, pawns first. */
+  captured: CapturedKind[]
+  /** Their material lead in pawns, ready to print; null unless they lead. */
+  lead: string | null
 }
 
 interface BoardViewerProps {
@@ -37,38 +40,35 @@ function squareCorner(square: string, orientation: 'white' | 'black') {
   return { left: (col + 1) * 12.5, top: row * 12.5 }
 }
 
-/** Name + accuracy on the left, remaining clock right-aligned to the board edge. */
-export function PlayerPlateRow({
-  plate,
-  color,
-  accuracyTooltip,
-}: {
-  plate: PlayerPlate
-  color: 'w' | 'b'
-  accuracyTooltip: string
-}) {
+/**
+ * Name on the left; the material this player is up and their clock on the right.
+ *
+ * The two are one right-aligned group, pieces first, so the pieces sit against
+ * the clock — and against the board's edge when the game has no clocks to show.
+ */
+export function PlayerPlateRow({ plate, color }: { plate: PlayerPlate; color: 'w' | 'b' }) {
   return (
     <div className="flex h-full items-center gap-2">
-      <span className="truncate text-sm font-medium">
+      <span className="min-w-0 truncate text-sm font-medium">
         {plate.name}
         <span className="sr-only">{color === 'w' ? ' (White)' : ' (Black)'}</span>
       </span>
-      {plate.accuracy && (
-        <span
-          className="shrink-0 cursor-help font-score text-[11px] text-ink-mute"
-          title={accuracyTooltip}
-        >
-          {plate.accuracy}
-        </span>
-      )}
-      {plate.clock != null && (
-        <span
-          className="ml-auto shrink-0 rounded bg-buff-soft px-2 py-0.5 font-score text-sm font-semibold tabular-nums"
-          aria-label={`${color === 'w' ? 'White' : 'Black'} clock`}
-        >
-          {formatClockTime(plate.clock)}
-        </span>
-      )}
+      <span className="ml-auto flex shrink-0 items-center gap-2">
+        {/* The pieces are the opponent's: they were taken from them. */}
+        <CapturedPieces
+          pieces={plate.captured}
+          color={color === 'w' ? 'b' : 'w'}
+          lead={plate.lead}
+        />
+        {plate.clock != null && (
+          <span
+            className="shrink-0 rounded bg-buff-soft px-2 py-0.5 font-score text-sm font-semibold tabular-nums"
+            aria-label={`${color === 'w' ? 'White' : 'Black'} clock`}
+          >
+            {formatClockTime(plate.clock)}
+          </span>
+        )}
+      </span>
     </div>
   )
 }

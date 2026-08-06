@@ -50,11 +50,12 @@ On the analysis page you can:
 
 - Step through the game with the navigation buttons (which name the previous and next moves),
   the move list, or ← → keys, and flip the board to either player's perspective
-- See each player's remaining clock and overall accuracy beside their name (their rating and
-  the estimated "played like" rating live in the Move Classification tab)
-- Follow the material balance in the strip beside the board: the pieces a player is *up* stack
-  outward from the centre on their side, with the lead marked at the far end. Even trades cancel
-  out, so four pawns apiece show nothing and five against four show one pawn
+- See each player's remaining clock beside their name (accuracy, rating and the estimated
+  "played like" rating live in the Move Classification tab)
+- Follow the material balance on the players' own rows: the pieces each is *up* sit just left of
+  their clock, with the lead in pawns beside them — or against the board's edge when the game
+  carries no clocks. Even trades cancel out, so four pawns apiece show nothing and five against
+  four show one pawn
 - Turn the engine on to get arrows for its top lines — shaded from best to worst — with the
   move actually played highlighted in gold
 - Read the engine's verdict under every inaccuracy, mistake, and blunder in the move list, with

@@ -435,10 +435,6 @@ export default function App() {
       ? Math.round((analysisProgress.done / analysisProgress.total) * 100)
       : null
 
-  const accuracyTooltip =
-    `Overall accuracy for the game: the average of each move's accuracy, which comes from the ` +
-    `win-% that move gave up (lichess formula). 100% means every move held the position's value.`
-
   const playedLikeTooltip =
     `Estimated "played like" rating for this game.\n\n` +
     `Estimated from average win-% lost per move in undecided positions, calibrated against ` +
@@ -583,7 +579,6 @@ export default function App() {
               blackName={blackName}
               whiteElo={whiteElo}
               blackElo={blackElo}
-              accuracyTooltip={accuracyTooltip}
               playedLikeTooltip={playedLikeTooltip}
               evalScore={evalScore}
               engineOn={engineOn}

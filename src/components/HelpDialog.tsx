@@ -148,9 +148,10 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
             </p>
             <p>
               Step through the game with the buttons under the board, by clicking a move in the
-              list, or with the keyboard. The bar beside the board shows who stands better, and the
-              strip beside it shows the material one side is up — an even trade cancels out, so
-              four pawns apiece show nothing and five against four show one pawn.
+              list, or with the keyboard. The bar beside the board shows who stands better, and
+              each player's own row shows the material they are up, just left of their clock — an
+              even trade cancels out, so four pawns apiece show nothing and five against four show
+              one pawn, with the lead in pawns beside them.
             </p>
             <p>
               Turn on <Ui>SF 18</Ui> for a live engine on the current position: its best lines are

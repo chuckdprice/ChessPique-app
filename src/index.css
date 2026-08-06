@@ -193,7 +193,7 @@ body {
  * to change shape at a breakpoint, and inline styles cannot. Children claim a
  * named area, so neither layout hard-codes row or column numbers.
  *
- * Phones stack: the board keeps the eval bar and captured strip beside it, and
+ * Phones stack: the board keeps the eval bar beside it, and
  * everything else goes underneath in reading order. The engine and move list
  * move below the board rather than sitting in a fourth column no phone is wide
  * enough to show.
@@ -201,14 +201,14 @@ body {
 .analysis-grid {
   display: grid;
   gap: 0.25rem 0.75rem;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   grid-template-areas:
-    "plate-top    plate-top    plate-top"
-    "eval-bar     board        captured"
-    "plate-bottom plate-bottom plate-bottom"
-    "nav          nav          nav"
-    "side         side         side"
-    "tabs         tabs         tabs";
+    "plate-top    plate-top"
+    "eval-bar     board"
+    "plate-bottom plate-bottom"
+    "nav          nav"
+    "side         side"
+    "tabs         tabs";
 }
 
 /*
@@ -222,7 +222,7 @@ body {
        An auto track soaks up the spare width, and it did: in landscape the
        board column stretched to 467px around a 240px board while the move list
        was squeezed to 243px and had to scroll sideways to show Black's moves. */
-    grid-template-columns: auto var(--board-size) auto minmax(12rem, 1fr);
+    grid-template-columns: auto var(--board-size) minmax(12rem, 1fr);
     /* Every row the side column spans is pinned, never auto. An auto row lets
        the move list's full height be shared out across the rows it spans: the
        board block grew to 256px around a 165px board and pushed the nav off
@@ -232,11 +232,11 @@ body {
        alone. Its buttons are wider than the board, so in that one column they
        spilled across the move list. */
     grid-template-areas:
-      ".        plate-top    .        side"
-      "eval-bar board        captured side"
-      ".        plate-bottom .        side"
-      "nav      nav          nav      side"
-      "tabs     tabs         tabs     tabs";
+      ".        plate-top    side"
+      "eval-bar board        side"
+      ".        plate-bottom side"
+      "nav      nav          side"
+      "tabs     tabs         tabs";
   }
 }
 
@@ -245,21 +245,20 @@ body {
     /* The plate rows are fixed rather than auto: the side column spans rows
        1-3, and an auto row would stretch to fit its content instead of ending
        level with the player names. */
-    grid-template-columns: auto var(--board-size) auto minmax(15rem, 1fr);
+    grid-template-columns: auto var(--board-size) minmax(15rem, 1fr);
     grid-template-rows: 2rem var(--board-size) 2rem auto minmax(0, 1fr);
     grid-template-areas:
-      ".        plate-top    .        side"
-      "eval-bar board        captured side"
-      ".        plate-bottom .        side"
-      ".        nav          .        ."
-      "tabs     tabs         tabs     tabs";
+      ".        plate-top    side"
+      "eval-bar board        side"
+      ".        plate-bottom side"
+      ".        nav          ."
+      "tabs     tabs         tabs";
   }
 }
 
 .area-plate-top { grid-area: plate-top; }
 .area-eval-bar { grid-area: eval-bar; }
 .area-board { grid-area: board; }
-.area-captured { grid-area: captured; }
 .area-side { grid-area: side; }
 .area-plate-bottom { grid-area: plate-bottom; }
 .area-nav { grid-area: nav; }
@@ -270,10 +269,11 @@ body {
  *
  * Normally the board takes the height left over by the header, steps, plates,
  * nav and charts, capped by width so a tall narrow phone cannot push it past
- * the screen edge.
+ * the screen edge. The width term covers the page padding and the eval bar;
+ * the captured pieces moved onto the name rows and cost it nothing.
  */
 .app-main {
-  --board-size: min(calc(100vw - 7rem), clamp(240px, calc(100dvh - 470px), 560px));
+  --board-size: min(calc(100vw - 5rem), clamp(240px, calc(100dvh - 470px), 560px));
 }
 
 /*
@@ -290,7 +290,7 @@ body {
  */
 @media (max-height: 520px) {
   .app-main {
-    --board-size: min(calc(100vw - 20rem), max(180px, calc(100dvh - 95px)));
+    --board-size: min(calc(100vw - 17rem), max(180px, calc(100dvh - 95px)));
     padding-top: 0.15rem;
     padding-bottom: 0.15rem;
   }

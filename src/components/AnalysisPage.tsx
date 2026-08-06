@@ -5,14 +5,13 @@ import type { GameAnalysis, RefinedEval } from '../lib/engine/analysis'
 import type { Score } from '../lib/engine/uci'
 import type { EngineSettings } from '../lib/settings'
 import type { ChartRow, ReplayedGame } from '../lib/gameModel'
-import { clockAtPly, explorationFen } from '../lib/gameModel'
+import { capturedMaterial, clockAtPly, explorationFen } from '../lib/gameModel'
 import type { Exploration } from '../lib/gameModel'
 import type { Opening } from '../lib/openings'
 import AnalysisProgress from './AnalysisProgress'
 import AnalysisTabs from './AnalysisTabs'
 import BoardViewer, { BoardNav, ExploreBar, PlayerPlateRow } from './BoardViewer'
 import type { PlayerPlate } from './BoardViewer'
-import CapturedStrip from './CapturedStrip'
 import EnginePanel from './EnginePanel'
 import EvalBar from './EvalBar'
 import MoveTable from './MoveTable'
@@ -41,7 +40,6 @@ interface AnalysisPageProps {
   /** Rating from the PGN tag, shown in the Move Classification tab. */
   whiteElo: string | null
   blackElo: string | null
-  accuracyTooltip: string
   playedLikeTooltip: string
   evalScore: Score | null
   engineOn: boolean
@@ -79,7 +77,6 @@ export default function AnalysisPage({
   blackName,
   whiteElo,
   blackElo,
-  accuracyTooltip,
   playedLikeTooltip,
   evalScore,
   engineOn,
@@ -100,19 +97,21 @@ export default function AnalysisPage({
   const hasClocks = moves.some((m) => m.clkSeconds != null)
   const startSeconds = hasClocks ? (result.timeControl?.startSeconds ?? null) : null
 
-  // Accuracy needs the whole review, so it stays a placeholder until then.
-  const accuracyLabel = (accuracy: number | undefined) =>
-    accuracy != null ? `(${accuracy.toFixed(1)}%)` : analysisProgress ? '(…)' : null
-
+  // Each player's row shows what they are up, so it carries the *opponent's*
+  // missing pieces, and the lead badge goes to whoever holds it.
+  const captured = capturedMaterial(shownFen)
+  const lead = Math.abs(captured.diff)
   const whitePlate: PlayerPlate = {
     name: whiteName,
-    accuracy: accuracyLabel(analysis?.white.accuracy),
     clock: clockAtPly(moves, ply, 'w', startSeconds),
+    captured: captured.black,
+    lead: captured.diff > 0 ? `+${lead}` : null,
   }
   const blackPlate: PlayerPlate = {
     name: blackName,
-    accuracy: accuracyLabel(analysis?.black.accuracy),
     clock: clockAtPly(moves, ply, 'b', startSeconds),
+    captured: captured.white,
+    lead: captured.diff < 0 ? `+${lead}` : null,
   }
   const topPlate = orientation === 'white' ? blackPlate : whitePlate
   const bottomPlate = orientation === 'white' ? whitePlate : blackPlate
@@ -138,7 +137,7 @@ export default function AnalysisPage({
       {/* Shape lives in .analysis-grid in index.css so it can change at lg. */}
       <div className="analysis-grid min-h-0 lg:flex-1">
         <div className="area-plate-top min-w-0">
-          <PlayerPlateRow plate={topPlate} color={topColor} accuracyTooltip={accuracyTooltip} />
+          <PlayerPlateRow plate={topPlate} color={topColor} />
         </div>
 
         <div className="area-eval-bar flex">
@@ -155,10 +154,6 @@ export default function AnalysisPage({
             exploration={exploration}
             onPieceMove={onPieceMove}
           />
-        </div>
-
-        <div className="area-captured">
-          <CapturedStrip fen={shownFen} orientation={orientation} />
         </div>
 
         {/* On lg this spans rows 1-3, so the engine pane's top lines up with the
@@ -188,11 +183,7 @@ export default function AnalysisPage({
         </div>
 
         <div className="area-plate-bottom min-w-0">
-          <PlayerPlateRow
-            plate={bottomPlate}
-            color={bottomColor}
-            accuracyTooltip={accuracyTooltip}
-          />
+          <PlayerPlateRow plate={bottomPlate} color={bottomColor} />
         </div>
 
         <div className="area-nav flex justify-center pt-1">

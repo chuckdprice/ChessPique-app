@@ -76,12 +76,11 @@ Deployed at <https://chessnoter.vercel.app> from `main` (auto-deploy on push).
 The version in the header is `major.minor` from `package.json` plus a build
 number derived from the commit's timestamp, so it changes on every commit.
 
-**Unverified:** the Lichess sign-in and study import have never run against a
-real account end to end. Every piece is checked — the authorize request, CORS on
-all four endpoints with an `Authorization` header, the NDJSON shape, the import
-request's URL and body — but only Chuck can complete an actual sign-in. If it
-misbehaves, the useful detail is what the pop-up's address bar shows after
-pressing Authorize.
+The Lichess sign-in and study import work: Chuck confirmed the whole flow
+against his own account on 6 August 2026, after the pop-up handoff was changed
+to identify the return by `state` rather than by a URL marker. Treat that path
+as working, and suspect a regression rather than a never-worked bug if it
+breaks.
 
 **Never built:** a Send Feedback form. It was asked for once, then interrupted
 before the one open question was answered — the app is fully static, so there is

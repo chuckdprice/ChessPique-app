@@ -135,7 +135,9 @@ export default function EnginePanel({
       aria-label="Engine analysis"
       className="relative rounded-xl border border-rule bg-card shadow-sm"
     >
-      <div className="flex items-center gap-3 px-4 py-3">
+      {/* Nothing in this strip is taller than the text now, so it is padded
+          like a row of text rather than like a header. */}
+      <div className="flex items-center gap-3 px-4 py-1.5">
         <button
           type="button"
           role="switch"
@@ -187,7 +189,7 @@ export default function EnginePanel({
           aria-expanded={settingsOpen}
           aria-label="Engine settings"
           title="Engine settings"
-          className="rounded-md p-1.5 text-ink-mute transition-colors hover:bg-buff-soft hover:text-ink"
+          className="rounded-md p-1 text-ink-mute transition-colors hover:bg-buff-soft hover:text-ink"
         >
           <svg
             aria-hidden="true"
@@ -217,7 +219,7 @@ export default function EnginePanel({
       )}
 
       {enabled && (
-        <ul className="border-t border-rule px-4 py-2">
+        <ul className="border-t border-rule px-4 py-1">
           {(update?.lines ?? []).map((line) => (
             <li
               key={line.multipv}

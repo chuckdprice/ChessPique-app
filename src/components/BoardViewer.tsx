@@ -214,8 +214,8 @@ export function BoardNav({
   orientation,
 }: BoardNavProps) {
   const button =
-    'shrink-0 rounded-md border border-rule bg-card px-2 py-1.5 leading-none text-ink transition-colors hover:bg-buff-soft disabled:cursor-not-allowed disabled:opacity-30'
-  const arrow = `${button} text-xl`
+    'shrink-0 rounded-md border border-rule bg-card px-2 py-2 leading-none text-ink transition-colors hover:bg-buff-soft disabled:cursor-not-allowed disabled:opacity-30'
+  const arrow = `${button} text-2xl`
   const prevLabel = plyLabel(moves, ply - 1)
   const nextLabel = plyLabel(moves, ply + 1)
   const currentLabel = plyLabel(moves, ply)
@@ -224,7 +224,7 @@ export function BoardNav({
   // edges rather than running past them into the page margin.
   return (
     <div
-      className="flex w-(--board-size) max-w-full items-center justify-between gap-1"
+      className="flex w-(--board-size) max-w-full items-center justify-between gap-0.5"
       role="group"
       aria-label="Move navigation"
     >
@@ -290,7 +290,7 @@ export function BoardNav({
         <svg
           aria-hidden="true"
           viewBox="0 0 24 24"
-          className="size-5"
+          className="size-6"
           fill="none"
           stroke="currentColor"
           strokeWidth="2"

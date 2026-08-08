@@ -36,6 +36,7 @@ interface PgnFilePageProps {
   headers: Array<{ name: string; value: string }>
   onHeaderChange: (index: number, value: string) => void
   onHeaderAdd: (name: string) => void
+  onHeaderRemove: (index: number) => void
   /** Tags the app writes on every conversion, shown read-only in the editor. */
   generatedHeaders: Array<{ name: string; value: string }>
   /** What the converted PGN carries beyond the moves. */
@@ -65,6 +66,7 @@ export default function PgnFilePage({
   headers,
   onHeaderChange,
   onHeaderAdd,
+  onHeaderRemove,
   generatedHeaders,
   extras,
   onExtraChange,
@@ -308,6 +310,7 @@ export default function PgnFilePage({
                 headers={headers}
                 onChange={onHeaderChange}
                 onAdd={onHeaderAdd}
+                onRemove={onHeaderRemove}
                 generated={generatedHeaders}
                 opening={opening}
               />

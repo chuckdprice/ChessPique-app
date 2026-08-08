@@ -29,8 +29,12 @@ comes from the moves rather than from anything typed.
 A ChessNoteR export often has no tags at all, so the editor also has an **Add a tag** picker.
 It offers the standard tags the game does not already carry — the Seven Tag Roster first, then
 the common optional ones — and the tags the app writes itself are never in the list, because a
-value typed into one would be overwritten on the way out. An added tag starts empty and reaches
-the converted PGN as soon as it has a value.
+value typed into one would be overwritten on the way out. Choosing one adds it there and then;
+it starts empty and reaches the converted PGN as soon as it has a value.
+
+A bin beside a tag's name takes it back out of both the editor and the converted PGN, and
+returns it to the picker. Only the game's own tags have one: ECO, Opening and Annotator are
+written on every conversion, so removing them would last until the next keystroke.
 
 Four switches above the converted text decide the rest — all on by default:
 

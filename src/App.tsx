@@ -219,6 +219,10 @@ export default function App() {
     setHeaders((prev) => withTag(prev, name))
   }, [])
 
+  const handleHeaderRemove = useCallback((index: number) => {
+    setHeaders((prev) => prev.filter((_, i) => i !== index))
+  }, [])
+
   const handleHeaderChange = useCallback((index: number, value: string) => {
     setHeaders((prev) => prev.map((h, i) => (i === index ? { ...h, value } : h)))
   }, [])
@@ -607,6 +611,7 @@ export default function App() {
             headers={headers}
             onHeaderChange={handleHeaderChange}
             onHeaderAdd={handleHeaderAdd}
+            onHeaderRemove={handleHeaderRemove}
             generatedHeaders={generatedHeaders}
             extras={pgnExtras}
             onExtraChange={handleExtraChange}

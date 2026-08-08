@@ -142,18 +142,22 @@ export default function EnginePanel({
           aria-checked={enabled}
           aria-label="Toggle engine analysis"
           onClick={() => onEnabledChange(!enabled)}
-          className={`relative h-6 w-10 shrink-0 rounded-full transition-colors ${
+          // The track is only 16px tall now, so the tap target is grown past it
+          // by a pseudo-element rather than by padding, which would show.
+          className={`relative h-4 w-7 shrink-0 rounded-full transition-colors before:absolute before:-inset-2 before:content-[''] ${
             enabled ? 'bg-felt' : 'bg-rule'
           }`}
         >
           <span
-            className={`absolute top-0.5 size-5 rounded-full bg-card shadow transition-[left] ${
-              enabled ? 'left-[18px]' : 'left-0.5'
+            className={`absolute top-0.5 size-3 rounded-full bg-card shadow transition-[left] ${
+              enabled ? 'left-[14px]' : 'left-0.5'
             }`}
           />
         </button>
 
-        <span className="font-score text-xl font-semibold tabular-nums">
+        {/* Same size as the scores in the lines below: this is the first of
+            them, not a headline over them. */}
+        <span className="font-score text-xs font-semibold tabular-nums">
           {enabled && topLine ? formatScore(topLine.score) : '—'}
         </span>
 

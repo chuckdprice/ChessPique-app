@@ -188,7 +188,7 @@ export default function AnalysisPage({
           <PlayerPlateRow plate={bottomPlate} color={bottomColor} />
         </div>
 
-        <div className="area-nav flex justify-center pt-1">
+        <div className="area-nav flex min-w-0 pt-1">
           <BoardNav
             moves={moves}
             ply={ply}

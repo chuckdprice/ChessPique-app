@@ -210,7 +210,7 @@ body {
     "plate-top    plate-top"
     "eval-bar     board"
     "plate-bottom plate-bottom"
-    "nav          nav"
+    ".            nav"
     "side         side"
     "tabs         tabs";
 }
@@ -232,14 +232,14 @@ body {
        board block grew to 256px around a 165px board and pushed the nav off
        the bottom. The nav row is included — the side reaches it too. */
     grid-template-rows: 1.75rem var(--board-size) 1.75rem 2.25rem minmax(0, 1fr);
-    /* The nav sits under the board block rather than in the board column
-       alone. Its buttons are wider than the board, so in that one column they
-       spilled across the move list. */
+    /* The nav sits in the board column, which it now fits: the buttons carry
+       arrows rather than move names, so the row is no longer wider than the
+       board and no longer spills across the move list. */
     grid-template-areas:
       ".        plate-top    side"
       "eval-bar board        side"
       ".        plate-bottom side"
-      "nav      nav          side"
+      ".        nav          side"
       "tabs     tabs         tabs";
   }
 }
@@ -278,6 +278,22 @@ body {
  */
 .app-main {
   --board-size: min(calc(100vw - 5rem), clamp(240px, calc(100dvh - 470px), 560px));
+}
+
+/*
+ * Portrait phones.
+ *
+ * Here the board has nothing beside it — the engine and the move list stack
+ * underneath — so height spent on it is only height the page scrolls, never
+ * height taken from something else. The shared height budget above ignored
+ * that and pinned the board at its 240px floor, leaving a third of the screen
+ * bare to the right of it. Width alone decides instead — the same width term
+ * as above, which already allows for a desktop scrollbar at this size.
+ */
+@media (max-width: 639px) {
+  .app-main {
+    --board-size: calc(100vw - 5rem);
+  }
 }
 
 /*
@@ -331,15 +347,10 @@ body {
     padding-top: 0.15rem;
   }
 
-  /* Compact nav: the move names go and the arrows stay, so the row fits under
-     the board instead of running across the move list. */
-  [data-nav-label] {
-    display: none;
-  }
-  [data-nav-step] {
-    width: auto;
-  }
-  [data-nav-current] {
-    width: 4.5rem;
+  /* The nav row is charged against the board's height here, so the buttons
+     give up their padding rather than their arrows. */
+  [data-nav-btn] {
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
   }
 }

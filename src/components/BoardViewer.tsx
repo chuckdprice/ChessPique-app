@@ -214,51 +214,65 @@ export function BoardNav({
   orientation,
 }: BoardNavProps) {
   const button =
-    'rounded-md border border-rule bg-card px-2.5 py-1.5 leading-none text-ink transition-colors hover:bg-buff-soft disabled:cursor-not-allowed disabled:opacity-30'
+    'shrink-0 rounded-md border border-rule bg-card px-2 py-1.5 leading-none text-ink transition-colors hover:bg-buff-soft disabled:cursor-not-allowed disabled:opacity-30'
+  const arrow = `${button} text-xl`
   const prevLabel = plyLabel(moves, ply - 1)
   const nextLabel = plyLabel(moves, ply + 1)
   const currentLabel = plyLabel(moves, ply)
 
+  // Exactly the board's width, so the row's ends line up with the board's
+  // edges rather than running past them into the page margin.
   return (
-    <div className="flex items-center gap-2" role="group" aria-label="Move navigation">
+    <div
+      className="flex w-(--board-size) max-w-full items-center justify-between gap-1"
+      role="group"
+      aria-label="Move navigation"
+    >
       <button
         type="button"
-        className={`${button} text-lg`}
+        data-nav-btn
+        className={arrow}
         onClick={() => onPlyChange(0)}
         disabled={ply === 0}
         aria-label="Go to start"
       >
         «
       </button>
-      {/* Fixed widths so the row never reflows as move names change length. */}
+      {/* The neighbouring moves are named in the labels rather than on the
+          buttons: the names changed width as the game went on, which is what
+          pushed this row wider than the board. */}
       <button
         type="button"
-        data-nav-step="prev"
-        className={`${button} flex w-28 items-center gap-1.5 font-score text-xs`}
+        data-nav-btn
+        className={arrow}
         onClick={() => onPlyChange(Math.max(0, ply - 1))}
         disabled={ply === 0}
+        title={prevLabel ?? 'Start'}
         aria-label={prevLabel ? `Previous move: ${prevLabel}` : 'Back to starting position'}
       >
-        <span aria-hidden="true">‹</span>
-        <span data-nav-label className="truncate">{prevLabel ?? 'Start'}</span>
+        ‹
       </button>
-      <span data-nav-current className="w-24 shrink-0 truncate rounded-md bg-felt px-2 py-1.5 text-center font-score text-xs font-semibold text-buff">
+      <span
+        data-nav-current
+        className="min-w-0 max-w-40 flex-1 truncate rounded-md bg-felt px-2 py-1.5 text-center font-score text-xs font-semibold text-buff"
+      >
         {currentLabel ?? 'Start'}
       </span>
       <button
         type="button"
-        data-nav-step="next"
-        className={`${button} flex w-28 items-center justify-end gap-1.5 font-score text-xs`}
+        data-nav-btn
+        className={arrow}
         onClick={() => onPlyChange(Math.min(lastPly, ply + 1))}
         disabled={ply === lastPly}
+        title={nextLabel ?? undefined}
         aria-label={nextLabel ? `Next move: ${nextLabel}` : 'Next move'}
       >
-        <span data-nav-label className="truncate">{nextLabel ?? '—'}</span>
-        <span aria-hidden="true">›</span>
+        ›
       </button>
       <button
         type="button"
-        className={`${button} text-lg`}
+        data-nav-btn
+        className={arrow}
         onClick={() => onPlyChange(lastPly)}
         disabled={ply === lastPly}
         aria-label="Go to end"
@@ -267,6 +281,7 @@ export function BoardNav({
       </button>
       <button
         type="button"
+        data-nav-btn
         className={button}
         onClick={onRotate}
         aria-label={`Rotate board — view from ${orientation === 'white' ? "Black's" : "White's"} side`}
@@ -275,7 +290,7 @@ export function BoardNav({
         <svg
           aria-hidden="true"
           viewBox="0 0 24 24"
-          className="size-[18px]"
+          className="size-5"
           fill="none"
           stroke="currentColor"
           strokeWidth="2"

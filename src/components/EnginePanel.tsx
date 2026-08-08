@@ -98,9 +98,6 @@ export default function EnginePanel({
             // The top line's own depth, not the search's: it is the depth that
             // produced the score being handed over.
             onTopScoreRef.current?.(u.lines[0]?.score ?? null, u.lines[0]?.depth ?? 0)
-            onFirstMovesRef.current?.(
-              u.lines.map((line) => line.pvUci[0]).filter((uci): uci is string => !!uci),
-            )
           }
         },
       })
@@ -118,6 +115,23 @@ export default function EnginePanel({
       engineRef.current?.stop()
     }
   }, [enabled, fen, settings])
+
+  /**
+   * The board's arrows, taken from the very lines being listed.
+   *
+   * They used to be sent from inside the search instead, which let the two
+   * disagree: the settled result is set here once the search ends and that call
+   * never sent them, so the arrows stayed on whatever the last throttled update
+   * held. With equal-scoring moves that reorder between depths, the arrows kept
+   * their old ranking and could point at a move the list no longer showed.
+   *
+   * A line with no principal variation yet keeps its place as an empty string,
+   * so an arrow's rank is always its line's rank.
+   */
+  useEffect(() => {
+    if (!enabled) return
+    onFirstMovesRef.current?.((update?.lines ?? []).map((line) => line.pvUci[0] ?? ''))
+  }, [enabled, update])
 
   // Tear the worker down when the panel unmounts.
   useEffect(

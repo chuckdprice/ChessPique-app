@@ -452,6 +452,9 @@ export default function App() {
 
     const list: Arrow[] = []
     engineMoves.slice(0, ENGINE_ARROW_ALPHA.length).forEach((uci, i) => {
+      // A line the engine has not given a move for yet holds its place, so the
+      // arrows below it keep the rank — and the shade — of their own line.
+      if (!uci) return
       const from = uci.slice(0, 2)
       const to = uci.slice(2, 4)
       const key = `${from}${to}`
@@ -472,7 +475,7 @@ export default function App() {
       })
     }
     return list
-  }, [engineOn, engineMoves, game, ply])
+  }, [engineOn, engineMoves, game, ply, exploration])
 
   const analysisPercent =
     analysisProgress && analysisProgress.total > 0

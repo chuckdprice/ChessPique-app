@@ -1,11 +1,14 @@
-/** Persisted user settings: appearance (theme + accent) and engine options. */
+/** Persisted user settings: appearance (theme, board, pieces) and engine options. */
 
-export type ThemePreference = 'light' | 'dark' | 'system'
-export type Accent = 'green' | 'blue' | 'purple' | 'orange' | 'red'
+import { BOARDS, PIECE_SETS, THEMES, boardById, themeById } from './appearance'
 
 export interface AppearanceSettings {
-  theme: ThemePreference
-  accent: Accent
+  /** Theme id from THEMES — a whole palette, not just an accent. */
+  theme: string
+  /** Board colour id from BOARDS. */
+  board: string
+  /** Piece set id from PIECE_SETS. */
+  pieces: string
 }
 
 export interface EngineSettings {
@@ -17,9 +20,11 @@ export interface EngineSettings {
   hashMb: number
 }
 
-export const ACCENTS: Accent[] = ['green', 'blue', 'purple', 'orange', 'red']
-
-export const DEFAULT_APPEARANCE: AppearanceSettings = { theme: 'system', accent: 'blue' }
+export const DEFAULT_APPEARANCE: AppearanceSettings = {
+  theme: 'tournament',
+  board: 'tournament',
+  pieces: 'classic',
+}
 export const DEFAULT_ENGINE: EngineSettings = { searchTimeSec: 8, multiPv: 3, hashMb: 128 }
 
 const APPEARANCE_KEY = 'chessnoter.appearance'
@@ -37,9 +42,18 @@ function load<T>(key: string, fallback: T): T {
 
 export function loadAppearance(): AppearanceSettings {
   const a = load(APPEARANCE_KEY, DEFAULT_APPEARANCE)
-  if (!['light', 'dark', 'system'].includes(a.theme)) a.theme = 'system'
-  if (!ACCENTS.includes(a.accent)) a.accent = DEFAULT_APPEARANCE.accent
-  return a
+  // Settings saved before the themes existed hold 'light' | 'dark' | 'system'
+  // here. Anything that is not a theme id resolves to the closest preset —
+  // whether it came from that older shape or from a theme since renamed.
+  if (!THEMES.some((t) => t.id === a.theme)) {
+    const wantsDark = a.theme === 'dark' || (a.theme === 'system' && systemDark())
+    a.theme = wantsDark ? 'midnight' : DEFAULT_APPEARANCE.theme
+  }
+  if (!BOARDS.some((b) => b.id === a.board)) a.board = DEFAULT_APPEARANCE.board
+  if (!PIECE_SETS.some((p) => p.id === a.pieces)) a.pieces = DEFAULT_APPEARANCE.pieces
+  // Only these three go back out, so a key from an older shape — `accent`,
+  // say — is dropped on the next save rather than carried forever.
+  return { theme: a.theme, board: a.board, pieces: a.pieces }
 }
 
 export function saveAppearance(a: AppearanceSettings): void {
@@ -69,24 +83,18 @@ export function saveEngineSettings(e: EngineSettings): void {
 const systemDark = () =>
   typeof matchMedia !== 'undefined' && matchMedia('(prefers-color-scheme: dark)').matches
 
-/** Stamp data-theme / data-accent on <html> for the CSS variable scopes. */
-export function applyAppearance(a: AppearanceSettings): void {
-  const resolved = a.theme === 'system' ? (systemDark() ? 'dark' : 'light') : a.theme
-  document.documentElement.dataset.theme = resolved
-  document.documentElement.dataset.accent = a.accent
-}
-
 /**
- * Apply stored appearance now and keep following the OS preference while the
- * user is in "system" mode. Returns an unsubscribe function.
+ * Put the appearance on <html>: the theme's base picks the var block in
+ * index.css, its own vars go on as inline properties, which beat any rule in
+ * the stylesheet, and the board's two colours join them so the board and its
+ * previews can read one source.
  */
-export function watchSystemTheme(getCurrent: () => AppearanceSettings): () => void {
-  if (typeof matchMedia === 'undefined') return () => {}
-  const mq = matchMedia('(prefers-color-scheme: dark)')
-  const onChange = () => {
-    const current = getCurrent()
-    if (current.theme === 'system') applyAppearance(current)
-  }
-  mq.addEventListener('change', onChange)
-  return () => mq.removeEventListener('change', onChange)
+export function applyAppearance(a: AppearanceSettings): void {
+  const root = document.documentElement
+  const theme = themeById(a.theme)
+  root.dataset.theme = theme.base
+  for (const [name, value] of Object.entries(theme.vars)) root.style.setProperty(name, value)
+  const board = boardById(a.board)
+  root.style.setProperty('--board-light', board.light)
+  root.style.setProperty('--board-dark', board.dark)
 }

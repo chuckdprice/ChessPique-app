@@ -209,8 +209,36 @@ book position it reached. The data is ~420 kB, so it loads on demand rather than
 
 ## Appearance
 
-The palette icon in the header opens theme settings: Light, Dark, or System (which follows
-the OS setting live), plus five accent colors. Choices persist in `localStorage`.
+The palette icon in the header opens a dialog with three tabs — **Theme**, **Board** and
+**Pieces**. Every pick previews live on the page behind the dialog; **Save** keeps it,
+**Cancel** puts back whatever was showing when the dialog opened. The choice persists in
+`localStorage`.
+
+- **Theme** is a whole palette, not an accent: page, card, ink, rules and accent all move
+  together. There are ten, half light and half dark. Each names a base — the light or dark
+  variable block in `src/index.css`, which carries the chart, status and move-classification
+  colors — and overrides the ten variables that give the app its character. `applyAppearance`
+  writes those onto `<html>` as inline custom properties, which beat any stylesheet rule, so
+  a theme needs no CSS of its own.
+- **Board** is 24 light/dark square pairs, applied as `--board-light` / `--board-dark`.
+- **Pieces** is eleven sets. *Classic* is react-chessboard's own drawing; the rest are SVG
+  files under `public/piece`, loaded as `<img>` so they stay out of the bundle and get cached.
+
+### Piece set credits
+
+The sets other than *Classic* come from the [Lichess](https://github.com/lichess-org/lila)
+project, and only sets under a permissive or attribution license are included:
+
+| Set | Author | License |
+| --- | --- | --- |
+| Classic, Merida | Colin M.L. Burnett; Armando Hernandez Marroquin | GPLv2+ |
+| Chessnut | Alexis Luengas | Apache 2.0 |
+| Fantasy, Spatial, Celtic | Maurizio Monge | MIT |
+| Rhos | RhosGFX | CC0 1.0 |
+| Kiwen Suwi | neverRare | CC BY 4.0 |
+| Firi | James Faure | CC BY 4.0 |
+| Totoy | Kosal Sen | CC BY 4.0 |
+| Papercut | Nikolay Anzarov | CC BY 4.0 |
 
 ## How clocks are computed
 

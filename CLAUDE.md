@@ -55,6 +55,12 @@ the harness's drag tool (mouse events) cannot move a piece. Drive it with a
 - The engine review takes roughly a minute for a 30-move game, and longer when
   the browser pane is backgrounded. Budget for it when testing anything
   downstream of `analysis`.
+- **A theme is inline custom properties on `<html>`, not a stylesheet rule.**
+  `applyAppearance` writes them, which is why they win over the light/dark
+  blocks in `index.css`. Two consequences: every theme must set every variable
+  in `ThemeVar` — one it omits is inherited from whichever theme ran before it,
+  and a unit test guards this — and in the browser pane you check a theme by
+  reading `document.documentElement.style`, never `getComputedStyle`.
 
 ## Conventions
 
@@ -67,7 +73,7 @@ the harness's drag tool (mouse events) cannot move a piece. Drive it with a
   `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>` line.
 - Commit and push only when Chuck asks. He asks explicitly, usually right after
   reviewing.
-- `npm run build && npm test` before every commit. 95 tests as of this writing;
+- `npm run build && npm test` before every commit. 113 tests as of this writing;
   they cover `src/lib` only — the UI is verified in the browser.
 
 ## State of play
@@ -81,6 +87,11 @@ against his own account on 6 August 2026, after the pop-up handoff was changed
 to identify the return by `state` rather than by a URL marker. Treat that path
 as working, and suspect a regression rather than a never-worked bug if it
 breaks.
+
+The piece sets under `public/piece` are lichess's files, and only sets under a
+permissive or attribution licence are here — several of the nicest ones on
+lichess are CC BY-NC-SA and were left out on purpose. The README carries the
+credits; keep them in step if a set is added.
 
 **Never built:** a Send Feedback form. It was asked for once, then interrupted
 before the one open question was answered — the app is fully static, so there is

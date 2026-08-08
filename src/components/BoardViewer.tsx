@@ -1,5 +1,7 @@
+import { useMemo } from 'react'
 import { Chessboard, defaultArrowOptions } from 'react-chessboard'
-import type { Arrow } from 'react-chessboard'
+import type { Arrow, PieceRenderObject } from 'react-chessboard'
+import { PIECE_CODES, pieceSrc } from '../lib/appearance'
 import { formatClockTime } from '../lib/convert'
 import type { Move } from '../lib/convert'
 import { formatVariation, hasMoveMarker } from '../lib/engine/analysis'
@@ -29,6 +31,31 @@ interface BoardViewerProps {
   exploration: Exploration | null
   /** Play a move by hand. Returning false snaps the piece back. */
   onPieceMove: (from: string, to: string) => boolean
+  /** Piece set id from the appearance settings. */
+  pieceSet: string
+}
+
+/**
+ * The chosen set as react-chessboard wants it. `classic` returns undefined so
+ * the library keeps its own drawing; the rest are files under public/piece,
+ * which are plain <img> rather than inlined SVG so the browser caches them and
+ * the bundle never carries twelve drawings per set.
+ */
+function pieceRenderers(setId: string): PieceRenderObject | undefined {
+  if (setId === 'classic') return undefined
+  return Object.fromEntries(
+    PIECE_CODES.map((code) => [
+      code,
+      () => (
+        <img
+          src={pieceSrc(setId, code)}
+          alt=""
+          draggable={false}
+          className="size-full select-none"
+        />
+      ),
+    ]),
+  )
 }
 
 /** Top-right-corner position of a square as percentages, given orientation. */
@@ -81,7 +108,9 @@ export default function BoardViewer({
   arrows,
   exploration,
   onPieceMove,
+  pieceSet,
 }: BoardViewerProps) {
+  const pieces = useMemo(() => pieceRenderers(pieceSet), [pieceSet])
   const highlight = exploration ? exploration.lastMoveSquares : replay.lastMoveSquares[ply]
   // The badge grades a move that was actually played, so it has nothing to say
   // about a position reached by hand.
@@ -114,10 +143,14 @@ export default function BoardViewer({
           // Keep the library's geometry defaults; only take over opacity so the
           // per-arrow rgba alpha is the single source of fade.
           arrowOptions: { ...defaultArrowOptions, opacity: 1, activeOpacity: 1 },
-          lightSquareStyle: { backgroundColor: '#efe8d6' },
-          darkSquareStyle: { backgroundColor: '#4e7d63' },
-          darkSquareNotationStyle: { color: '#efe8d6' },
-          lightSquareNotationStyle: { color: '#4e7d63' },
+          // The chosen board, read from the vars the appearance settings put
+          // on <html>, so a change lands without this component knowing.
+          // Coordinates keep taking the other square's colour.
+          lightSquareStyle: { backgroundColor: 'var(--board-light)' },
+          darkSquareStyle: { backgroundColor: 'var(--board-dark)' },
+          darkSquareNotationStyle: { color: 'var(--board-light)' },
+          lightSquareNotationStyle: { color: 'var(--board-dark)' },
+          pieces,
           boardStyle: { width: '100%', height: '100%' },
         }}
       />

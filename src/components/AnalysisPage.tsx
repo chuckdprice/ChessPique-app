@@ -50,6 +50,8 @@ interface AnalysisPageProps {
   onEngineMoves: (ucis: string[]) => void
   onCommentChange: (ply: number, comment: string) => void
   arrows: Arrow[]
+  /** Piece set id from the appearance settings. */
+  pieceSet: string
 }
 
 /**
@@ -88,6 +90,7 @@ export default function AnalysisPage({
   onEngineMoves,
   onCommentChange,
   arrows,
+  pieceSet,
 }: AnalysisPageProps) {
   const [orientation, setOrientation] = useState<'white' | 'black'>('white')
   const lastPly = replay.fens.length - 1
@@ -155,6 +158,7 @@ export default function AnalysisPage({
             arrows={arrows}
             exploration={exploration}
             onPieceMove={onPieceMove}
+            pieceSet={pieceSet}
           />
         </div>
 

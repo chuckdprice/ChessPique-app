@@ -1,10 +1,12 @@
 @import "tailwindcss";
 
 /*
- * Semantic color system. Raw values live on :root scoped by data-theme and
- * data-accent; Tailwind utilities reference them through @theme inline, so
- * components keep using bg-felt / text-ink / border-rule and pick up theme
- * and accent changes automatically.
+ * Semantic color system. The two blocks below are the light and dark bases:
+ * whichever one a theme names supplies everything it does not set itself, and
+ * its own colours arrive as inline custom properties on <html> (see
+ * applyAppearance). Tailwind utilities reference these through @theme inline,
+ * so components keep using bg-felt / text-ink / border-rule and pick up a
+ * theme change automatically.
  */
 
 :root {
@@ -44,31 +46,14 @@
   --phase-middlegame: #c98500;
   --phase-endgame: #d03b3b;
 
-  /* ---- Accent: tournament green (default) ---- */
+  /* ---- Accent and board: the Tournament Green theme's own values ----
+     Every theme replaces these as inline properties on <html>; they are here
+     so the first paint, before that runs, is already the default theme. */
   --accent: #1e5943;
   --accent-hover: #153f30;
   --accent-bright: #2c7a5c;
-}
-
-:root[data-accent="blue"] {
-  --accent: #1e56b0;
-  --accent-hover: #16407f;
-  --accent-bright: #3572d4;
-}
-:root[data-accent="purple"] {
-  --accent: #6d3ab8;
-  --accent-hover: #532b8f;
-  --accent-bright: #8b5cf6;
-}
-:root[data-accent="orange"] {
-  --accent: #b35309;
-  --accent-hover: #8a3e06;
-  --accent-bright: #d97316;
-}
-:root[data-accent="red"] {
-  --accent: #b32424;
-  --accent-hover: #8a1b1b;
-  --accent-bright: #d94040;
+  --board-light: #efe8d6;
+  --board-dark: #4e7d63;
 }
 
 :root[data-theme="dark"] {
@@ -103,34 +88,6 @@
   --class-blunder: #ef5350;
   --phase-middlegame: #e9a92a;
   --phase-endgame: #ef5350;
-}
-
-/* Slightly brighter accents on the dark surface */
-:root[data-theme="dark"]:not([data-accent]),
-:root[data-theme="dark"][data-accent="green"] {
-  --accent: #23684f;
-  --accent-hover: #2c8161;
-  --accent-bright: #3d9a76;
-}
-:root[data-theme="dark"][data-accent="blue"] {
-  --accent: #2563c4;
-  --accent-hover: #2f74e0;
-  --accent-bright: #5a94e8;
-}
-:root[data-theme="dark"][data-accent="purple"] {
-  --accent: #7c4bd0;
-  --accent-hover: #8d61dc;
-  --accent-bright: #a685ec;
-}
-:root[data-theme="dark"][data-accent="orange"] {
-  --accent: #c05e10;
-  --accent-hover: #d4711f;
-  --accent-bright: #e08a40;
-}
-:root[data-theme="dark"][data-accent="red"] {
-  --accent: #c23434;
-  --accent-hover: #d44848;
-  --accent-bright: #e06a6a;
 }
 
 @theme inline {

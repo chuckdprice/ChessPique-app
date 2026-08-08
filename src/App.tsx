@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Arrow } from 'react-chessboard'
-import AppearanceMenu from './components/AppearanceMenu'
+import AppearanceDialog from './components/AppearanceDialog'
 import BrandMark from './components/BrandMark'
 import HelpDialog from './components/HelpDialog'
 import PgnFilePage from './components/PgnFilePage'
@@ -35,7 +35,6 @@ import {
   loadAppearance,
   loadEngineSettings,
   saveAppearance,
-  watchSystemTheme,
 } from './lib/settings'
 import type { AppearanceSettings, EngineSettings } from './lib/settings'
 
@@ -98,6 +97,9 @@ export default function App() {
   const [sourceFileName, setSourceFileName] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [helpOpen, setHelpOpen] = useState(false)
+  const [appearanceOpen, setAppearanceOpen] = useState(false)
+  // What the app is currently wearing. While the dialog is open this holds the
+  // draft, so a pick is seen on the page behind it; only Save writes it down.
   const [appearance, setAppearance] = useState<AppearanceSettings>(loadAppearance)
   const [engineSettings, setEngineSettings] = useState<EngineSettings>(loadEngineSettings)
   const [engineOn, setEngineOn] = useState(false)
@@ -131,13 +133,9 @@ export default function App() {
   })
   const analysisSignal = useRef<{ cancelled: boolean } | null>(null)
 
-  const appearanceRef = useRef(appearance)
-  appearanceRef.current = appearance
-  useEffect(() => {
-    applyAppearance(appearance)
-    saveAppearance(appearance)
-  }, [appearance])
-  useEffect(() => watchSystemTheme(() => appearanceRef.current), [])
+  // What was showing when the dialog opened, to go back to on Cancel.
+  const savedAppearance = useRef(appearance)
+  useEffect(() => applyAppearance(appearance), [appearance])
 
   // Fetch the analysis chunk once the browser is idle, while the user is still
   // pasting or picking a PGN, so Convert never waits on a network round trip.
@@ -517,7 +515,33 @@ export default function App() {
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            <AppearanceMenu value={appearance} onChange={setAppearance} />
+            <button
+              type="button"
+              onClick={() => {
+                savedAppearance.current = appearance
+                setAppearanceOpen(true)
+              }}
+              aria-label="Appearance settings"
+              title="Appearance"
+              className="rounded-lg border border-buff/30 p-2 text-buff transition-colors hover:bg-buff/10"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                className="size-5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 3a9 9 0 1 0 0 18c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16a5 5 0 0 0 5-5c0-4.42-4.03-8-9-8Z" />
+                <circle cx="6.5" cy="11.5" r="0.5" fill="currentColor" />
+                <circle cx="9.5" cy="7.5" r="0.5" fill="currentColor" />
+                <circle cx="14.5" cy="7.5" r="0.5" fill="currentColor" />
+                <circle cx="17.5" cy="11.5" r="0.5" fill="currentColor" />
+              </svg>
+            </button>
             <button
               type="button"
               onClick={() => setHelpOpen(true)}
@@ -617,10 +641,28 @@ export default function App() {
               onEngineMoves={handleEngineMoves}
               onCommentChange={handleCommentChange}
               arrows={arrows}
+              pieceSet={appearance.pieces}
             />
           </Suspense>
         )}
       </main>
+
+      {appearanceOpen && (
+        <AppearanceDialog
+          value={appearance}
+          onPreview={setAppearance}
+          onSave={(next) => {
+            setAppearance(next)
+            saveAppearance(next)
+            savedAppearance.current = next
+            setAppearanceOpen(false)
+          }}
+          onCancel={() => {
+            setAppearance(savedAppearance.current)
+            setAppearanceOpen(false)
+          }}
+        />
+      )}
 
       {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}
     </div>

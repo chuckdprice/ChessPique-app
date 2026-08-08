@@ -75,12 +75,29 @@ const DownloadIcon = () => (
   </svg>
 )
 
-/** Both external sites open in a new tab, so they share the same affordance. */
-const ExternalIcon = () => (
-  <svg {...ICON_PROPS}>
-    <path d="M14 4h6v6" />
-    <path d="M20 4 11 13" />
-    <path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4" />
+/*
+ * The two sites' own marks, so a button says where it goes before its label is
+ * read. Both are the Simple Icons drawings (CC0); the marks themselves are the
+ * sites' trademarks, used here only to point at those sites. They are solid
+ * shapes rather than strokes, so they take fill and not the stroke the icons
+ * above are drawn with.
+ */
+const BRAND_ICON_PROPS = {
+  'aria-hidden': true,
+  viewBox: '0 0 24 24',
+  className: 'size-4 shrink-0',
+  fill: 'currentColor',
+}
+
+const LichessIcon = () => (
+  <svg {...BRAND_ICON_PROPS}>
+    <path d="M10.457 6.161a.237.237 0 0 0-.296.165c-.8 2.785 2.819 5.579 5.214 7.428.653.504 1.216.939 1.591 1.292 1.745 1.642 2.564 2.851 2.733 3.178a.24.24 0 0 0 .275.122c.047-.013 4.726-1.3 3.934-4.574a.257.257 0 0 0-.023-.06L18.204 3.407 18.93.295a.24.24 0 0 0-.262-.293c-1.7.201-3.115.435-4.5 1.425-4.844-.323-8.718.9-11.213 3.539C.334 7.737-.246 11.515.085 14.128c.763 5.655 5.191 8.631 9.081 9.532.993.229 1.974.34 2.923.34 3.344 0 6.297-1.381 7.946-3.85a.24.24 0 0 0-.372-.3c-3.411 3.527-9.002 4.134-13.296 1.444-4.485-2.81-6.202-8.41-3.91-12.749C4.741 4.221 8.801 2.362 13.888 3.31c.056.01.115 0 .165-.029l.335-.197c.926-.546 1.961-1.157 2.873-1.279l-.694 1.993a.243.243 0 0 0 .02.202l6.082 10.192c-.193 2.028-1.706 2.506-2.226 2.611-.287-.645-.814-1.364-2.306-2.803-.422-.407-1.21-.941-2.124-1.56-2.364-1.601-5.937-4.02-5.391-5.984a.239.239 0 0 0-.165-.295z" />
+  </svg>
+)
+
+const ChessComIcon = () => (
+  <svg {...BRAND_ICON_PROPS}>
+    <path d="M12 0a3.85 3.85 0 0 0-3.875 3.846A3.84 3.84 0 0 0 9.73 6.969l-2.79 1.85c0 .622.144 1.114.434 1.649H9.83c-.014.245-.014.549-.014.925 0 .025.003.048.006.071-.064 1.353-.507 3.472-3.62 5.842-.816.625-1.423 1.495-1.806 2.533a.33.33 0 0 0-.045.084 8.124 8.124 0 0 0-.39 2.516c0 .1.216 1.561 8.038 1.561s8.038-1.46 8.038-1.561c0-2.227-.824-4.048-2.24-5.133-4.034-3.08-3.586-5.74-3.644-6.838h2.458c.29-.535.434-1.027.434-1.649l-2.79-1.836a3.86 3.86 0 0 0 1.604-3.123A3.873 3.873 0 0 0 13.445.275c-.004-.002-.01.004-.015.004A3.76 3.76 0 0 0 12 0Z" />
   </svg>
 )
 
@@ -164,24 +181,46 @@ export default function PgnActions({ pgn, fileName, compact = false }: PgnAction
   }
 
   const size = compact ? 'px-3 py-1.5 text-sm' : 'px-4 py-2.5'
-  const button = `inline-flex items-center gap-1.5 rounded-lg bg-felt font-medium text-buff shadow-sm transition-colors hover:bg-felt-deep ${size}`
+  const face =
+    'inline-flex items-center rounded-lg bg-felt font-medium text-buff shadow-sm transition-colors hover:bg-felt-deep'
+  const button = `${face} gap-1.5 ${size}`
+  // Square, so a lone icon is centred rather than sitting in a label's slot.
+  const iconOnly = `${face} justify-center ${compact ? 'size-8' : 'size-11'}`
 
   return (
     /* No shrink-0: it stopped the row being squeezed to the available width,
        so flex-wrap never engaged and the last button ran off a phone screen. */
     <div className="flex flex-wrap items-center gap-2">
-      <button type="button" onClick={copy} title="Copy the PGN to the clipboard" className={button}>
+      {/* Copy and Download carry their icon alone: the pair is a convention
+          anyone reads at a glance, and the words were the widest part of a row
+          that has to wrap onto a phone. Their labels live in the tooltip and
+          in the screen-reader name. */}
+      <button
+        type="button"
+        onClick={copy}
+        title={copied ? 'Copied' : 'Copy the PGN to the clipboard'}
+        aria-label={copied ? 'Copied' : 'Copy the PGN to the clipboard'}
+        className={iconOnly}
+      >
         {copied ? <CheckIcon /> : <CopyIcon />}
-        {copied ? 'Copied' : 'Copy'}
       </button>
       <button
         type="button"
         onClick={download}
         title={`Download ${fileName}`}
-        className={button}
+        aria-label={`Download ${fileName}`}
+        className={iconOnly}
       >
         <DownloadIcon />
-        Download
+      </button>
+      <button
+        type="button"
+        onClick={openChessCom}
+        title="Open on the chess.com analysis board in a new tab"
+        className={button}
+      >
+        <ChessComIcon />
+        Analysis
       </button>
       <button
         type="button"
@@ -190,17 +229,8 @@ export default function PgnActions({ pgn, fileName, compact = false }: PgnAction
         title="Import to lichess.org in a new tab, then request its computer analysis from the game page"
         className={`${button} disabled:cursor-not-allowed disabled:opacity-70`}
       >
-        <ExternalIcon />
-        {lichess === 'importing' ? 'Importing…' : lichess === 'error' ? 'Import failed' : 'Lichess'}
-      </button>
-      <button
-        type="button"
-        onClick={openChessCom}
-        title="Open on the chess.com analysis board in a new tab"
-        className={button}
-      >
-        <ExternalIcon />
-        Chess.com
+        <LichessIcon />
+        {lichess === 'importing' ? 'Importing…' : lichess === 'error' ? 'Import failed' : 'Analysis'}
       </button>
     </div>
   )

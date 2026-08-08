@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="ChessNoteR Game Analysis">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3730a3"/>
+      <stop offset="45%" stop-color="#6d28d9"/>
+      <stop offset="100%" stop-color="#0891b2"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="54%" r="46%">
+      <stop offset="0%" stop-color="#a5f3fc" stop-opacity=".5"/>
+      <stop offset="100%" stop-color="#a5f3fc" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="king" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#7dd3fc"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="64" height="64" rx="14" fill="url(#tile)"/>
+
+  <!-- Circuit traces: kept to the corners, where they read as texture at any
+       size and never break the king's outline. -->
+  <g fill="none" stroke="#7dd3fc" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" opacity=".55">
+    <path d="M0 19h8.5l4.5-4.5h5"/>
+    <path d="M0 45h6.5l4.5 4.5h6"/>
+    <path d="M64 21h-8.5l-4.5-4.5h-4.5"/>
+    <path d="M64 47h-6.5l-4.5 4.5h-5.5"/>
+  </g>
+  <g fill="#a5f3fc" opacity=".9">
+    <circle cx="18.5" cy="14.5" r="2"/>
+    <circle cx="17.5" cy="49.5" r="2"/>
+    <circle cx="46" cy="16.5" r="2"/>
+    <circle cx="47.5" cy="51.5" r="2"/>
+  </g>
+
+  <ellipse cx="32" cy="34" rx="25" ry="25" fill="url(#glow)"/>
+
+  <!-- King: cross, dome, collar, flared body, base. -->
+  <g fill="url(#king)">
+    <rect x="30.1" y="6.5" width="3.8" height="12.5" rx="1.9"/>
+    <rect x="26.2" y="9.6" width="11.6" height="3.8" rx="1.9"/>
+    <path d="M32 18.5c-6 0-10.8 4.2-10.8 9.5 0 3.6 2 6 3.6 8.6h14.4c1.6-2.6 3.6-5 3.6-8.6 0-5.3-4.8-9.5-10.8-9.5z"/>
+    <rect x="21.4" y="37.4" width="21.2" height="5" rx="2.5"/>
+    <path d="M25 43.4h14l3.4 6.6H21.6z"/>
+    <rect x="16.8" y="49.4" width="30.4" height="7" rx="3.5"/>
+  </g>
+</svg>

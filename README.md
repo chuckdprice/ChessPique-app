@@ -215,13 +215,10 @@ book position it reached. The data is ~420 kB, so it loads on demand rather than
 
 ## The PGN boxes
 
-Both PGN boxes have a grip in their bottom-right corner. Dragging it sets the box's height, and
-that height is kept in `localStorage` per box. Until one is dragged it fills its column as
-before, with a floor of ten lines of its own monospace — the column has almost no height to give
-on a phone or a tablet, where the boxes were coming out about four lines tall. In practice that
-is 10 lines on a phone held sideways, 12 upright and 19 on a tablet. The grip is drawn rather
-than left to the browser's `resize`, which does nothing on iOS, and it takes arrow keys as well
-as a finger or a mouse.
+Both PGN boxes take the height left in their column, with a floor of ten lines of their own
+monospace: the column has almost no height to give on a phone or a tablet, where the boxes were
+coming out about four lines tall. In practice that is 10 lines on a phone held sideways, 12
+upright and 19 on a tablet, and a desktop window is filled as before.
 
 ## Appearance
 

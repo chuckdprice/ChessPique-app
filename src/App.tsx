@@ -34,11 +34,9 @@ import {
   applyAppearance,
   loadAppearance,
   loadEngineSettings,
-  loadPaneHeights,
   saveAppearance,
-  savePaneHeights,
 } from './lib/settings'
-import type { AppearanceSettings, EngineSettings, PaneHeights, PaneId } from './lib/settings'
+import type { AppearanceSettings, EngineSettings } from './lib/settings'
 
 // The analysis page owns every heavy dependency in the app — recharts for the
 // eval and clock charts, react-chessboard for the board — and none of it is
@@ -104,7 +102,6 @@ export default function App() {
   // draft, so a pick is seen on the page behind it; only Save writes it down.
   const [appearance, setAppearance] = useState<AppearanceSettings>(loadAppearance)
   const [engineSettings, setEngineSettings] = useState<EngineSettings>(loadEngineSettings)
-  const [paneHeights, setPaneHeights] = useState<PaneHeights>(loadPaneHeights)
   const [engineOn, setEngineOn] = useState(false)
   const [liveScore, setLiveScore] = useState<Score | null>(null)
   const [engineMoves, setEngineMoves] = useState<string[]>([])
@@ -220,14 +217,6 @@ export default function App() {
 
   const handleHeaderAdd = useCallback((name: string) => {
     setHeaders((prev) => withTag(prev, name))
-  }, [])
-
-  const handlePaneHeightChange = useCallback((id: PaneId, px: number) => {
-    setPaneHeights((prev) => {
-      const next = { ...prev, [id]: px }
-      savePaneHeights(next)
-      return next
-    })
   }, [])
 
   const handleHeaderChange = useCallback((index: number, value: string) => {
@@ -619,8 +608,6 @@ export default function App() {
             onHeaderChange={handleHeaderChange}
             onHeaderAdd={handleHeaderAdd}
             generatedHeaders={generatedHeaders}
-            paneHeights={paneHeights}
-            onPaneHeightChange={handlePaneHeightChange}
             extras={pgnExtras}
             onExtraChange={handleExtraChange}
             opening={opening}

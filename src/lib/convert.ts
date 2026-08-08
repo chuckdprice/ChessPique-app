@@ -616,6 +616,84 @@ export function buildPgn(
 }
 
 /**
+ * The Seven Tag Roster, in the order the PGN standard fixes for it. A file is
+ * only valid with all seven, which a ChessNoteR export does not always have —
+ * they can be added by hand in the tag editor.
+ */
+export const SEVEN_TAG_ROSTER = [
+  'Event',
+  'Site',
+  'Date',
+  'Round',
+  'White',
+  'Black',
+  'Result',
+] as const
+
+/**
+ * Tags offered for adding, roster first. ECO, Opening and Annotator are not
+ * here: the app writes those itself, so one added by hand would be overwritten
+ * on the way out.
+ */
+export const STANDARD_TAGS: string[] = [
+  ...SEVEN_TAG_ROSTER,
+  'WhiteElo',
+  'BlackElo',
+  'WhiteTitle',
+  'BlackTitle',
+  'WhiteTeam',
+  'BlackTeam',
+  'TimeControl',
+  'Termination',
+  'Mode',
+  'EventDate',
+  'EventType',
+  'Section',
+  'Stage',
+  'Board',
+  'PlyCount',
+  'Variation',
+  'SubVariation',
+  'FEN',
+  'SetUp',
+]
+
+/**
+ * A tag added to the list, in a sensible place: a roster tag goes among the
+ * roster tags already there, in the standard's order, so adding Site to a game
+ * that has Event and Date lands it between them. Anything else goes at the end,
+ * which is where PGN puts its optional tags. An existing tag is left alone.
+ */
+export function withTag(
+  headers: Array<{ name: string; value: string }>,
+  name: string,
+  value = '',
+): Array<{ name: string; value: string }> {
+  if (headers.some((header) => header.name === name)) return headers
+  const rank = SEVEN_TAG_ROSTER.indexOf(name as (typeof SEVEN_TAG_ROSTER)[number])
+  if (rank < 0) return [...headers, { name, value }]
+  const at = headers.findIndex((header) => {
+    const other = SEVEN_TAG_ROSTER.indexOf(header.name as (typeof SEVEN_TAG_ROSTER)[number])
+    return other > rank
+  })
+  if (at < 0) {
+    // No later roster tag to sit before. Ahead of the optional tags all the
+    // same, so the roster stays together at the top of the file.
+    const lastRoster = headers.reduce(
+      (found, header, i) =>
+        SEVEN_TAG_ROSTER.includes(header.name as (typeof SEVEN_TAG_ROSTER)[number]) ? i : found,
+      -1,
+    )
+    return [
+      ...headers.slice(0, lastRoster + 1),
+      { name, value },
+      ...headers.slice(lastRoster + 1),
+    ]
+  }
+  return [...headers.slice(0, at), { name, value }, ...headers.slice(at)]
+}
+
+/**
  * Headers with generated tags folded in: a tag the game already carries is
  * overwritten in place, keeping PGN's conventional order, and a new one is
  * appended at the end of the list.

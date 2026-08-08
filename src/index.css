@@ -148,6 +148,24 @@ body {
 }
 
 /*
+ * A PGN box that has never been dragged.
+ *
+ * It still takes the height left in its column, which is what fills a desktop
+ * window, but no longer only that: on a phone the column has almost nothing to
+ * give and the source box came out about four lines tall. The floor is a share
+ * of the viewport, so the box is usable on a phone and the pane scrolls to it.
+ * A dragged box gets an explicit height instead, and neither term applies.
+ */
+.pgn-pane-fill {
+  flex: 1 1 auto;
+  /* The floor is ten lines of the box's own 12px/1.625 monospace plus its
+     padding and border, which is what a phone and a tablet get: their column
+     has almost no height to hand out, and 38vh only overtakes ten lines on a
+     screen taller than about 560px. */
+  min-height: clamp(calc(10 * 1.625 * 12px + 1.125rem), 38vh, 28rem);
+}
+
+/*
  * Analysis page layout.
  *
  * This lives here rather than as inline styles on the component because it has

@@ -9,6 +9,9 @@ import {
   parseClockTime,
   parseTimecontrolHeader,
   withExtraTags,
+  withTag,
+  SEVEN_TAG_ROSTER,
+  STANDARD_TAGS,
 } from './convert'
 import { buildChartRows, clockAtPly, replayGame } from './gameModel'
 
@@ -309,6 +312,59 @@ describe('withExtraTags', () => {
   it('leaves the headers it was given untouched', () => {
     withExtraTags(headers, [{ name: 'ECO', value: 'D02' }])
     expect(headers[1].value).toBe('A00')
+  })
+})
+
+describe('withTag', () => {
+  it('puts a roster tag among the roster tags, in the standard order', () => {
+    const headers = [
+      { name: 'Event', value: 'Club night' },
+      { name: 'Date', value: '2026.08.08' },
+    ]
+    expect(withTag(headers, 'Site').map((h) => h.name)).toEqual(['Event', 'Site', 'Date'])
+  })
+
+  it('keeps the roster together when the new tag is last of it', () => {
+    const headers = [
+      { name: 'Event', value: 'Club night' },
+      { name: 'Annotator', value: 'https://example.com/' },
+    ]
+    expect(withTag(headers, 'Result').map((h) => h.name)).toEqual([
+      'Event',
+      'Result',
+      'Annotator',
+    ])
+  })
+
+  it('appends a tag that is not in the roster', () => {
+    const headers = [{ name: 'Event', value: 'Club night' }]
+    expect(withTag(headers, 'WhiteElo').map((h) => h.name)).toEqual(['Event', 'WhiteElo'])
+  })
+
+  it('adds it empty, ready to be filled in', () => {
+    expect(withTag([], 'Event')).toEqual([{ name: 'Event', value: '' }])
+  })
+
+  it('leaves a tag the game already carries alone', () => {
+    const headers = [{ name: 'Event', value: 'Club night' }]
+    expect(withTag(headers, 'Event')).toBe(headers)
+  })
+
+  it('builds a file with the added tag once it has a value', () => {
+    const { moves, result } = convertPgn('1. d4 d5 *')
+    const headers = withTag(withTag([], 'Event'), 'White')
+    headers[0].value = 'Club night'
+    headers[1].value = 'Chuck'
+    const pgn = buildPgn(headers, moves, result)
+    expect(pgn).toContain('[Event "Club night"]')
+    expect(pgn).toContain('[White "Chuck"]')
+  })
+
+  it('offers the roster first and never offers a generated tag', () => {
+    expect(STANDARD_TAGS.slice(0, 7)).toEqual([...SEVEN_TAG_ROSTER])
+    for (const generated of ['ECO', 'Opening', 'Annotator']) {
+      expect(STANDARD_TAGS).not.toContain(generated)
+    }
   })
 })
 

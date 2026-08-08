@@ -22,9 +22,15 @@ sized so a 1440×900 desktop window needs no scrolling on either step.
 
 Every converted game is tagged `[Annotator "https://chessnoter.vercel.app/"]`, so a file that
 gets passed around says where it was made, and `ECO` / `Opening` whenever the opening is known
-(see [Opening names](#opening-names)). The name also shows in a read-only *Opening* field among
-the tag fields on the left, reading `ECO: Name` — it comes from the moves, so it is shown rather
-than edited.
+(see [Opening names](#opening-names)). All three are shown read-only in the *PGN Header Editor*
+whether or not the source file carried them — the opening as one `ECO: Name` field, since it
+comes from the moves rather than from anything typed.
+
+A ChessNoteR export often has no tags at all, so the editor also has an **Add a tag** picker.
+It offers the standard tags the game does not already carry — the Seven Tag Roster first, then
+the common optional ones — and the tags the app writes itself are never in the list, because a
+value typed into one would be overwritten on the way out. An added tag starts empty and reaches
+the converted PGN as soon as it has a value.
 
 Four switches above the converted text decide the rest — all on by default:
 
@@ -206,6 +212,16 @@ node scripts/build-openings.mjs
 The book is keyed by **position**, not by move order, so a transposition is still named
 correctly — 1.Nf3 d5 2.d4 and 1.d4 d5 2.Nf3 are one opening. A game is named by the deepest
 book position it reached. The data is ~420 kB, so it loads on demand rather than with the app.
+
+## The PGN boxes
+
+Both PGN boxes have a grip in their bottom-right corner. Dragging it sets the box's height, and
+that height is kept in `localStorage` per box. Until one is dragged it fills its column as
+before, with a floor of ten lines of its own monospace — the column has almost no height to give
+on a phone or a tablet, where the boxes were coming out about four lines tall. In practice that
+is 10 lines on a phone held sideways, 12 upright and 19 on a tablet. The grip is drawn rather
+than left to the browser's `resize`, which does nothing on iOS, and it takes arrow keys as well
+as a finger or a mouse.
 
 ## Appearance
 

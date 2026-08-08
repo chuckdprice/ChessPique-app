@@ -1,7 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { BOARDS, PIECE_SETS, THEMES, boardById, pieceSetById, themeById } from './appearance'
 import type { ThemeVar } from './appearance'
-import { DEFAULT_APPEARANCE, loadAppearance, saveAppearance } from './settings'
+import {
+  DEFAULT_APPEARANCE,
+  MIN_PANE_PX,
+  loadAppearance,
+  loadPaneHeights,
+  savePaneHeights,
+  saveAppearance,
+} from './settings'
 
 /** Enough of the Storage API for the settings module; tests run in node. */
 function fakeStorage() {
@@ -99,5 +106,44 @@ describe('loadAppearance', () => {
   it('survives a corrupt entry', () => {
     localStorage.setItem('chessnoter.appearance', '{not json')
     expect(loadAppearance()).toEqual(DEFAULT_APPEARANCE)
+  })
+})
+
+describe('pane heights', () => {
+  beforeEach(() => {
+    globalThis.localStorage = fakeStorage()
+  })
+  afterEach(() => {
+    Reflect.deleteProperty(globalThis, 'localStorage')
+  })
+
+  it('reads back what was saved', () => {
+    savePaneHeights({ source: 320, converted: 240 })
+    expect(loadPaneHeights()).toEqual({ source: 320, converted: 240 })
+  })
+
+  // A pane with no entry has never been dragged, and must stay absent rather
+  // than gain a number: the stylesheet's viewport-relative default is what
+  // makes the box the right size on a phone and on a desktop both.
+  it('leaves a pane that was never dragged out of the result', () => {
+    savePaneHeights({ source: 320 })
+    expect(loadPaneHeights()).toEqual({ source: 320 })
+  })
+
+  it('clamps a height from outside the draggable range', () => {
+    savePaneHeights({ source: 1, converted: 99999 })
+    const loaded = loadPaneHeights()
+    expect(loaded.source).toBe(MIN_PANE_PX)
+    expect(loaded.converted).toBe(2000)
+  })
+
+  it('ignores a value that is not a number', () => {
+    localStorage.setItem('chessnoter.panes', JSON.stringify({ source: 'tall' }))
+    expect(loadPaneHeights()).toEqual({})
+  })
+
+  it('survives a corrupt entry', () => {
+    localStorage.setItem('chessnoter.panes', '{not json')
+    expect(loadPaneHeights()).toEqual({})
   })
 })

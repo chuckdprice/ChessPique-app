@@ -73,7 +73,7 @@ the harness's drag tool (mouse events) cannot move a piece. Drive it with a
   `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>` line.
 - Commit and push only when Chuck asks. He asks explicitly, usually right after
   reviewing.
-- `npm run build && npm test` before every commit. 113 tests as of this writing;
+- `npm run build && npm test` before every commit. 125 tests as of this writing;
   they cover `src/lib` only — the UI is verified in the browser.
 
 ## State of play

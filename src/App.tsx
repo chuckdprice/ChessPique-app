@@ -7,7 +7,7 @@ import PgnFilePage from './components/PgnFilePage'
 import StepNav from './components/StepNav'
 import type { Page } from './components/StepNav'
 import type { PgnExtras } from './components/PgnExtrasSwitches'
-import { buildPgn, convertPgn, withExtraTags } from './lib/convert'
+import { buildPgn, convertPgn, withExtraTags, withTag } from './lib/convert'
 import type { ConvertOptions, ConvertResult } from './lib/convert'
 import { findOpening } from './lib/openings'
 import type { Opening } from './lib/openings'
@@ -34,9 +34,11 @@ import {
   applyAppearance,
   loadAppearance,
   loadEngineSettings,
+  loadPaneHeights,
   saveAppearance,
+  savePaneHeights,
 } from './lib/settings'
-import type { AppearanceSettings, EngineSettings } from './lib/settings'
+import type { AppearanceSettings, EngineSettings, PaneHeights, PaneId } from './lib/settings'
 
 // The analysis page owns every heavy dependency in the app — recharts for the
 // eval and clock charts, react-chessboard for the board — and none of it is
@@ -102,6 +104,7 @@ export default function App() {
   // draft, so a pick is seen on the page behind it; only Save writes it down.
   const [appearance, setAppearance] = useState<AppearanceSettings>(loadAppearance)
   const [engineSettings, setEngineSettings] = useState<EngineSettings>(loadEngineSettings)
+  const [paneHeights, setPaneHeights] = useState<PaneHeights>(loadPaneHeights)
   const [engineOn, setEngineOn] = useState(false)
   const [liveScore, setLiveScore] = useState<Score | null>(null)
   const [engineMoves, setEngineMoves] = useState<string[]>([])
@@ -214,6 +217,18 @@ export default function App() {
       signal.cancelled = true
     }
   }, [game])
+
+  const handleHeaderAdd = useCallback((name: string) => {
+    setHeaders((prev) => withTag(prev, name))
+  }, [])
+
+  const handlePaneHeightChange = useCallback((id: PaneId, px: number) => {
+    setPaneHeights((prev) => {
+      const next = { ...prev, [id]: px }
+      savePaneHeights(next)
+      return next
+    })
+  }, [])
 
   const handleHeaderChange = useCallback((index: number, value: string) => {
     setHeaders((prev) => prev.map((h, i) => (i === index ? { ...h, value } : h)))
@@ -338,20 +353,30 @@ export default function App() {
 
   const opening = useOpening(game?.replay.fens ?? null)
 
+  /**
+   * The tags the app adds itself: the opening whenever the book knows it, and
+   * where the file came from. They go into the converted PGN and are shown
+   * read-only in the tag editor, which is the only place they appear at all
+   * when the source file carried no tags of its own.
+   */
+  const generatedHeaders = useMemo(
+    () =>
+      game
+        ? [
+            ...(opening
+              ? [
+                  { name: 'ECO', value: opening.eco },
+                  { name: 'Opening', value: opening.name },
+                ]
+              : []),
+            { name: 'Annotator', value: ANNOTATOR_URL },
+          ]
+        : [],
+    [game, opening],
+  )
+
   const convertedPgn = useMemo(() => {
     if (!game) return null
-
-    // The tags the app adds itself: the opening whenever the book knows it, and
-    // where the file came from.
-    const extras = [
-      ...(opening
-        ? [
-            { name: 'ECO', value: opening.eco },
-            { name: 'Opening', value: opening.name },
-          ]
-        : []),
-      { name: 'Annotator', value: ANNOTATOR_URL },
-    ]
 
     // evals[i] is the position *after* ply i, so move i takes evals[i + 1] —
     // the evaluation of what it led to, which is where a reader expects it.
@@ -381,14 +406,14 @@ export default function App() {
           })
         : undefined
 
-    return buildPgn(withExtraTags(headers, extras), moves, game.result.result, {
+    return buildPgn(withExtraTags(headers, generatedHeaders), moves, game.result.result, {
       evals,
       clocks: pgnExtras.clocks,
       comments: pgnExtras.comments,
       notes,
       variations,
     })
-  }, [game, moves, headers, opening, analysis, deeperEvals, pgnExtras])
+  }, [game, moves, headers, generatedHeaders, analysis, deeperEvals, pgnExtras])
 
   const downloadName = useMemo(() => {
     const white = findHeader(headers, 'White') ?? 'White'
@@ -592,6 +617,10 @@ export default function App() {
             downloadName={downloadName}
             headers={headers}
             onHeaderChange={handleHeaderChange}
+            onHeaderAdd={handleHeaderAdd}
+            generatedHeaders={generatedHeaders}
+            paneHeights={paneHeights}
+            onPaneHeightChange={handlePaneHeightChange}
             extras={pgnExtras}
             onExtraChange={handleExtraChange}
             opening={opening}

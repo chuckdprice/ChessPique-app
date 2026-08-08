@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { copyText } from '../lib/clipboard'
 import type { ConvertOptions } from '../lib/convert'
 import type { Opening } from '../lib/openings'
+import type { PaneHeights, PaneId } from '../lib/settings'
 import { loadSession, openSignInWindow, saveSession, signIn } from '../lib/lichess/oauth'
 import { fetchAccount } from '../lib/lichess/studies'
 import LichessStudyDialog from './LichessStudyDialog'
 import PgnActions from './PgnActions'
 import PgnExtrasSwitches from './PgnExtrasSwitches'
 import type { PgnExtras } from './PgnExtrasSwitches'
+import PgnPane from './PgnPane'
 import TagEditor from './TagEditor'
 
 interface PgnFilePageProps {
@@ -24,6 +26,12 @@ interface PgnFilePageProps {
   /** PGN tags for the header editor; empty until a game has been converted. */
   headers: Array<{ name: string; value: string }>
   onHeaderChange: (index: number, value: string) => void
+  onHeaderAdd: (name: string) => void
+  /** Tags the app writes on every conversion, shown read-only in the editor. */
+  generatedHeaders: Array<{ name: string; value: string }>
+  /** Heights the two PGN boxes were dragged to, and a way to record a new one. */
+  paneHeights: PaneHeights
+  onPaneHeightChange: (id: PaneId, px: number) => void
   /** What the converted PGN carries beyond the moves. */
   extras: PgnExtras
   onExtraChange: (id: keyof PgnExtras, on: boolean) => void
@@ -33,9 +41,6 @@ interface PgnFilePageProps {
 
 type OverrideMode = 'auto' | 'none' | 'delay' | 'increment'
 type SourceTab = 'original' | 'headers'
-
-const PANE_CLASS =
-  'w-full min-h-0 flex-1 resize-none rounded-lg border border-rule bg-buff-soft/60 px-3 py-2 font-score text-[12px] leading-relaxed placeholder:text-ink-mute/60'
 
 export default function PgnFilePage({
   onConvert,
@@ -48,6 +53,10 @@ export default function PgnFilePage({
   downloadName,
   headers,
   onHeaderChange,
+  onHeaderAdd,
+  generatedHeaders,
+  paneHeights,
+  onPaneHeightChange,
   extras,
   onExtraChange,
   opening,
@@ -251,16 +260,17 @@ export default function PgnFilePage({
                 <p className="mb-2 shrink-0 truncate text-xs text-ink-mute">
                   {sourceFileName ?? 'or paste below'}
                 </p>
-                <textarea
+                <PgnPane
+                  paneId="source"
+                  height={paneHeights.source ?? null}
+                  onHeightChange={(px) => onPaneHeightChange('source', px)}
+                  label="Source PGN"
                   value={text}
-                  onChange={(e) => {
-                    onTextChange(e.target.value)
+                  onChange={(next) => {
+                    onTextChange(next)
                     onSourceFileNameChange(null)
                   }}
-                  spellCheck={false}
-                  aria-label="Source PGN"
                   placeholder={'[Event "..."]\n[TimeControl "G70/d10"]\n\n1. d4 {[%emt 0:00:00]} d5 {[%emt 0:00:05]} ...'}
-                  className={PANE_CLASS}
                 />
                 <div className="mt-3 flex shrink-0 items-center justify-end gap-2">
                   <button
@@ -286,7 +296,13 @@ export default function PgnFilePage({
             )}
 
             {tab === 'headers' && (
-              <TagEditor headers={headers} onChange={onHeaderChange} opening={opening} />
+              <TagEditor
+                headers={headers}
+                onChange={onHeaderChange}
+                onAdd={onHeaderAdd}
+                generated={generatedHeaders}
+                opening={opening}
+              />
             )}
           </div>
         </section>
@@ -304,13 +320,14 @@ export default function PgnFilePage({
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col p-4">
-            <textarea
-              readOnly
+            <PgnPane
+              paneId="converted"
+              height={paneHeights.converted ?? null}
+              onHeightChange={(px) => onPaneHeightChange('converted', px)}
+              label="Converted PGN"
               value={convertedPgn ?? ''}
-              spellCheck={false}
-              aria-label="Converted PGN"
+              readOnly
               placeholder="Convert a game to see the %clk output here."
-              className={PANE_CLASS}
             />
 
             <div className="mt-3 flex shrink-0 flex-wrap items-center gap-2">

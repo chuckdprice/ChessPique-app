@@ -213,97 +213,106 @@ export function BoardNav({
   onRotate,
   orientation,
 }: BoardNavProps) {
-  const button =
-    'shrink-0 rounded-md border border-rule bg-card px-2 py-2 leading-none text-ink transition-colors hover:bg-buff-soft disabled:cursor-not-allowed disabled:opacity-30'
-  const arrow = `${button} text-2xl`
+  // A heavier outline and a lift, because these sit on the bare page rather
+  // than in a card and were reading as flat text next to the board.
+  const face =
+    'border-2 border-felt-bright/60 bg-card py-1 text-felt-bright shadow-sm transition-colors hover:bg-buff-soft disabled:cursor-not-allowed disabled:opacity-30'
+  // The four share edges rather than sitting apart, so the run of them reads
+  // as one control. Overlapping the borders keeps the seams a single rule.
+  const seg = `${face} flex-1 -ml-0.5 first:ml-0 first:rounded-l-md last:rounded-r-md`
   const prevLabel = plyLabel(moves, ply - 1)
   const nextLabel = plyLabel(moves, ply + 1)
   const currentLabel = plyLabel(moves, ply)
 
   // Exactly the board's width, so the row's ends line up with the board's
-  // edges rather than running past them into the page margin.
+  // edges rather than running past them into the page margin. The cluster is
+  // centred on the board and the rotate button is taken out of the flow to
+  // hold that right edge, so the one does not push the other off centre; the
+  // cluster's own width stops short of it on both sides.
   return (
     <div
-      className="flex w-(--board-size) max-w-full items-center justify-between gap-0.5"
+      className="relative flex w-(--board-size) max-w-full items-center justify-center"
       role="group"
       aria-label="Move navigation"
     >
+      <div className="flex w-full max-w-[min(20rem,calc(100%-5rem))] items-center">
+        <button
+          type="button"
+          className={seg}
+          onClick={() => onPlyChange(0)}
+          disabled={ply === 0}
+          aria-label="Go to start"
+        >
+          <NavIcon d="M11 18l-6-6 6-6M18 18l-6-6 6-6" />
+        </button>
+        {/* The neighbouring moves are named in the labels rather than on the
+            buttons: the names changed width as the game went on, which is what
+            pushed this row wider than the board. */}
+        <button
+          type="button"
+          className={seg}
+          onClick={() => onPlyChange(Math.max(0, ply - 1))}
+          disabled={ply === 0}
+          title={prevLabel ?? 'Start'}
+          aria-label={prevLabel ? `Previous move: ${prevLabel}` : 'Back to starting position'}
+        >
+          <NavIcon d="M15 18l-6-6 6-6" />
+        </button>
+        <button
+          type="button"
+          className={seg}
+          onClick={() => onPlyChange(Math.min(lastPly, ply + 1))}
+          disabled={ply === lastPly}
+          title={nextLabel ?? undefined}
+          aria-label={nextLabel ? `Next move: ${nextLabel}` : 'Next move'}
+        >
+          <NavIcon d="M9 18l6-6-6-6" />
+        </button>
+        <button
+          type="button"
+          className={seg}
+          onClick={() => onPlyChange(lastPly)}
+          disabled={ply === lastPly}
+          aria-label="Go to end"
+        >
+          <NavIcon d="M13 18l6-6-6-6M6 18l6-6-6-6" />
+        </button>
+      </div>
+
       <button
         type="button"
-        data-nav-btn
-        className={arrow}
-        onClick={() => onPlyChange(0)}
-        disabled={ply === 0}
-        aria-label="Go to start"
-      >
-        «
-      </button>
-      {/* The neighbouring moves are named in the labels rather than on the
-          buttons: the names changed width as the game went on, which is what
-          pushed this row wider than the board. */}
-      <button
-        type="button"
-        data-nav-btn
-        className={arrow}
-        onClick={() => onPlyChange(Math.max(0, ply - 1))}
-        disabled={ply === 0}
-        title={prevLabel ?? 'Start'}
-        aria-label={prevLabel ? `Previous move: ${prevLabel}` : 'Back to starting position'}
-      >
-        ‹
-      </button>
-      <span
-        data-nav-current
-        className="min-w-0 max-w-40 flex-1 truncate rounded-md bg-felt px-2 py-1.5 text-center font-score text-xs font-semibold text-buff"
-      >
-        {currentLabel ?? 'Start'}
-      </span>
-      <button
-        type="button"
-        data-nav-btn
-        className={arrow}
-        onClick={() => onPlyChange(Math.min(lastPly, ply + 1))}
-        disabled={ply === lastPly}
-        title={nextLabel ?? undefined}
-        aria-label={nextLabel ? `Next move: ${nextLabel}` : 'Next move'}
-      >
-        ›
-      </button>
-      <button
-        type="button"
-        data-nav-btn
-        className={arrow}
-        onClick={() => onPlyChange(lastPly)}
-        disabled={ply === lastPly}
-        aria-label="Go to end"
-      >
-        »
-      </button>
-      <button
-        type="button"
-        data-nav-btn
-        className={button}
+        className={`${face} absolute right-0 rounded-md px-1.5`}
         onClick={onRotate}
         aria-label={`Rotate board — view from ${orientation === 'white' ? "Black's" : "White's"} side`}
         title="Rotate board"
       >
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 24 24"
-          className="size-6"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M21 12a9 9 0 1 1-2.64-6.36" />
-          <path d="M21 3v6h-6" />
-        </svg>
+        <NavIcon d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6" />
       </button>
       <span className="sr-only" aria-live="polite">
         {currentLabel ?? 'Starting position'}
       </span>
     </div>
+  )
+}
+
+/**
+ * One nav glyph. The arrows are drawn rather than typed: as characters they
+ * were a fraction of their font size, so at any size that matched the rotate
+ * icon they still looked half of it.
+ */
+function NavIcon({ d }: { d: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="mx-auto size-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.25"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d={d} />
+    </svg>
   )
 }

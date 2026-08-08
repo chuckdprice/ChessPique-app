@@ -231,7 +231,7 @@ body {
        the move list's full height be shared out across the rows it spans: the
        board block grew to 256px around a 165px board and pushed the nav off
        the bottom. The nav row is included — the side reaches it too. */
-    grid-template-rows: 1.75rem var(--board-size) 1.75rem 2.75rem minmax(0, 1fr);
+    grid-template-rows: 1.75rem var(--board-size) 1.75rem 2.25rem minmax(0, 1fr);
     /* The nav sits in the board column, which it now fits: the buttons carry
        arrows rather than move names, so the row is no longer wider than the
        board and no longer spills across the move list. */
@@ -345,12 +345,5 @@ body {
   }
   .area-nav {
     padding-top: 0.15rem;
-  }
-
-  /* The nav row is charged against the board's height here, so the buttons
-     give up their padding rather than their arrows. */
-  [data-nav-btn] {
-    padding-top: 0.125rem;
-    padding-bottom: 0.125rem;
   }
 }

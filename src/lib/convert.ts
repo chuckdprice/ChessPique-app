@@ -257,7 +257,8 @@ function isMoveNumber(token: string): { moveNo: number; side: 'w' | 'b' } | null
   return { moveNo: parseInt(match[1], 10), side: match[2] ? 'b' : 'w' }
 }
 
-function extractTimingFromComments(commentTokens: string[]): {
+/** Exported for the move tree, which reads the same comments off its nodes. */
+export function extractTimingFromComments(commentTokens: string[]): {
   emtSeconds: number | null
   anchorClockSeconds: number | null
 } {
@@ -296,7 +297,7 @@ function extractTimingFromComments(commentTokens: string[]): {
  * itself; anything left is the annotator's prose and is the only part worth
  * carrying into the output. Several comments on one move are run together.
  */
-function humanComment(commentTokens: string[]): string | null {
+export function humanComment(commentTokens: string[]): string | null {
   const parts: string[] = []
   for (const token of commentTokens) {
     const text = commentText(token)

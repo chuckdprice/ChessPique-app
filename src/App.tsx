@@ -3,9 +3,11 @@ import type { Arrow } from 'react-chessboard'
 import AppearanceDialog from './components/AppearanceDialog'
 import BrandMark from './components/BrandMark'
 import HelpDialog from './components/HelpDialog'
+import NavDrawer, { NavToggle } from './components/NavDrawer'
 import PgnFilePage from './components/PgnFilePage'
+import SettingsPage from './components/SettingsPage'
 import StepNav from './components/StepNav'
-import type { Page } from './components/StepNav'
+import type { Page } from './lib/pages'
 import type { PgnExtras } from './components/PgnExtrasSwitches'
 import { buildPgn, convertPgn, withExtraTags, withTag } from './lib/convert'
 import type { ConvertOptions, ConvertResult } from './lib/convert'
@@ -35,6 +37,7 @@ import {
   loadAppearance,
   loadEngineSettings,
   saveAppearance,
+  saveEngineSettings,
 } from './lib/settings'
 import type { AppearanceSettings, EngineSettings } from './lib/settings'
 
@@ -97,6 +100,7 @@ export default function App() {
   const [sourceFileName, setSourceFileName] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [helpOpen, setHelpOpen] = useState(false)
+  const [navOpen, setNavOpen] = useState(false)
   const [appearanceOpen, setAppearanceOpen] = useState(false)
   // What the app is currently wearing. While the dialog is open this holds the
   // draft, so a pick is seen on the page behind it; only Save writes it down.
@@ -276,6 +280,20 @@ export default function App() {
     [],
   )
 
+  // Opening the dialog records what to go back to on Cancel, so every route
+  // into it — the nav today, anything else later — restores the same way.
+  const handleAppearanceOpen = useCallback(() => {
+    savedAppearance.current = appearance
+    setAppearanceOpen(true)
+  }, [appearance])
+
+  // The gear on the analysis page saves for itself; the Settings page is the
+  // other way in, so it persists here rather than leaving it to the page.
+  const handleEngineSettingsSave = useCallback((next: EngineSettings) => {
+    setEngineSettings(next)
+    saveEngineSettings(next)
+  }, [])
+
   const handleCommentChange = useCallback((ply: number, comment: string) => {
     setCommentEdits((prev) => new Map(prev).set(ply, comment))
   }, [])
@@ -289,9 +307,11 @@ export default function App() {
     [],
   )
 
-  // Arrow-key navigation on the analysis page, except while typing in a field.
+  // Arrow-key navigation on the analysis page, except while typing in a field
+  // or while something is open over it — an arrow key belongs to whatever has
+  // the user's attention, not to the board behind it.
   useEffect(() => {
-    if (!game || page !== 'analysis' || helpOpen) return
+    if (!game || page !== 'analysis' || helpOpen || navOpen || appearanceOpen) return
     const lastPly = game.replay.fens.length - 1
     // Keyboard navigation is navigation: it leaves any hand-played line, the
     // same as the buttons and the move list do.
@@ -325,7 +345,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [game, page, helpOpen])
+  }, [game, page, helpOpen, navOpen, appearanceOpen])
 
   const chartRows = useMemo(() => (game ? buildChartRows(game.result.moves) : []), [game])
 
@@ -497,6 +517,7 @@ export default function App() {
     <div className="flex min-h-dvh flex-col lg:h-dvh lg:overflow-hidden">
       <header className="app-header shrink-0 bg-felt text-buff">
         <div className="mx-auto flex max-w-[1600px] items-center gap-4 px-4 py-2.5 sm:px-6">
+          <NavToggle onOpen={() => setNavOpen(true)} />
           <BrandMark />
           <div className="min-w-0 flex-1">
             <h1 className="font-display text-xl font-semibold leading-tight tracking-tight">
@@ -535,34 +556,10 @@ export default function App() {
             </p>
           </div>
 
+          {/* Appearance used to sit here too; it lives on the left-nav now.
+              Help stays: it is the one control worth reaching without opening
+              anything first. */}
           <div className="flex shrink-0 items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                savedAppearance.current = appearance
-                setAppearanceOpen(true)
-              }}
-              aria-label="Appearance settings"
-              title="Appearance"
-              className="rounded-lg border border-buff/30 p-2 text-buff transition-colors hover:bg-buff/10"
-            >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 24 24"
-                className="size-5"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M12 3a9 9 0 1 0 0 18c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16a5 5 0 0 0 5-5c0-4.42-4.03-8-9-8Z" />
-                <circle cx="6.5" cy="11.5" r="0.5" fill="currentColor" />
-                <circle cx="9.5" cy="7.5" r="0.5" fill="currentColor" />
-                <circle cx="14.5" cy="7.5" r="0.5" fill="currentColor" />
-                <circle cx="17.5" cy="11.5" r="0.5" fill="currentColor" />
-              </svg>
-            </button>
             <button
               type="button"
               onClick={() => setHelpOpen(true)}
@@ -623,6 +620,10 @@ export default function App() {
           />
         )}
 
+        {page === 'settings' && (
+          <SettingsPage engine={engineSettings} onEngineChange={handleEngineSettingsSave} />
+        )}
+
         {page === 'analysis' && game && (
           <Suspense
             fallback={
@@ -670,6 +671,17 @@ export default function App() {
           </Suspense>
         )}
       </main>
+
+      {navOpen && (
+        <NavDrawer
+          page={page}
+          onNavigate={setPage}
+          onClose={() => setNavOpen(false)}
+          gameLoaded={!!game}
+          onAppearance={handleAppearanceOpen}
+          onHelp={() => setHelpOpen(true)}
+        />
+      )}
 
       {appearanceOpen && (
         <AppearanceDialog

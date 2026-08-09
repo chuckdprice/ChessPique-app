@@ -87,6 +87,16 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
             </p>
           </Section>
 
+          <Section title="Getting around">
+            <p>
+              The button at the top left opens the menu. It reaches both pages —{' '}
+              <Ui>PGN File</Ui> and <Ui>Game Analysis</Ui>, the same two the bar under the header
+              shows — plus <Ui>Appearance</Ui> for the theme, board and pieces,{' '}
+              <Ui>Settings</Ui> for how the engine searches, and this help. <Key>Esc</Key> closes
+              it, as does a click anywhere outside it.
+            </p>
+          </Section>
+
           <Section title="Step 1 — PGN File">
             <p>
               The page is two panes. On the left, where the game comes in, under two tabs; on the

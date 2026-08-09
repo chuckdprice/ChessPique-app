@@ -138,6 +138,24 @@ body {
   @apply bg-paper text-ink antialiased;
 }
 
+/*
+ * The left-nav slides in on open and is simply gone on close.
+ *
+ * A keyframe rather than a transition because the drawer is only in the DOM
+ * while it is open: a transition needs a frame at the starting value to move
+ * away from, which a mounting element never has. The reduced-motion block
+ * above already flattens this to nothing.
+ */
+@keyframes nav-drawer-in {
+  from {
+    transform: translateX(-100%);
+  }
+}
+
+.nav-drawer {
+  animation: nav-drawer-in 180ms ease-out;
+}
+
 :root[data-theme="dark"] {
   color-scheme: dark;
 }

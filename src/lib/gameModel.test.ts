@@ -3,6 +3,7 @@ import type { Move } from './convert'
 import {
   capturedMaterial,
   explorationFen,
+  moveTargets,
   playExploredMove,
   replayGame,
   startExploration,
@@ -73,6 +74,51 @@ describe('capturedMaterial', () => {
     expect(captured.white).toEqual(['p'])
     expect(captured.black).toEqual(['r'])
     expect(captured.diff).toBe(13)
+  })
+})
+
+describe('moveTargets', () => {
+  /** The squares reachable from `square`, sorted so order cannot fail a test. */
+  const squares = (fen: string, square: string) =>
+    moveTargets(fen, square)
+      .map((target) => target.to)
+      .sort()
+
+  it('gives a piece its moves', () => {
+    expect(squares(fenAfter([]), 'g1')).toEqual(['f3', 'h3'])
+  })
+
+  it('marks which targets take a piece', () => {
+    // 1. e4 d5: the pawn may push to e5 or take on d5.
+    const targets = moveTargets(fenAfter(['e4', 'd5']), 'e4')
+    expect(targets).toContainEqual({ to: 'e5', capture: false })
+    expect(targets).toContainEqual({ to: 'd5', capture: true })
+  })
+
+  it('marks en passant as a capture, though the square is empty', () => {
+    const fen = fenAfter(['e4', 'a6', 'e5', 'd5'])
+    expect(moveTargets(fen, 'e5')).toContainEqual({ to: 'd6', capture: true })
+  })
+
+  it('offers a promotion square once, not once per piece', () => {
+    expect(squares('8/P7/8/4k3/8/8/8/4K3 w - - 0 1', 'a7')).toEqual(['a8'])
+  })
+
+  it("names castling by the king's square, which is how it is played", () => {
+    const fen = fenAfter(['e4', 'e5', 'Nf3', 'Nf6', 'Bc4', 'Bc5'])
+    expect(squares(fen, 'e1')).toEqual(['e2', 'f1', 'g1'])
+  })
+
+  it('has nothing for an empty square, the wrong side, or a pinned piece', () => {
+    expect(moveTargets(fenAfter([]), 'e4')).toEqual([])
+    expect(moveTargets(fenAfter([]), 'e7')).toEqual([])
+    // The knight cannot leave the king in check from the bishop on b4.
+    expect(moveTargets('4k3/8/8/8/1b6/2N5/8/4K3 w - - 0 1', 'c3')).toEqual([])
+  })
+
+  it('survives a square or a position it cannot read', () => {
+    expect(moveTargets(fenAfter([]), 'z9')).toEqual([])
+    expect(moveTargets('not a fen', 'e2')).toEqual([])
   })
 })
 

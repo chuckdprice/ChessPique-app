@@ -1,12 +1,12 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Chessboard, defaultArrowOptions } from 'react-chessboard'
-import type { Arrow, PieceRenderObject } from 'react-chessboard'
+import type { Arrow, PieceRenderObject, SquareHandlerArgs } from 'react-chessboard'
 import { PIECE_CODES, pieceSrc } from '../lib/appearance'
 import { formatClockTime } from '../lib/convert'
 import type { Move } from '../lib/convert'
 import { formatVariation, hasMoveMarker } from '../lib/engine/analysis'
 import type { GameAnalysis } from '../lib/engine/analysis'
-import { explorationFen } from '../lib/gameModel'
+import { explorationFen, moveTargets } from '../lib/gameModel'
 import type { CapturedKind, Exploration, ReplayedGame } from '../lib/gameModel'
 import CapturedPieces from './CapturedPieces'
 import ClassBadge from './ClassBadge'
@@ -57,6 +57,27 @@ function pieceRenderers(setId: string): PieceRenderObject | undefined {
     ]),
   )
 }
+
+/** The square of the last move played, and of a piece picked up to move. */
+const HIGHLIGHT = 'rgba(237, 189, 71, 0.5)'
+/**
+ * Where a selected piece may go: a dot on an empty square, a ring around a
+ * piece it can take. Gradients rather than elements, so they cost nothing but
+ * a style on squares the board already draws.
+ *
+ * `closest-side` is what makes their sizes predictable — a gradient's 100% is
+ * otherwise the distance to the square's *corner*, which put the ring under
+ * the piece instead of around it. With it, 100% is half the square's width, so
+ * the ring reaches the edges; its last stop is transparent so it stops there
+ * rather than flooding the corners.
+ *
+ * The dot is dark with a pale rim because the board themes run from cream to
+ * near-black, and a plain dark dot all but vanished on Midnight.
+ */
+const MOVE_DOT =
+  'radial-gradient(circle closest-side, rgba(0, 0, 0, 0.42) 0 26%, rgba(255, 255, 255, 0.18) 27% 31%, transparent 32%)'
+const CAPTURE_RING =
+  'radial-gradient(circle closest-side, transparent 0 76%, rgba(226, 74, 74, 0.8) 78% 97%, transparent 98%)'
 
 /** Top-right-corner position of a square as percentages, given orientation. */
 function squareCorner(square: string, orientation: 'white' | 'black') {
@@ -111,6 +132,29 @@ export default function BoardViewer({
   pieceSet,
 }: BoardViewerProps) {
   const pieces = useMemo(() => pieceRenderers(pieceSet), [pieceSet])
+  const fen = exploration ? explorationFen(exploration) : replay.fens[ply]
+  // The position the piece was picked in is carried with it so that any change
+  // of position — a move played here, a step through the game, a take-back —
+  // drops the selection without an effect to clear it.
+  const [picked, setPicked] = useState<{ square: string; fen: string } | null>(null)
+  const selected = picked && picked.fen === fen ? picked.square : null
+  const targets = useMemo(() => (selected ? moveTargets(fen, selected) : []), [fen, selected])
+
+  const handleSquareClick = ({ square }: SquareHandlerArgs) => {
+    if (selected === square) {
+      setPicked(null)
+      return
+    }
+    if (selected && targets.some((target) => target.to === square)) {
+      onPieceMove(selected, square)
+      setPicked(null)
+      return
+    }
+    // A square with nothing to move — empty, the other side's, or a piece with
+    // no legal move — clears the selection rather than taking it.
+    setPicked(moveTargets(fen, square).length > 0 ? { square, fen } : null)
+  }
+
   const highlight = exploration ? exploration.lastMoveSquares : replay.lastMoveSquares[ply]
   // The badge grades a move that was actually played, so it has nothing to say
   // about a position reached by hand.
@@ -123,7 +167,19 @@ export default function BoardViewer({
   const squareStyles: Record<string, React.CSSProperties> = {}
   if (highlight) {
     for (const square of highlight) {
-      squareStyles[square] = { backgroundColor: 'rgba(237, 189, 71, 0.5)' }
+      squareStyles[square] = { backgroundColor: HIGHLIGHT }
+    }
+  }
+  if (selected) {
+    squareStyles[selected] = { backgroundColor: HIGHLIGHT }
+    for (const target of targets) {
+      // The gradient sits behind the piece, so a capture ring encircles it
+      // rather than covering it. Merged with any highlight already here: the
+      // move just played is often what the selected piece can take back.
+      squareStyles[target.to] = {
+        ...squareStyles[target.to],
+        backgroundImage: target.capture ? CAPTURE_RING : MOVE_DOT,
+      }
     }
   }
 
@@ -131,11 +187,12 @@ export default function BoardViewer({
     <div className="relative size-(--board-size) overflow-hidden rounded-lg shadow-md">
       <Chessboard
         options={{
-          position: exploration ? explorationFen(exploration) : replay.fens[ply],
+          position: fen,
           boardOrientation: orientation,
           allowDragging: true,
           onPieceDrop: ({ sourceSquare, targetSquare }) =>
             targetSquare != null && onPieceMove(sourceSquare, targetSquare),
+          onSquareClick: handleSquareClick,
           allowDrawingArrows: false,
           animationDurationInMs: 150,
           squareStyles,
@@ -205,7 +262,7 @@ export function ExploreBar({
         title={line || undefined}
         className="min-w-0 flex-1 truncate font-score text-xs text-ink-mute"
       >
-        {line || 'drag a piece to try a move — the engine follows the board'}
+        {line || 'drag or click a piece to try a move — the engine follows the board'}
       </span>
       <button
         type="button"

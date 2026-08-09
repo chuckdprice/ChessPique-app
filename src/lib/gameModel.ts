@@ -1,4 +1,5 @@
 import { Chess } from 'chess.js'
+import type { Square } from 'chess.js'
 import type { Move } from './convert'
 
 export interface ReplayedGame {
@@ -93,6 +94,37 @@ export function playExploredMove(
   } catch {
     return null
   }
+}
+
+/** Somewhere the piece on a chosen square may go, for the board's markers. */
+export interface MoveTarget {
+  to: string
+  /** True when landing there takes a piece. */
+  capture: boolean
+}
+
+/**
+ * Where the piece on `square` may legally go, empty for an empty square, for
+ * one holding a piece of the side not to move, and for a piece with no moves.
+ *
+ * `capture` is read from the move rather than from what stands on the target,
+ * so en passant — which lands on an empty square — is still marked as one.
+ * Promotions collapse to one target: they are four moves to the same square.
+ */
+export function moveTargets(fen: string, square: string): MoveTarget[] {
+  let moves
+  try {
+    // Squares arrive from the board as plain strings; chess.js answers an
+    // unrecognised one with no moves, which is the answer this wants anyway.
+    moves = new Chess(fen).moves({ square: square as Square, verbose: true })
+  } catch {
+    return []
+  }
+  const byTo = new Map<string, MoveTarget>()
+  for (const move of moves) {
+    byTo.set(move.to, { to: move.to, capture: move.captured != null })
+  }
+  return [...byTo.values()]
 }
 
 /** Undo the last hand-played move; null once the line is back to its branch. */

@@ -166,12 +166,15 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               number that has settled is not mistaken for one that is stuck.
             </p>
             <p>
-              You can also move the pieces yourself: drag one and the board leaves the game to
-              follow your line, with the engine analysing each position as you reach it. A strip
-              above the board shows the moves so far, with <Ui>Take back</Ui> to unplay the last
-              one and <Ui>Back to game</Ui> to return. Any move of the navigation — a button, the
-              move list, or an arrow key — returns as well. Illegal moves snap back, and a pawn
-              reaching the last rank always becomes a queen.
+              You can also move the pieces yourself: drag one, or click it and then click where
+              it should go. A clicked piece marks its legal squares — a dot to move to, a red
+              ring around a piece it can take — and clicking it again puts it back down. Either
+              way the board leaves the game to follow your line, with the engine analysing each
+              position as you reach it. A strip above the board shows the moves so far, with{' '}
+              <Ui>Take back</Ui> to unplay the last one and <Ui>Back to game</Ui> to return. Any
+              move of the navigation — a button, the move list, or an arrow key — returns as
+              well. Illegal moves snap back, and a pawn reaching the last rank always becomes a
+              queen.
             </p>
             <p>
               Nothing you play this way touches the game: the move list, the accuracies, and the

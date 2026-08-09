@@ -3,11 +3,12 @@ import { Chessboard, defaultArrowOptions } from 'react-chessboard'
 import type { Arrow, PieceRenderObject, SquareHandlerArgs } from 'react-chessboard'
 import { PIECE_CODES, pieceSrc } from '../lib/appearance'
 import { formatClockTime } from '../lib/convert'
-import type { Move } from '../lib/convert'
-import { formatVariation, hasMoveMarker } from '../lib/engine/analysis'
+import { hasMoveMarker } from '../lib/engine/analysis'
 import type { GameAnalysis } from '../lib/engine/analysis'
-import { explorationFen, moveTargets } from '../lib/gameModel'
-import type { CapturedKind, Exploration, ReplayedGame } from '../lib/gameModel'
+import { moveTargets } from '../lib/gameModel'
+import type { CapturedKind } from '../lib/gameModel'
+import { isMainline, lineEndId, nextId, previousId } from '../lib/moveTree'
+import type { MoveTree } from '../lib/moveTree'
 import CapturedPieces from './CapturedPieces'
 import ClassBadge from './ClassBadge'
 
@@ -22,14 +23,13 @@ export interface PlayerPlate {
 }
 
 interface BoardViewerProps {
-  replay: ReplayedGame
-  ply: number
+  tree: MoveTree
+  /** The node the board is showing. */
+  currentId: string
   orientation: 'white' | 'black'
   analysis: GameAnalysis | null
   arrows: Arrow[]
-  /** The line being played out by hand, if any; it owns the board while set. */
-  exploration: Exploration | null
-  /** Play a move by hand. Returning false snaps the piece back. */
+  /** Play a move, which writes it into the game. False snaps the piece back. */
   onPieceMove: (from: string, to: string) => boolean
   /** Piece set id from the appearance settings. */
   pieceSet: string
@@ -122,17 +122,17 @@ export function PlayerPlateRow({ plate, color }: { plate: PlayerPlate; color: 'w
 }
 
 export default function BoardViewer({
-  replay,
-  ply,
+  tree,
+  currentId,
   orientation,
   analysis,
   arrows,
-  exploration,
   onPieceMove,
   pieceSet,
 }: BoardViewerProps) {
   const pieces = useMemo(() => pieceRenderers(pieceSet), [pieceSet])
-  const fen = exploration ? explorationFen(exploration) : replay.fens[ply]
+  const current = tree.nodes.get(currentId) ?? tree.nodes.get(tree.root)!
+  const fen = current.fen
   // The position the piece was picked in is carried with it so that any change
   // of position — a move played here, a step through the game, a take-back —
   // drops the selection without an effect to clear it.
@@ -155,11 +155,12 @@ export default function BoardViewer({
     setPicked(moveTargets(fen, square).length > 0 ? { square, fen } : null)
   }
 
-  const highlight = exploration ? exploration.lastMoveSquares : replay.lastMoveSquares[ply]
-  // The badge grades a move that was actually played, so it has nothing to say
-  // about a position reached by hand.
-  const moveAnalysis =
-    !exploration && ply > 0 ? (analysis?.moves[ply - 1] ?? null) : null
+  const highlight =
+    current.from && current.to ? ([current.from, current.to] as [string, string]) : null
+  // The review only covers the mainline, so a move in a variation has no grade
+  // to show — and neither does the starting position, which is not a move.
+  const graded = current.parent != null && isMainline(tree, currentId)
+  const moveAnalysis = graded ? (analysis?.moves[current.ply - 1] ?? null) : null
   const showBadge = moveAnalysis != null && hasMoveMarker(moveAnalysis.classification)
   const badgeSquare = showBadge && highlight ? highlight[1] : null
   const badgePos = badgeSquare ? squareCorner(badgeSquare, orientation) : null
@@ -227,79 +228,25 @@ export default function BoardViewer({
   )
 }
 
-/**
- * The strip that appears while a line is being tried out by hand.
- *
- * Navigation stays where it is: pressing it leaves the line, which is a normal
- * way to finish with one. What this adds is the line so far, unplaying its last
- * move, and a way back that does not move the game on.
- */
-export function ExploreBar({
-  exploration,
-  onTakeBack,
-  onExit,
-}: {
-  exploration: Exploration
-  onTakeBack: () => void
-  onExit: () => void
-}) {
-  const button =
-    'shrink-0 rounded-md border border-rule bg-card px-2.5 py-1.5 text-xs leading-none text-ink transition-colors hover:bg-buff-soft disabled:cursor-not-allowed disabled:opacity-30'
-  const line = formatVariation(
-    exploration.sans,
-    exploration.branchNumber,
-    exploration.branchColor,
-  )
-
-  return (
-    <div
-      className="flex w-full items-center gap-2 rounded-md border border-accent-bright/40 bg-accent-bright/10 px-2 py-1"
-      role="group"
-      aria-label="Trying a line"
-    >
-      <span className="shrink-0 text-xs font-medium text-ink">Trying a line</span>
-      <span
-        title={line || undefined}
-        className="min-w-0 flex-1 truncate font-score text-xs text-ink-mute"
-      >
-        {line || 'drag or click a piece to try a move — the engine follows the board'}
-      </span>
-      <button
-        type="button"
-        className={button}
-        onClick={onTakeBack}
-        disabled={exploration.sans.length === 0}
-      >
-        Take back
-      </button>
-      <button type="button" className={button} onClick={onExit}>
-        Back to game
-      </button>
-    </div>
-  )
-}
-
 interface BoardNavProps {
-  moves: Move[]
-  ply: number
-  lastPly: number
-  onPlyChange: (ply: number) => void
+  tree: MoveTree
+  currentId: string
+  onNavigate: (nodeId: string) => void
   onRotate: () => void
   orientation: 'white' | 'black'
 }
 
-/** "12. h3" / "13... Bg6" label for the move that lands on `ply`. */
-export function plyLabel(moves: Move[], ply: number): string | null {
-  if (ply <= 0 || ply > moves.length) return null
-  const move = moves[ply - 1]
-  return `${move.number}${move.color === 'w' ? '.' : '…'} ${move.san}`
+/** "12. h3" / "13... Bg6" for a node, or null for the starting position. */
+export function moveLabel(tree: MoveTree, nodeId: string | null): string | null {
+  const node = nodeId ? tree.nodes.get(nodeId) : null
+  if (!node || node.parent == null || !node.san) return null
+  return `${node.number}${node.color === 'w' ? '.' : '…'} ${node.san}`
 }
 
 export function BoardNav({
-  moves,
-  ply,
-  lastPly,
-  onPlyChange,
+  tree,
+  currentId,
+  onNavigate,
   onRotate,
   orientation,
 }: BoardNavProps) {
@@ -310,9 +257,15 @@ export function BoardNav({
   // The four share edges rather than sitting apart, so the run of them reads
   // as one control. Overlapping the borders keeps the seams a single rule.
   const seg = `${face} flex-1 -ml-0.5 first:ml-0 first:rounded-l-md last:rounded-r-md`
-  const prevLabel = plyLabel(moves, ply - 1)
-  const nextLabel = plyLabel(moves, ply + 1)
-  const currentLabel = plyLabel(moves, ply)
+  // Forward is this line's own continuation, so the buttons walk a variation
+  // rather than jumping back onto the mainline at the first press.
+  const atStart = currentId === tree.root
+  const previous = previousId(tree, currentId)
+  const next = nextId(tree, currentId)
+  const end = lineEndId(tree, currentId)
+  const prevLabel = moveLabel(tree, previous)
+  const nextLabel = moveLabel(tree, next)
+  const currentLabel = moveLabel(tree, currentId)
 
   // Exactly the board's width, so the row's ends line up with the board's
   // edges rather than running past them into the page margin. The cluster is
@@ -329,8 +282,8 @@ export function BoardNav({
         <button
           type="button"
           className={seg}
-          onClick={() => onPlyChange(0)}
-          disabled={ply === 0}
+          onClick={() => onNavigate(tree.root)}
+          disabled={atStart}
           aria-label="Go to start"
         >
           <NavIcon d="M11 18l-6-6 6-6M18 18l-6-6 6-6" />
@@ -341,8 +294,8 @@ export function BoardNav({
         <button
           type="button"
           className={seg}
-          onClick={() => onPlyChange(Math.max(0, ply - 1))}
-          disabled={ply === 0}
+          onClick={() => onNavigate(previous)}
+          disabled={atStart}
           title={prevLabel ?? 'Start'}
           aria-label={prevLabel ? `Previous move: ${prevLabel}` : 'Back to starting position'}
         >
@@ -351,8 +304,8 @@ export function BoardNav({
         <button
           type="button"
           className={seg}
-          onClick={() => onPlyChange(Math.min(lastPly, ply + 1))}
-          disabled={ply === lastPly}
+          onClick={() => next && onNavigate(next)}
+          disabled={!next}
           title={nextLabel ?? undefined}
           aria-label={nextLabel ? `Next move: ${nextLabel}` : 'Next move'}
         >
@@ -361,8 +314,8 @@ export function BoardNav({
         <button
           type="button"
           className={seg}
-          onClick={() => onPlyChange(lastPly)}
-          disabled={ply === lastPly}
+          onClick={() => onNavigate(end)}
+          disabled={end === currentId}
           aria-label="Go to end"
         >
           <NavIcon d="M13 18l6-6-6-6M6 18l6-6-6-6" />

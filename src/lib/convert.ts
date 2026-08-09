@@ -612,8 +612,21 @@ export function buildPgn(
   result: string | null,
   options: MovetextOptions = {},
 ): string {
+  return pgnWithMovetext(headers, formatMovetext(moves, result, options))
+}
+
+/**
+ * Headers and a movetext already written, joined into a file.
+ *
+ * The move tree writes its own movetext — variations and all — so it needs the
+ * header half of buildPgn without the move half.
+ */
+export function pgnWithMovetext(
+  headers: Array<{ name: string; value: string }>,
+  movetext: string,
+): string {
   const headerLines = headers.map((h) => `[${h.name} "${h.value}"]`)
-  return headerLines.join('\n') + '\n\n' + formatMovetext(moves, result, options) + '\n'
+  return headerLines.join('\n') + '\n\n' + movetext + '\n'
 }
 
 /**

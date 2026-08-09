@@ -180,7 +180,10 @@ export interface RefinedEval {
 }
 
 /**
- * Fold a live engine result into the deepened evaluations, keyed by ply.
+ * Fold a live engine result into the deepened evaluations.
+ *
+ * Keyed by whatever names a position — a ply while the game was a list, a node
+ * id now that it is a tree — since this only ever compares depths.
  *
  * The whole-game review runs at a fixed depth, but the live engine is left to
  * think for as long as the user stands on a position and routinely passes it.
@@ -191,16 +194,16 @@ export interface RefinedEval {
  * Shallower or equal results are dropped, and the map is returned unchanged so
  * a re-render costs nothing.
  */
-export function withDeeperEval(
-  refined: Map<number, RefinedEval>,
-  ply: number,
+export function withDeeperEval<K>(
+  refined: Map<K, RefinedEval>,
+  at: K,
   candidate: RefinedEval,
   reviewDepth: number,
-): Map<number, RefinedEval> {
-  const shown = refined.get(ply)?.depth ?? reviewDepth
+): Map<K, RefinedEval> {
+  const shown = refined.get(at)?.depth ?? reviewDepth
   if (!(candidate.depth > shown)) return refined
   const next = new Map(refined)
-  next.set(ply, candidate)
+  next.set(at, candidate)
   return next
 }
 

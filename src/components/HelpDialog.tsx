@@ -178,17 +178,28 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
             <p>
               You can also move the pieces yourself: drag one, or click it and then click where
               it should go. A clicked piece marks its legal squares — a dot to move to, a red
-              ring around a piece it can take — and clicking it again puts it back down. Either
-              way the board leaves the game to follow your line, with the engine analysing each
-              position as you reach it. A strip above the board shows the moves so far, with{' '}
-              <Ui>Take back</Ui> to unplay the last one and <Ui>Back to game</Ui> to return. Any
-              move of the navigation — a button, the move list, or an arrow key — returns as
-              well. Illegal moves snap back, and a pawn reaching the last rank always becomes a
-              queen.
+              ring around a piece it can take — and clicking it again puts it back down. Illegal
+              moves snap back, and a pawn reaching the last rank always becomes a queen.
             </p>
             <p>
-              Nothing you play this way touches the game: the move list, the accuracies, and the
-              PGN you export all still describe the moves that were actually played.
+              A move played at a position that already has one is kept as a <em>variation</em>{' '}
+              of it, listed under that move in the list and never displacing what was there. A
+              move that is already in the game is simply followed. So playing through a line you
+              have stored and branching off it are the same gesture, and nothing you try is lost
+              when you look at something else.
+            </p>
+            <p>
+              Right-click a move in the list — or hold it, on a touch screen — for what can be
+              done with the line it starts. <Ui>Promote</Ui> moves it up one place among the
+              alternatives, <Ui>Promote to mainline</Ui> makes it the game's own line all the way
+              back to the first move, <Ui>Demote</Ui> moves it down, and{' '}
+              <Ui>Delete from here</Ui> removes that move and everything after it.
+            </p>
+            <p>
+              The engine review covers the mainline, so a move in a variation carries no
+              accuracy or grade of its own. Turn the engine on and it will analyse whatever
+              position the board is showing, variation or not — and promoting a line to the
+              mainline runs the review again over the game that has become.
             </p>
             <p>
               Moves the engine had nothing to say about are left uncoloured, so the ones that

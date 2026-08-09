@@ -1,5 +1,4 @@
-import { Fragment, useEffect, useRef } from 'react'
-import type { Move } from '../lib/convert'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import {
   CLASSIFICATION_LABEL,
   CLASSIFICATION_SYMBOL,
@@ -10,40 +9,44 @@ import {
 import type { GameAnalysis, MoveAnalysis, RefinedEval } from '../lib/engine/analysis'
 import { formatScore } from '../lib/engine/uci'
 import type { Score } from '../lib/engine/uci'
+import { mainline } from '../lib/moveTree'
+import type { MoveNode, MoveTree } from '../lib/moveTree'
 import { classColor } from './ClassBadge'
+import MoveMenu from './MoveMenu'
 
 interface MoveTableProps {
-  moves: Move[]
-  result: string | null
-  /** Current ply: 0 = start, ply i = position after moves[i-1]. */
-  ply: number
-  onPlyChange: (ply: number) => void
+  tree: MoveTree
+  /** The node the board is showing. */
+  currentId: string
+  onNavigate: (nodeId: string) => void
   analysis: GameAnalysis | null
-  /** Evals the live engine has searched deeper than the review did, by ply. */
-  deeperEvals: Map<number, RefinedEval>
-}
-
-interface Cell {
-  san: string
-  ply: number
+  /** Evals the live engine has searched deeper than the review did, by node. */
+  deeperEvals: Map<string, RefinedEval>
+  onPromote: (nodeId: string, toMainline: boolean) => void
+  onDemote: (nodeId: string) => void
+  onDelete: (nodeId: string) => void
 }
 
 interface Row {
   number: number
-  white: Cell | null
-  black: Cell | null
+  white: MoveNode | null
+  black: MoveNode | null
 }
 
 export default function MoveTable({
-  moves,
-  result,
-  ply,
-  onPlyChange,
+  tree,
+  currentId,
+  onNavigate,
   analysis,
   deeperEvals,
+  onPromote,
+  onDemote,
+  onDelete,
 }: MoveTableProps) {
   const listRef = useRef<HTMLDivElement>(null)
   const currentRef = useRef<HTMLButtonElement>(null)
+  /** The move whose menu is open, and where to draw it. */
+  const [menu, setMenu] = useState<{ nodeId: string; x: number; y: number } | null>(null)
 
   /** Rows of the game kept visible above the current move. */
   const CONTEXT_ROWS = 2
@@ -74,22 +77,29 @@ export default function MoveTable({
     // is nothing above to show, and at the end nothing below.
     const target = list.scrollTop + (moveBox.top - listBox.top) - CONTEXT_ROWS * moveBox.height
     list.scrollTop = Math.max(0, target)
-  }, [ply])
+  }, [currentId])
 
+  const line = mainline(tree)
   const rows: Row[] = []
-  moves.forEach((move, index) => {
+  for (const node of line) {
     let row = rows[rows.length - 1]
-    if (!row || row.number !== move.number) {
-      row = { number: move.number, white: null, black: null }
+    if (!row || row.number !== node.number || (node.color === 'w' && row.white)) {
+      row = { number: node.number, white: null, black: null }
       rows.push(row)
     }
-    const cell = { san: move.san, ply: index + 1 }
-    if (move.color === 'w') row.white = cell
-    else row.black = cell
-  })
+    if (node.color === 'w') row.white = node
+    else row.black = node
+  }
 
-  const analysisFor = (cell: Cell | null): MoveAnalysis | null =>
-    cell ? (analysis?.moves[cell.ply - 1] ?? null) : null
+  /**
+   * Only the mainline was reviewed, so only it has a grade or an evaluation.
+   *
+   * The guard belongs here rather than at each call: the review is indexed by
+   * ply, and a variation move has a ply too — it would quietly borrow the
+   * verdict on whatever the mainline played at the same depth.
+   */
+  const analysisFor = (node: MoveNode | null): MoveAnalysis | null =>
+    node && isOnMainline(tree, node) ? (analysis?.moves[node.ply - 1] ?? null) : null
 
   /**
    * The evaluation to print after a move, and the depth behind it.
@@ -99,68 +109,89 @@ export default function MoveTable({
    * leaving the shallower number here would have the move list contradicting
    * the engine panel directly above it.
    */
-  const evalFor = (cell: Cell | null): { score: Score; depth: number | null } | null => {
-    if (!cell) return null
-    const deeper = deeperEvals.get(cell.ply)
-    const score = deeper?.score ?? analysisFor(cell)?.scoreAfter
+  const evalFor = (node: MoveNode | null): { score: Score; depth: number | null } | null => {
+    if (!node) return null
+    const deeper = deeperEvals.get(node.id)
+    const reviewed = analysisFor(node)
+    const score = deeper?.score ?? reviewed?.scoreAfter
     if (!score) return null
     // Infinity marks a terminal position, which was never searched at all.
-    const depth = deeper?.depth ?? analysis?.evalDepths[cell.ply]
+    const depth = deeper?.depth ?? (reviewed ? analysis?.evalDepths[node.ply] : undefined)
     return { score, depth: depth != null && Number.isFinite(depth) ? depth : null }
   }
 
   /**
    * Hover text carried by *both* halves of a move — the move itself and its
    * number — so a number that changes under you can explain itself.
-   *
-   * On the number alone it was a 48px target in an 850px row, and the move
-   * beside it is what anyone points at.
    */
-  const evalTitle = (cell: Cell | null): string | undefined => {
-    const shown = evalFor(cell)
+  const evalTitle = (node: MoveNode | null): string | undefined => {
+    const shown = evalFor(node)
     if (!shown || shown.depth == null) return undefined
     return `depth ${shown.depth}`
   }
 
-  const moveCell = (cell: Cell | null) => {
-    if (!cell) return <td className="px-2 text-ink-mute">…</td>
-    const current = cell.ply === ply
-    const info = analysisFor(cell)
+  /** Right-click, or a long press, opens the menu over the move it names. */
+  const menuHandlers = (nodeId: string) => ({
+    onContextMenu: (e: React.MouseEvent) => {
+      e.preventDefault()
+      setMenu({ nodeId, x: e.clientX, y: e.clientY })
+    },
+    onPointerDown: (e: React.PointerEvent) => {
+      if (e.pointerType !== 'touch') return
+      const { clientX: x, clientY: y } = e
+      const timer = window.setTimeout(() => setMenu({ nodeId, x, y }), 500)
+      const cancel = () => {
+        clearTimeout(timer)
+        window.removeEventListener('pointerup', cancel)
+        window.removeEventListener('pointermove', cancel)
+      }
+      window.addEventListener('pointerup', cancel)
+      window.addEventListener('pointermove', cancel)
+    },
+  })
+
+  const moveButton = (node: MoveNode, small = false) => {
+    const current = node.id === currentId
+    const info = analysisFor(node)
     // Only a classification that earns a marker earns a colour. Good and
     // Excellent cover most of a game between them, and colouring those left
     // the few moves worth finding competing with a wall of green.
     const color =
       info && hasMoveMarker(info.classification) ? classColor(info.classification) : undefined
     return (
-      <td className="py-0.5 pr-1">
-        <button
-          type="button"
-          ref={current ? currentRef : undefined}
-          onClick={() => onPlyChange(cell.ply)}
-          aria-current={current ? 'true' : undefined}
-          title={evalTitle(cell)}
-          className={`w-full rounded px-2 py-0.5 text-left font-score text-sm transition-colors ${
-            current ? 'bg-felt text-buff' : 'hover:bg-buff-soft'
-          }`}
-          style={current ? undefined : { color }}
-        >
-          {cell.san}
-          {info && hasMoveMarker(info.classification) && (
-            <span className="ml-1 text-[10px] font-bold" aria-hidden="true">
-              {CLASSIFICATION_SYMBOL[info.classification]}
-            </span>
-          )}
-        </button>
-      </td>
+      <button
+        type="button"
+        ref={current ? currentRef : undefined}
+        onClick={() => onNavigate(node.id)}
+        aria-current={current ? 'true' : undefined}
+        title={evalTitle(node)}
+        {...menuHandlers(node.id)}
+        className={`rounded font-score transition-colors ${
+          small ? 'px-1 py-0 text-xs' : 'w-full px-2 py-0.5 text-left text-sm'
+        } ${current ? 'bg-felt text-buff' : 'hover:bg-buff-soft'}`}
+        style={current ? undefined : { color }}
+      >
+        {node.san}
+        {info && hasMoveMarker(info.classification) && (
+          <span className="ml-1 text-[10px] font-bold" aria-hidden="true">
+            {CLASSIFICATION_SYMBOL[info.classification]}
+          </span>
+        )}
+      </button>
     )
   }
 
+  const moveCell = (node: MoveNode | null) => {
+    if (!node) return <td className="px-2 text-ink-mute">…</td>
+    return <td className="py-0.5 pr-1">{moveButton(node)}</td>
+  }
+
   /** Evaluation after the move, in one muted colour regardless of value. */
-  const evalCell = (cell: Cell | null) => {
-    const shown = evalFor(cell)
+  const evalCell = (node: MoveNode | null) => {
+    const shown = evalFor(node)
     return (
       <td
-        title={evalTitle(cell)}
+        title={evalTitle(node)}
         className="py-0.5 pr-2 text-right font-score text-xs text-ink-mute tabular-nums"
       >
         {shown ? formatScore(shown.score) : ''}
@@ -168,17 +199,92 @@ export default function MoveTable({
     )
   }
 
+  /**
+   * A variation as running text, the way a book prints one.
+   *
+   * Not a table of its own: a line three levels deep would need three nested
+   * tables to keep its columns, and what a reader wants from a variation is to
+   * read it, not to compare its evaluations column by column.
+   */
+  const variationLine = (startId: string): React.ReactNode => {
+    const out: React.ReactNode[] = []
+    let id: string | undefined = startId
+    let fresh = true
+    while (id) {
+      const node: MoveNode | undefined = tree.nodes.get(id)
+      if (!node || node.parent == null) break
+      const parent = tree.nodes.get(node.parent)
+      if (!parent) break
+
+      if (node.color === 'w') {
+        out.push(
+          <span key={`${node.id}-n`} className="text-ink-mute">
+            {node.number}.
+          </span>,
+        )
+      } else if (fresh) {
+        out.push(
+          <span key={`${node.id}-n`} className="text-ink-mute">
+            {node.number}…
+          </span>,
+        )
+      }
+      out.push(<Fragment key={node.id}>{moveButton(node, true)}</Fragment>)
+      fresh = false
+
+      if (parent.children[0] === id && parent.children.length > 1) {
+        for (const altId of parent.children.slice(1)) {
+          out.push(
+            <span key={`${altId}-alt`} className="text-ink-mute">
+              ({variationLine(altId)})
+            </span>,
+          )
+        }
+        fresh = true
+      }
+
+      if (node.comment) {
+        out.push(
+          <span key={`${node.id}-c`} className="italic text-ink-mute">
+            {node.comment}
+          </span>,
+        )
+        fresh = true
+      }
+
+      id = node.children[0]
+    }
+    return <span className="inline-flex flex-wrap items-baseline gap-x-1">{out}</span>
+  }
+
+  /** The alternatives to a mainline move, each on its own indented line. */
+  const variationRows = (node: MoveNode | null) => {
+    if (!node?.parent) return []
+    const parent = tree.nodes.get(node.parent)
+    if (!parent || parent.children[0] !== node.id || parent.children.length < 2) return []
+    return parent.children.slice(1).map((altId) => (
+      <tr key={`var-${altId}`}>
+        <td />
+        <td colSpan={4} className="pb-1 pr-2">
+          <div className="rounded-r border-l-[3px] border-accent-bright/50 bg-accent-bright/5 px-2 py-0.5 text-[11px] leading-relaxed">
+            {variationLine(altId)}
+          </div>
+        </td>
+      </tr>
+    ))
+  }
+
   /** The annotator's own words for a move, shown under it. */
-  const commentRow = (cell: Cell, comment: string) => (
-    <tr key={`comment-${cell.ply}`}>
+  const commentRow = (node: MoveNode) => (
+    <tr key={`comment-${node.id}`}>
       <td />
       <td colSpan={4} className="pb-1 pr-2">
         <button
           type="button"
-          onClick={() => onPlyChange(cell.ply)}
+          onClick={() => onNavigate(node.id)}
           className="block w-full rounded-r border-l-[3px] border-rule bg-buff-soft/40 px-2 py-0.5 text-left text-[11px] italic text-ink-mute transition-opacity hover:opacity-80"
         >
-          {comment}
+          {node.comment}
         </button>
       </td>
     </tr>
@@ -188,20 +294,19 @@ export default function MoveTable({
    * "Inaccuracy. c4 was best." beneath a flagged move, and under that the line
    * the engine had in mind — the moves it expected to follow its own.
    *
-   * The line is not clickable. The board follows the game, and these moves were
-   * never played in it; making them look walkable would promise a what-if board
-   * this page does not have.
+   * The line is not clickable. Those moves were never played, so making them
+   * look walkable would promise a branch of the tree that does not exist.
    */
-  const adviceRow = (cell: Cell, info: MoveAnalysis) => {
+  const adviceRow = (node: MoveNode, info: MoveAnalysis) => {
     const color = classColor(info.classification)
-    const variation = moveVariation(info)
+    const suggested = moveVariation(info)
     return (
-      <tr key={`advice-${cell.ply}`}>
+      <tr key={`advice-${node.id}`}>
         <td />
         <td colSpan={4} className="pb-1 pr-2">
           <button
             type="button"
-            onClick={() => onPlyChange(cell.ply)}
+            onClick={() => onNavigate(node.id)}
             className="block w-full rounded-r border-l-[3px] px-2 py-0.5 text-left text-[11px] transition-opacity hover:opacity-80"
             style={{
               borderColor: color,
@@ -217,9 +322,9 @@ export default function MoveTable({
               </>
             ) : null}
           </button>
-          {variation && (
+          {suggested && (
             <p className="mt-0.5 pl-2 font-score text-[11px] leading-snug text-ink-mute">
-              {variation}
+              {suggested}
             </p>
           )}
         </td>
@@ -243,26 +348,22 @@ export default function MoveTable({
           </colgroup>
           <tbody>
             {rows.map((row) => {
-              const whiteInfo = analysisFor(row.white)
-              const blackInfo = analysisFor(row.black)
-              const advice: React.ReactNode[] = []
-              const commentFor = (cell: Cell | null) =>
-                cell ? (moves[cell.ply - 1]?.comment ?? null) : null
-              // The annotator's words first, then the engine's verdict on the
-              // same move: whoever wrote the note said it about the move, not
-              // about the engine's opinion of it.
-              const whiteComment = commentFor(row.white)
-              if (row.white && whiteComment) advice.push(commentRow(row.white, whiteComment))
-              if (row.white && whiteInfo && NEEDS_ADVICE.includes(whiteInfo.classification)) {
-                advice.push(adviceRow(row.white, whiteInfo))
-              }
-              const blackComment = commentFor(row.black)
-              if (row.black && blackComment) advice.push(commentRow(row.black, blackComment))
-              if (row.black && blackInfo && NEEDS_ADVICE.includes(blackInfo.classification)) {
-                advice.push(adviceRow(row.black, blackInfo))
+              const under: React.ReactNode[] = []
+              // For each half of the row: the annotator's words, then the
+              // engine's verdict on the same move, then the alternatives to
+              // it. Whoever wrote the note said it about the move, not about
+              // the engine's opinion of it.
+              for (const node of [row.white, row.black]) {
+                if (!node) continue
+                if (node.comment) under.push(commentRow(node))
+                const info = analysisFor(node)
+                if (info && NEEDS_ADVICE.includes(info.classification)) {
+                  under.push(adviceRow(node, info))
+                }
+                under.push(...variationRows(node))
               }
               return (
-                <Fragment key={row.number}>
+                <Fragment key={row.white?.id ?? row.black?.id ?? row.number}>
                   <tr className="border-t border-rule/60">
                     <td className="px-1 py-0.5 text-right font-score text-xs text-ink-mute">
                       {row.number}.
@@ -272,18 +373,43 @@ export default function MoveTable({
                     {moveCell(row.black)}
                     {evalCell(row.black)}
                   </tr>
-                  {advice}
+                  {under}
                 </Fragment>
               )
             })}
           </tbody>
         </table>
-        {result && (
+        {tree.result && (
           <p className="border-t border-rule/60 px-2 py-2 text-center font-score text-sm font-semibold">
-            {result}
+            {tree.result}
           </p>
         )}
       </div>
+
+      {menu && (
+        <MoveMenu
+          tree={tree}
+          nodeId={menu.nodeId}
+          x={menu.x}
+          y={menu.y}
+          onClose={() => setMenu(null)}
+          onPromote={onPromote}
+          onDemote={onDemote}
+          onDelete={onDelete}
+        />
+      )}
     </section>
   )
+}
+
+/** Whether a node is on the mainline, without walking the tree twice per move. */
+function isOnMainline(tree: MoveTree, node: MoveNode): boolean {
+  let id: string | null = node.id
+  while (id) {
+    const at: MoveNode | undefined = tree.nodes.get(id)
+    if (!at || at.parent == null) return true
+    if (tree.nodes.get(at.parent)?.children[0] !== id) return false
+    id = at.parent
+  }
+  return true
 }

@@ -2,20 +2,27 @@ import { describe, expect, it } from 'vitest'
 import {
   addMove,
   addMoveSan,
+  applyMainlineTiming,
   deleteFrom,
   demote,
   emptyTree,
   formatTreeMovetext,
   isMainline,
+  lineEndId,
   lineTo,
   mainline,
+  mainlineFens,
   mainlineMoves,
+  mainlineUcis,
+  mainlinePlyOf,
+  nextId,
+  nodeAtMainlinePly,
   nodeOf,
   parseMoveTree,
+  previousId,
   promote,
   promoteToMainline,
   setComment,
-  variationDepth,
 } from './moveTree'
 import type { MoveTree } from './moveTree'
 
@@ -84,7 +91,6 @@ describe('a second answer to a position', () => {
     expect(sans(alt.tree)).toEqual(['e4', 'e5'])
     expect(nodeOf(alt.tree, alt.nodeId)?.san).toBe('c5')
     expect(isMainline(alt.tree, alt.nodeId)).toBe(false)
-    expect(variationDepth(alt.tree, alt.nodeId)).toBe(1)
   })
 
   it('walks into the line that already holds the move instead of doubling it', () => {
@@ -377,6 +383,97 @@ describe('a round trip through PGN', () => {
     const { tree, warnings } = parseMoveTree(repertoire)
     expect(warnings).toEqual([])
     expect(text(tree)).toBe(repertoire)
+  })
+})
+
+describe('stepping about', () => {
+  /** 1. e4 e5 2. Nf3 with 1... c5 2. Nc3 as a variation. */
+  const withBranch = () => {
+    const { tree } = parseMoveTree('1. e4 e5 (1... c5 2. Nc3) 2. Nf3 *')
+    const [e4, e5, nf3] = mainline(tree)
+    const sicilian = nodeOf(tree, e4.id)!.children[1]
+    return { tree, e4, e5, nf3, sicilian, nc3: nodeOf(tree, sicilian)!.children[0] }
+  }
+
+  it('steps back to the move before, and stops at the start', () => {
+    const { tree, e4, e5, nf3 } = withBranch()
+    expect(previousId(tree, nf3.id)).toBe(e5.id)
+    expect(previousId(tree, e4.id)).toBe(tree.root)
+    expect(previousId(tree, tree.root)).toBe(tree.root)
+  })
+
+  it('steps back out of a variation to the move it branched from', () => {
+    const { tree, e4, sicilian } = withBranch()
+    expect(previousId(tree, sicilian)).toBe(e4.id)
+  })
+
+  it('steps forward down the line it is on, not back onto the mainline', () => {
+    const { tree, sicilian, nc3 } = withBranch()
+    expect(nextId(tree, sicilian)).toBe(nc3)
+    expect(nextId(tree, nc3)).toBeNull()
+  })
+
+  it('runs to the end of the line it is on', () => {
+    const { tree, sicilian, nc3, nf3 } = withBranch()
+    expect(lineEndId(tree, sicilian)).toBe(nc3)
+    expect(lineEndId(tree, tree.root)).toBe(nf3.id)
+  })
+})
+
+describe('the bridge to the ply-numbered parts of the app', () => {
+  it('gives the mainline positions with the start at the front', () => {
+    const { tree } = parseMoveTree('1. e4 e5 (1... c5) 2. Nf3 *')
+    const fens = mainlineFens(tree)
+    expect(fens).toHaveLength(4)
+    expect(fens[0]).toBe(nodeOf(tree, tree.root)?.fen)
+    expect(fens[3]).toBe(mainline(tree)[2].fen)
+  })
+
+  it('gives the engine a UCI per mainline move, promotions included', () => {
+    const { tree } = parseMoveTree('1. e4 e5 2. Nf3 *')
+    expect(mainlineUcis(tree)).toEqual(['e2e4', 'e7e5', 'g1f3'])
+    const promo = emptyTree('8/P7/8/4k3/8/8/8/4K3 w - - 0 1')
+    const added = addMove(promo, promo.root, 'a7', 'a8')!
+    expect(nodeOf(added.tree, added.nodeId)?.uci).toBe('a7a8q')
+  })
+
+  it('finds the mainline node at a ply, and the root at nought', () => {
+    const { tree } = parseMoveTree('1. e4 e5 2. Nf3 *')
+    expect(nodeAtMainlinePly(tree, 0)?.id).toBe(tree.root)
+    expect(nodeAtMainlinePly(tree, 2)?.san).toBe('e5')
+    expect(nodeAtMainlinePly(tree, 9)).toBeNull()
+  })
+
+  it('reports a variation at the ply of the branch it hangs off', () => {
+    const { tree } = parseMoveTree('1. e4 e5 (1... c5 2. Nf3 d6) 2. Nf3 *')
+    const sicilian = nodeOf(tree, 'n1')!.children[1]
+    const deep = nodeOf(tree, sicilian)!.children[0]
+    // e4 is ply 1 and on the mainline; c5 and everything after it is not.
+    expect(mainlinePlyOf(tree, 'n1')).toBe(1)
+    expect(mainlinePlyOf(tree, sicilian)).toBe(1)
+    expect(mainlinePlyOf(tree, deep)).toBe(1)
+  })
+
+  it('puts the converter’s clocks on the mainline and leaves variations alone', () => {
+    const { tree } = parseMoveTree('1. e4 e5 (1... c5) 2. Nf3 *')
+    const timed = applyMainlineTiming(tree, [
+      { number: 1, color: 'w', san: 'e4', emtSeconds: 5, anchorClockSeconds: null, clkSeconds: 3595, spentSeconds: 5, comment: null },
+      { number: 1, color: 'b', san: 'e5', emtSeconds: 7, anchorClockSeconds: null, clkSeconds: 3593, spentSeconds: 7, comment: null },
+    ])
+    expect(mainline(timed)[0].clkSeconds).toBe(3595)
+    expect(mainline(timed)[1].spentSeconds).toBe(7)
+    // The third mainline move had no timing to receive, and nor did the Sicilian.
+    expect(mainline(timed)[2].clkSeconds).toBeNull()
+    const sicilian = nodeOf(timed, 'n1')!.children[1]
+    expect(nodeOf(timed, sicilian)?.clkSeconds).toBeNull()
+  })
+
+  it('writes the clocks it was given back into the movetext', () => {
+    const { tree } = parseMoveTree('1. e4 e5 *')
+    const timed = applyMainlineTiming(tree, [
+      { number: 1, color: 'w', san: 'e4', emtSeconds: null, anchorClockSeconds: null, clkSeconds: 5388, spentSeconds: null, comment: null },
+    ])
+    expect(text(timed)).toBe('1. e4 {[%clk 1:29:48]} e5 *')
   })
 })
 

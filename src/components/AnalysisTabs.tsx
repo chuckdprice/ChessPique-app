@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Move } from '../lib/convert'
 import type { GameAnalysis } from '../lib/engine/analysis'
 import type { ChartRow } from '../lib/gameModel'
+import type { MoveNode } from '../lib/moveTree'
 import type { Opening } from '../lib/openings'
 import ClassificationTable from './ClassificationTable'
 import ClockChart from './ClockChart'
@@ -27,7 +28,9 @@ interface AnalysisTabsProps {
   whiteElo: string | null
   blackElo: string | null
   playedLikeTooltip: string
-  onCommentChange: (ply: number, comment: string) => void
+  /** The move the comment tab edits — the board's own node. */
+  commentNode: MoveNode
+  onCommentChange: (nodeId: string, comment: string) => void
 }
 
 /**
@@ -140,6 +143,7 @@ export default function AnalysisTabs({
   moves,
   ply,
   onPlyChange,
+  commentNode,
   chartRows,
   startSeconds,
   opening,
@@ -280,7 +284,7 @@ export default function AnalysisTabs({
             <AnalysisPending progress={progress} error={analysisError} />
           ))}
         {tab === 'comments' && (
-          <CommentEditor moves={moves} ply={ply} onCommentChange={onCommentChange} />
+          <CommentEditor node={commentNode} onCommentChange={onCommentChange} />
         )}
         {tab === 'times' && (
           <ClockChart

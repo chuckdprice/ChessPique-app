@@ -23,6 +23,8 @@ export interface MoveNode {
   /** Squares the move went between, for the board's highlight; null at root. */
   from: string | null
   to: string | null
+  /** "e2e4", "a7a8q" — what the engine wants. Null at the root. */
+  uci: string | null
   /** The position this node stands for: after its move, or the start. */
   fen: string
   /** 0 at the root, 1 after White's first move. */
@@ -75,6 +77,7 @@ export function emptyTree(startFen: string = STARTING_FEN): MoveTree {
     san: null,
     from: null,
     to: null,
+    uci: null,
     fen: startFen,
     ply: 0,
     color,
@@ -139,7 +142,7 @@ export function addMove(
   } catch {
     return null
   }
-  return attach(tree, parent, played.san, played.from, played.to, chess.fen())
+  return attach(tree, parent, played, chess.fen())
 }
 
 /** The same, from SAN — what the PGN parser has. Null when it is not legal. */
@@ -154,17 +157,19 @@ export function addMoveSan(tree: MoveTree, parentId: string, san: string): AddRe
   } catch {
     return null
   }
-  return attach(tree, parent, played.san, played.from, played.to, chess.fen())
+  return attach(tree, parent, played, chess.fen())
 }
 
-function attach(
-  tree: MoveTree,
-  parent: MoveNode,
-  san: string,
-  from: string,
-  to: string,
-  fen: string,
-): AddResult {
+/** What chess.js hands back for a played move — only the parts a node keeps. */
+interface PlayedMove {
+  san: string
+  from: string
+  to: string
+  promotion?: string
+}
+
+function attach(tree: MoveTree, parent: MoveNode, played: PlayedMove, fen: string): AddResult {
+  const { san, from, to } = played
   const existing = parent.children.find((id) => tree.nodes.get(id)?.san === san)
   if (existing) return { tree, nodeId: existing, created: false }
 
@@ -175,6 +180,7 @@ function attach(
     san,
     from,
     to,
+    uci: `${from}${to}${played.promotion ?? ''}`,
     fen,
     ply: parent.ply + 1,
     color,
@@ -315,17 +321,95 @@ export function isMainline(tree: MoveTree, nodeId: string): boolean {
   return true
 }
 
-/** How deep in variations a node sits: 0 on the mainline, 1 inside one, … */
-export function variationDepth(tree: MoveTree, nodeId: string): number {
-  let depth = 0
+/**
+ * Stepping about the tree, which is what the arrow keys and the nav buttons do.
+ *
+ * Back is the move before, forward is this line's own continuation rather than
+ * the mainline's: once the board is inside a variation, stepping through it is
+ * the whole point, and jumping back out at every press would make a variation
+ * unreadable.
+ */
+export function previousId(tree: MoveTree, nodeId: string): string {
+  return tree.nodes.get(nodeId)?.parent ?? tree.root
+}
+
+export function nextId(tree: MoveTree, nodeId: string): string | null {
+  return tree.nodes.get(nodeId)?.children[0] ?? null
+}
+
+/** The last move of the line this node sits on. */
+export function lineEndId(tree: MoveTree, nodeId: string): string {
+  let id = nodeId
+  for (;;) {
+    const next = tree.nodes.get(id)?.children[0]
+    if (!next) return id
+    id = next
+  }
+}
+
+/** Positions down the mainline; [0] is the start, like ReplayedGame's fens. */
+export function mainlineFens(tree: MoveTree): string[] {
+  const start = tree.nodes.get(tree.root)?.fen
+  return [start ?? STARTING_FEN, ...mainline(tree).map((n) => n.fen)]
+}
+
+/** UCI of every mainline move, in order — what the engine review is given. */
+export function mainlineUcis(tree: MoveTree): string[] {
+  return mainline(tree).map((n) => n.uci ?? '')
+}
+
+/** The mainline node at a ply, or the root at 0. Null past the end. */
+export function nodeAtMainlinePly(tree: MoveTree, ply: number): MoveNode | null {
+  if (ply <= 0) return tree.nodes.get(tree.root) ?? null
+  return mainline(tree)[ply - 1] ?? null
+}
+
+/**
+ * How far down the mainline a node sits.
+ *
+ * A node in a variation has no ply of its own — nothing in the review or the
+ * charts is about it — so it reports the last mainline position it passed
+ * through, which is the branch point its line hangs off.
+ */
+export function mainlinePlyOf(tree: MoveTree, nodeId: string): number {
   let id: string | null = nodeId
   while (id) {
     const node: MoveNode | undefined = tree.nodes.get(id)
-    if (!node || node.parent == null) break
-    if (tree.nodes.get(node.parent)?.children[0] !== id) depth += 1
+    if (!node) return 0
+    if (node.parent == null) return 0
+    if (isMainline(tree, id)) return node.ply
     id = node.parent
   }
-  return depth
+  return 0
+}
+
+/**
+ * Copy the converter's timings onto the mainline.
+ *
+ * The clock work happens on a flat list — running clocks only mean anything
+ * along one line — so the tree is parsed from the same movetext and then told
+ * what that pass worked out. They agree move for move by construction; the
+ * length guard is for a file whose mainline the two read differently, where
+ * writing timings past that point would attach them to the wrong moves.
+ */
+export function applyMainlineTiming(tree: MoveTree, moves: Move[]): MoveTree {
+  const line = mainline(tree)
+  const count = Math.min(line.length, moves.length)
+  if (count === 0) return tree
+
+  const nodes = new Map(tree.nodes)
+  for (let i = 0; i < count; i++) {
+    const node = line[i]
+    const move = moves[i]
+    nodes.set(node.id, {
+      ...node,
+      emtSeconds: move.emtSeconds,
+      anchorClockSeconds: move.anchorClockSeconds,
+      clkSeconds: move.clkSeconds,
+      spentSeconds: move.spentSeconds,
+    })
+  }
+  return { ...tree, nodes }
 }
 
 /**
@@ -500,6 +584,12 @@ export interface TreeMovetextOptions {
   evals?: Map<string, string>
   /** The engine's verdict on a move, written as a comment of its own. */
   notes?: Map<string, string>
+  /**
+   * The engine's preferred line after a move, already numbered, written as a
+   * further variation. It is not part of the tree — nobody played it — so it
+   * arrives as text and goes in after whatever real variations the move has.
+   */
+  engineLines?: Map<string, string>
   /** Where to wrap. PGN allows any whitespace; readers expect short lines. */
   columns?: number
 }
@@ -570,6 +660,12 @@ export function formatTreeMovetext(
           out.push(...inner)
         }
         // Whatever follows the parentheses has to name itself again.
+        fresh = true
+      }
+
+      const engineLine = options.engineLines?.get(node.id)
+      if (engineLine) {
+        out.push(`(${engineLine.replace(/[()]/g, '')})`)
         fresh = true
       }
 

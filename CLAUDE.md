@@ -73,8 +73,15 @@ the harness's drag tool (mouse events) cannot move a piece. Drive it with a
   `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>` line.
 - Commit and push only when Chuck asks. He asks explicitly, usually right after
   reviewing.
-- `npm run build && npm test` before every commit. 125 tests as of this writing;
+- `npm run build && npm test` before every commit. 127 tests as of this writing;
   they cover `src/lib` only — the UI is verified in the browser.
+- **Bump the version with `npm version`, never by editing `package.json`.** Only
+  major and minor are read (`vite.config.ts` derives the build number from the
+  commit timestamp), but the lockfile carries the version too, and hand-editing
+  drifted the two apart for five minor releases before anyone noticed. Add
+  `--no-git-tag-version` to leave the change uncommitted for review; without it
+  npm makes the commit and tag itself, which bypasses the rule above about
+  committing only when asked.
 
 ## State of play
 

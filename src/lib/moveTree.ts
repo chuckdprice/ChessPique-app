@@ -580,6 +580,12 @@ export interface TreeMovetextOptions {
   comments?: boolean
   /** Write the [%clk ...] comments. Default true. */
   clocks?: boolean
+  /**
+   * Write the game's own variations. Default true — they are part of the game,
+   * not an annotation of it. Off writes the mainline alone, which is what a
+   * reader who only wants the moves as played is asking for.
+   */
+  variations?: boolean
   /** Formatted %eval values by node id, as produced by formatEvalTag. */
   evals?: Map<string, string>
   /** The engine's verdict on a move, written as a comment of its own. */
@@ -647,7 +653,11 @@ export function formatTreeMovetext(
       out.push(annotated(node))
       fresh = false
 
-      if (parent.children[0] === id && parent.children.length > 1) {
+      if (
+        options.variations !== false &&
+        parent.children[0] === id &&
+        parent.children.length > 1
+      ) {
         for (const altId of parent.children.slice(1)) {
           const inner = writeLine(altId, true)
           if (inner.length === 0) continue

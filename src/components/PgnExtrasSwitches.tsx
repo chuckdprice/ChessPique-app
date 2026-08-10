@@ -41,7 +41,7 @@ const SWITCHES: Array<{ id: keyof PgnExtras; label: string; hint: string }> = [
   {
     id: 'variations',
     label: 'Variations',
-    hint: 'Write the engine\'s line after a flagged move, as a PGN variation',
+    hint: "Write the game's own variations, and the engine's line after a flagged move",
   },
 ]
 

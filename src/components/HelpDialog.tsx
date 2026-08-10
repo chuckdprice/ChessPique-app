@@ -121,10 +121,11 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               have the moves without them. <Ui>Evals</Ui> writes Stockfish's score on every move
               as <code>{'{[%eval 0.38]}'}</code>. <Ui>Comments</Ui> keeps any notes your source
               PGN had against its moves, and adds the engine's own verdict on a weak one —{' '}
-              <code>{'{Inaccuracy. Bb5 was best.}'}</code>. <Ui>Variations</Ui> writes the line
-              the engine preferred, in brackets after the move:{' '}
-              <code>(5. Bb5 Nd7 6. Bxc6 bxc6)</code>. The last three wait on the review from
-              step 2.
+              <code>{'{Inaccuracy. Bb5 was best.}'}</code>. <Ui>Variations</Ui> writes every
+              bracketed line — the game's own variations, and the one the engine preferred after
+              a weak move: <code>(5. Bb5 Nd7 6. Bxc6 bxc6)</code>. Off, the file is the mainline
+              alone. Evals, the engine's verdicts and its suggested lines all wait on the review
+              from step 2.
             </p>
             <p>
               Under the text: <Ui>Copy</Ui> and <Ui>Download</Ui> take the file;{' '}

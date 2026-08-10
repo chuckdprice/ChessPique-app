@@ -56,12 +56,12 @@ Four switches above the converted text decide the rest — all on by default:
   plus the engine's verdict on a weak move as a comment of its own:
   `{Inaccuracy. Bb5 was best.}`. Timing commands and bare clock readings are not comments and
   are always rewritten.
-- **Variations** — the line the engine preferred, after the move it replaces:
-  `(5. Bb5 Nd7 6. Bxc6 bxc6)`. This is the engine's suggestion only; the game's own variations
-  are always written, since they are part of the game.
+- **Variations** — every parenthesised line: the game's own variations, and the line the engine
+  preferred after the move it replaces, `(5. Bb5 Nd7 6. Bxc6 bxc6)`. Off writes the mainline
+  alone, for a reader who wants the moves as played and nothing else.
 
-Whatever the switches say, Black's reply after a bracket resumes as `5... e6`, so a reader
-coming out of one is never left guessing whose move it is.
+Black's reply after a bracket resumes as `5... e6`, so a reader coming out of one is never left
+guessing whose move it is — and with variations off there are no brackets, so it does not.
 
 A converted file can be fed straight back in and comes back the same, variations and all —
 comments, NAGs and nesting included. (Before v2.0 the parser discarded parenthesised lines, so

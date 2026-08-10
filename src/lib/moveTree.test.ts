@@ -327,6 +327,28 @@ describe('writing movetext', () => {
     for (const line of out.split('\n')) expect(line.length).toBeLessThanOrEqual(40)
   })
 
+  it('leaves the variations out when they are not wanted', () => {
+    const { tree } = parseMoveTree('1. e4 e5 (1... c5 2. Nf3) (1... e6) 2. Nf3 *')
+    expect(formatTreeMovetext(tree, { variations: false })).toBe('1. e4 e5 2. Nf3 *')
+  })
+
+  it('does not number a move twice for a variation it did not write', () => {
+    // The "2..." only exists to reorient a reader coming out of brackets. With
+    // no brackets there is nothing to come out of.
+    const { tree } = parseMoveTree('1. e4 e5 2. Nf3 (2. Bc4) Nc6 *')
+    expect(formatTreeMovetext(tree, { variations: false })).toBe('1. e4 e5 2. Nf3 Nc6 *')
+  })
+
+  it('keeps the engine’s own line when the game’s variations are left out', () => {
+    // They are separate things: one is the game, the other an annotation of it.
+    const { tree } = parseMoveTree('1. e4 e5 (1... c5) *')
+    const out = formatTreeMovetext(tree, {
+      variations: false,
+      engineLines: new Map([['n1', '1... c6 2. d4']]),
+    })
+    expect(out).toBe('1. e4 (1... c6 2. d4) 1... e5 *')
+  })
+
   it('wraps inside a long variation, not only around it', () => {
     // A variation written as one token cannot break, and a repertoire whose
     // first line holds a twenty-move variation came out hundreds of

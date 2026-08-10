@@ -499,6 +499,7 @@ export default function App() {
     const movetext = formatTreeMovetext(game.tree, {
       clocks: pgnExtras.clocks,
       comments: pgnExtras.comments,
+      variations: pgnExtras.variations,
       evals,
       notes,
       engineLines,

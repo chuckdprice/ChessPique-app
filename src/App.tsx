@@ -711,8 +711,14 @@ export default function App() {
   const whiteName = (game && findHeader(headers, 'White')) || 'White'
   const blackName = (game && findHeader(headers, 'Black')) || 'Black'
 
-  const whiteElo = (game && findHeader(headers, 'WhiteElo')) || null
-  const blackElo = (game && findHeader(headers, 'BlackElo')) || null
+  // "?" is what a PGN writes for a rating it does not know, and "-" for a
+  // player who has none — both mean there is nothing to print.
+  const ratingTag = (name: string) => {
+    const value = (game && findHeader(headers, name))?.trim()
+    return value && value !== '?' && value !== '-' ? value : null
+  }
+  const whiteElo = ratingTag('WhiteElo')
+  const blackElo = ratingTag('BlackElo')
 
   // The bar shows the same number as the move list does for this position, so
   // a deepened eval has to reach both or the two would disagree on screen. A

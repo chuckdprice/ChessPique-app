@@ -14,6 +14,8 @@ import ClassBadge from './ClassBadge'
 
 export interface PlayerPlate {
   name: string
+  /** Rating from the PGN tag, ready to print; null when the file gives none. */
+  elo: string | null
   /** Remaining clock, or null when the PGN has no clock times. */
   clock: number | null
   /** The pieces this player is up, pawns first. */
@@ -97,10 +99,17 @@ function squareCorner(square: string, orientation: 'white' | 'black') {
 export function PlayerPlateRow({ plate, color }: { plate: PlayerPlate; color: 'w' | 'b' }) {
   return (
     <div className="flex h-full items-center gap-2">
-      <span className="min-w-0 truncate text-sm font-medium">
-        {plate.name}
-        <span className="sr-only">{color === 'w' ? ' (White)' : ' (Black)'}</span>
-      </span>
+      {/* The rating sits outside the truncating span so that a long name eats
+          its own characters rather than the number's. */}
+      <div className="flex min-w-0 items-baseline gap-1.5">
+        <span className="min-w-0 truncate text-sm font-medium">
+          {plate.name}
+          <span className="sr-only">{color === 'w' ? ' (White)' : ' (Black)'}</span>
+        </span>
+        {plate.elo && (
+          <span className="shrink-0 font-score text-xs text-ink-mute">({plate.elo})</span>
+        )}
+      </div>
       <span className="ml-auto flex shrink-0 items-center gap-2">
         {/* The pieces are the opponent's: they were taken from them. */}
         <CapturedPieces

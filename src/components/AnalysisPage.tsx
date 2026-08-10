@@ -133,12 +133,14 @@ export default function AnalysisPage({
   const lead = Math.abs(captured.diff)
   const whitePlate: PlayerPlate = {
     name: whiteName,
+    elo: whiteElo,
     clock: clockAtPly(moves, ply, 'w', startSeconds),
     captured: captured.black,
     lead: captured.diff > 0 ? `+${lead}` : null,
   }
   const blackPlate: PlayerPlate = {
     name: blackName,
+    elo: blackElo,
     clock: clockAtPly(moves, ply, 'b', startSeconds),
     captured: captured.white,
     lead: captured.diff < 0 ? `+${lead}` : null,

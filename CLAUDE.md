@@ -31,10 +31,19 @@ measurement, not folklore:
 | `getComputedStyle` — returns stale values, even for a literal inline colour | screenshot the pixels |
 | `window.open` — becomes a same-tab navigation | reason about it; test the parts |
 | `navigator.clipboard.readText` — "Document is not focused" | stub `writeText` and assert its argument |
+| `computer` key presses — arrows never reach the page | dispatch a `KeyboardEvent` on `window` |
 
 `getBoundingClientRect` and DOM attribute reads *are* reliable. So are
 screenshots. `computer` clicks and scrolls land even when the call reports a
 timeout — re-query the DOM afterwards rather than assuming it failed.
+
+**Click coordinates go wrong after a custom `resize_window`.** They are
+screenshot pixels scaled by viewport ÷ screenshot width — 1.6 at the desktop
+preset. After `resize_window` with an arbitrary width the factor became 5.74
+and every click landed somewhere else, silently: the drawer test looked like an
+app bug for several minutes. Use the `mobile` / `tablet` / `desktop` presets,
+and if a click does nothing, calibrate before debugging the app — attach a
+capturing `click` listener, click a known point, and compare.
 
 **The chessboard needs pointer events.** react-chessboard v5 uses dnd-kit, so
 the harness's drag tool (mouse events) cannot move a piece. Drive it with a
@@ -42,10 +51,21 @@ the harness's drag tool (mouse events) cannot move a piece. Drive it with a
 
 ## Things that will bite
 
-- **Never put per-move edits into `game` state.** The whole-game Stockfish
-  review keys off that object's identity, so a keystroke there restarts about a
-  minute of engine work. Comment edits live in a separate map in `App` and are
-  folded into a derived `moves` array; do the same for anything similar.
+- **The engine review must never key off the game object's identity.** It costs
+  about a minute, and everything about a game — including every comment — now
+  lives in one `MoveTree` that a keystroke replaces. The effect depends on
+  `mainlineKey` instead, a string of the mainline's UCIs: it changes when the
+  moves change and not when anything else does, and React compares dependencies
+  by value. Anything else that is expensive and only about the moves belongs on
+  that same key. (Comment edits used to be held in a separate ply-keyed map for
+  this reason; that is gone, and a ply cannot name a move in a variation anyway.)
+- **A ply does not identify a position any more.** The game is a tree, so the
+  cursor is a node id (`currentId`) and so are the keys of `deeperEvals`. Plies
+  still name mainline moves, and the charts and accuracies still use them
+  because they are only ever about the mainline — `App` translates at that one
+  boundary with `mainlinePlyOf` and `nodeAtMainlinePly`. Looking analysis up by
+  a ply you did not check is on the mainline is a real bug that has happened
+  once: a variation move quietly borrowed the mainline's verdict at that depth.
 - **Don't run `npx prettier`.** There is no config, so it applies its own
   defaults — semicolons and double quotes — and reformats an entire file against
   the house style (no semicolons, single quotes). It produced a 220-line diff
@@ -73,7 +93,7 @@ the harness's drag tool (mouse events) cannot move a piece. Drive it with a
   `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>` line.
 - Commit and push only when Chuck asks. He asks explicitly, usually right after
   reviewing.
-- `npm run build && npm test` before every commit. 127 tests as of this writing;
+- `npm run build && npm test` before every commit. 179 tests as of this writing;
   they cover `src/lib` only — the UI is verified in the browser.
 - **Bump the version with `npm version`, never by editing `package.json`.** Only
   major and minor are read (`vite.config.ts` derives the build number from the
@@ -88,6 +108,17 @@ the harness's drag tool (mouse events) cannot move a piece. Drive it with a
 Deployed at <https://chessnoter.vercel.app> from `main` (auto-deploy on push).
 The version in the header is `major.minor` from `package.json` plus a build
 number derived from the commit's timestamp, so it changes on every commit.
+
+**v2.0 is in progress on the `v2.0` branch**, which is where the work is. `main`
+still holds v1 and still serves production; the tag `v1.6-final` marks the last
+v1 release and the point v2 branched from. Pushes to `v2.0` get preview
+deployments, not production — merging to `main` is what makes v2 live, and Chuck
+means it to replace v1 rather than run alongside it.
+
+Done on the branch: the left-nav menu, a Settings page, the move tree and
+variation editing. Still open from the original list: starting a PGN from
+scratch — `emptyTree()` exists and works, there is simply no way to ask for one
+yet.
 
 The Lichess sign-in and study import work: Chuck confirmed the whole flow
 against his own account on 6 August 2026, after the pop-up handoff was changed

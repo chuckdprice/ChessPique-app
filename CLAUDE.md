@@ -32,10 +32,19 @@ measurement, not folklore:
 | `window.open` — becomes a same-tab navigation | reason about it; test the parts |
 | `navigator.clipboard.readText` — "Document is not focused" | stub `writeText` and assert its argument |
 | `computer` key presses — arrows never reach the page | dispatch a `KeyboardEvent` on `window` |
+| Viewport size — `innerWidth`/`innerHeight` and `clientWidth`/`clientHeight` all read **0** while the pane is backgrounded | take the size from an element's rect, or treat 0 as "unknown" |
 
 `getBoundingClientRect` and DOM attribute reads *are* reliable. So are
 screenshots. `computer` clicks and scrolls land even when the call reports a
 timeout — re-query the DOM afterwards rather than assuming it failed.
+
+The zero viewport is the nastier one, because element rects keep their real
+values beside it: code that places something *relative to the viewport* gets
+believable inputs and an absurd bound. Clamping a hover preview to
+`innerWidth - width` pinned every one of them to the left edge, which read as a
+placement bug in the app. `showPreview` in `EnginePanel` now treats a
+zero-width viewport as no bound at all, and that guard is there for the pane
+rather than for any real browser.
 
 **Click coordinates go wrong after a custom `resize_window`.** They are
 screenshot pixels scaled by viewport ÷ screenshot width — 1.6 at the desktop

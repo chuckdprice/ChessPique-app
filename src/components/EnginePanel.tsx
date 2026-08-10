@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Chess } from 'chess.js'
 import { Engine, ENGINE_NAME, formatScore } from '../lib/engine/uci'
 import type { AnalyzeUpdate, EngineLine } from '../lib/engine/uci'
 import { saveEngineSettings } from '../lib/settings'
 import type { EngineSettings } from '../lib/settings'
 import EngineSettingsPanel from './EngineSettings'
+import MiniBoard from './MiniBoard'
 import ReviewRing from './ReviewRing'
 
 interface EnginePanelProps {
@@ -20,6 +22,9 @@ interface EnginePanelProps {
    */
   reviewActive?: boolean
   reviewProgress?: { done: number; total: number } | null
+  /** Piece set and orientation, so a previewed line looks like the real board. */
+  pieceSet: string
+  orientation: 'white' | 'black'
   /**
    * Latest top-line score (white POV) and the depth that produced it; null
    * when idle. The depth lets the caller tell a deeper answer from a shallower
@@ -30,8 +35,13 @@ interface EnginePanelProps {
   onFirstMoves?: (ucis: string[]) => void
 }
 
-/** Format a PV as numbered SAN from the given position, e.g. "9... e4 10. Ne1 h5". */
-function numberedLine(fen: string, sans: string[]): string {
+/**
+ * A PV as one printable token per move, e.g. ["9... e4", "10. Ne1", "h5"].
+ *
+ * One token per move rather than one string per line, because each token is
+ * hovered on its own to preview the position it leads to.
+ */
+function pvTokens(fen: string, sans: string[]): string[] {
   const parts = fen.split(' ')
   let moveNo = parseInt(parts[5] ?? '1', 10) || 1
   let white = parts[1] !== 'b'
@@ -43,8 +53,33 @@ function numberedLine(fen: string, sans: string[]): string {
     if (!white) moveNo += 1
     white = !white
   }
-  return out.join(' ')
+  return out
 }
+
+/** Format a PV as numbered SAN from the given position, e.g. "9... e4 10. Ne1 h5". */
+function numberedLine(fen: string, sans: string[]): string {
+  return pvTokens(fen, sans).join(' ')
+}
+
+/**
+ * The position after playing `sans` up to and including `upTo`, or null if the
+ * line does not play out — a PV arriving mid-search can be one move stale for
+ * the position it is listed under.
+ */
+function fenAfter(fen: string, sans: string[], upTo: number): string | null {
+  try {
+    const game = new Chess(fen)
+    for (let i = 0; i <= upTo; i++) game.move(sans[i])
+    return game.fen()
+  } catch {
+    return null
+  }
+}
+
+/** Board edge and card padding of the hover preview, in pixels. */
+const PREVIEW_BOARD = 168
+const PREVIEW_PAD = 6
+const PREVIEW_BOX = PREVIEW_BOARD + PREVIEW_PAD * 2
 
 export default function EnginePanel({
   fen,
@@ -54,6 +89,8 @@ export default function EnginePanel({
   onSettingsChange,
   reviewActive = false,
   reviewProgress = null,
+  pieceSet,
+  orientation,
   onTopScore,
   onFirstMoves,
 }: EnginePanelProps) {
@@ -63,6 +100,10 @@ export default function EnginePanel({
   // number under it is going to keep climbing.
   const [searching, setSearching] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  // The hovered move's position, already placed: a fixed-position card cannot
+  // be laid out relative to the move, so where it goes is worked out once, on
+  // entering the move, from the rect the mouse is over.
+  const [preview, setPreview] = useState<{ fen: string; left: number; top: number } | null>(null)
   const lastFlush = useRef(0)
   const onTopScoreRef = useRef(onTopScore)
   onTopScoreRef.current = onTopScore
@@ -152,7 +193,33 @@ export default function EnginePanel({
     [],
   )
 
+  // A preview belongs to the position it was opened over, so a new position or
+  // the engine going off has to take it with it — mouseleave never fires when
+  // the move it was on is unmounted from under the pointer.
+  useEffect(() => setPreview(null), [enabled, fen])
+
   const topLine: EngineLine | undefined = update?.lines[0]
+
+  /** Open the preview above the hovered move, or below it when the top is full. */
+  const showPreview = (el: HTMLElement, sans: string[], upTo: number) => {
+    const at = fenAfter(fen, sans, upTo)
+    if (!at) return
+    const rect = el.getBoundingClientRect()
+    // A viewport of no width is not a narrow one: a browser pane that has
+    // stopped painting reports zero, and clamping to that would pin every
+    // preview to the left edge. With nothing to clamp against, the move's own
+    // edge is the honest answer.
+    const vw = document.documentElement.clientWidth
+    const vh = document.documentElement.clientHeight
+    const above = rect.top - PREVIEW_BOX - 8
+    const below = rect.bottom + 8
+    const top = above >= 8 ? above : below
+    setPreview({
+      fen: at,
+      left: vw > 0 ? Math.max(8, Math.min(rect.left, vw - PREVIEW_BOX - 8)) : rect.left,
+      top: vh > 0 ? Math.max(8, Math.min(top, vh - PREVIEW_BOX - 8)) : top,
+    })
+  }
 
   return (
     <section
@@ -246,7 +313,7 @@ export default function EnginePanel({
       )}
 
       {enabled && (
-        <ul className="border-t border-rule px-4 py-1">
+        <ul className="border-t border-rule px-4 py-1" onPointerLeave={() => setPreview(null)}>
           {(update?.lines ?? []).map((line) => (
             <li
               key={line.multipv}
@@ -256,7 +323,26 @@ export default function EnginePanel({
               <span className="w-10 shrink-0 font-semibold tabular-nums">
                 {formatScore(line.score)}
               </span>
-              <span className="truncate text-ink-mute">{numberedLine(fen, line.pvSan)}</span>
+              <span className="truncate text-ink-mute">
+                {pvTokens(fen, line.pvSan).map((token, i) => (
+                  // The separating space is outside the move so that the hover
+                  // highlight is the width of the move and not a space wider.
+                  <Fragment key={i}>
+                    {i > 0 && ' '}
+                    <span
+                      className="cursor-help rounded-sm hover:bg-buff-soft hover:text-ink"
+                      // Pointer rather than mouse events, so that a tap does
+                      // not open a board a phone has no way to close: a touch
+                      // fires mouseenter too, and nothing fires the leave.
+                      onPointerEnter={(e) => {
+                        if (e.pointerType === 'mouse') showPreview(e.currentTarget, line.pvSan, i)
+                      }}
+                    >
+                      {token}
+                    </span>
+                  </Fragment>
+                ))}
+              </span>
             </li>
           ))}
           {!update && (
@@ -266,6 +352,26 @@ export default function EnginePanel({
           )}
         </ul>
       )}
+
+      {/* Through the body, so no ancestor's overflow can clip it: the pane is
+          overflow-hidden from sm up, and the line it hangs off is truncating.
+          It never takes the pointer, so moving along a line never lands the
+          mouse on the board that the last move opened. */}
+      {preview &&
+        createPortal(
+          <div
+            className="pointer-events-none fixed z-50 rounded-lg border border-rule bg-card shadow-lg"
+            style={{ left: preview.left, top: preview.top, padding: PREVIEW_PAD }}
+          >
+            <MiniBoard
+              fen={preview.fen}
+              orientation={orientation}
+              pieceSet={pieceSet}
+              size={PREVIEW_BOARD}
+            />
+          </div>,
+          document.body,
+        )}
     </section>
   )
 }

@@ -200,6 +200,8 @@ export default function AnalysisPage({
             onSettingsChange={onEngineSettingsChange}
             reviewActive={reviewing}
             reviewProgress={analysisProgress}
+            pieceSet={pieceSet}
+            orientation={orientation}
             onTopScore={onTopScore}
             onFirstMoves={onEngineMoves}
           />

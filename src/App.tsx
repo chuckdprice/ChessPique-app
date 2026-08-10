@@ -28,7 +28,7 @@ import {
   REVIEW_DEPTH,
   withDeeperEval,
 } from './lib/engine/analysis'
-import type { GameAnalysis, RefinedEval } from './lib/engine/analysis'
+import type { GameAnalysis, RefinedEval, ReviewedPosition } from './lib/engine/analysis'
 import { formatEvalTag } from './lib/engine/uci'
 import type { Score } from './lib/engine/uci'
 import { buildChartRows } from './lib/gameModel'
@@ -180,6 +180,12 @@ export default function App() {
    * having to close it.
    */
   const [branch, setBranch] = useState<{ atId: string; index: number } | null>(null)
+  /**
+   * Bumped whenever a game is loaded, so the review runs for it even when its
+   * moves happen to match the game before — the key below is the moves alone,
+   * and two different files can hold the same ones.
+   */
+  const [gameEpoch, setGameEpoch] = useState(0)
   const [appearanceOpen, setAppearanceOpen] = useState(false)
   // What the app is currently wearing. While the dialog is open this holds the
   // draft, so a pick is seen on the page behind it; only Save writes it down.
@@ -205,6 +211,14 @@ export default function App() {
     variations: true,
   })
   const analysisSignal = useRef<{ cancelled: boolean } | null>(null)
+  /**
+   * Positions the review has already searched, kept for the life of the tab.
+   *
+   * An evaluation is about a position, not about the game it turned up in, so
+   * this is never cleared — a game built move by move re-uses everything it
+   * worked out for the move before.
+   */
+  const reviewCache = useRef(new Map<string, ReviewedPosition>())
 
   // What was showing when the dialog opened, to go back to on Cancel.
   const savedAppearance = useRef(appearance)
@@ -306,6 +320,7 @@ export default function App() {
     analysisSignal.current = signal
     analyzeGame(mainlineFens(tree), mainlineMoves(tree), mainlineUcis(tree), {
       signal,
+      cache: reviewCache.current,
       onProgress: (done, total) => {
         if (!signal.cancelled) setAnalysisProgress({ done, total })
       },
@@ -325,7 +340,7 @@ export default function App() {
     return () => {
       signal.cancelled = true
     }
-  }, [game])
+  }, [mainlineKey, gameEpoch])
 
   const handleHeaderAdd = useCallback((name: string) => {
     setHeaders((prev) => withTag(prev, name))
@@ -399,6 +414,7 @@ export default function App() {
     setAnalysisError(null)
     setLiveScore(null)
     setEngineMoves([])
+    setGameEpoch((n) => n + 1)
     setGame({ result: NO_CONVERSION, tree })
     setWarningsDismissed(false)
     setHeaders(newGameHeaders())

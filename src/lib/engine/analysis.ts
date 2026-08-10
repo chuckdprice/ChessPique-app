@@ -422,12 +422,32 @@ export function buildGameAnalysis(
 export const REVIEW_DEPTH = 20
 export const REVIEW_MOVETIME_CAP_MS = 2500
 
+/** What the review learned about one position, and all it needs to keep. */
+export interface ReviewedPosition {
+  score: Score
+  depth: number
+  best: { uci: string | null; san: string | null; line: string[] }
+}
+
 export interface AnalyzeGameOptions {
   depth?: number
   movetimeMs?: number
   onProgress?: (done: number, total: number) => void
   /** Flip to true to abort; the promise then resolves null. */
   signal?: { cancelled: boolean }
+  /**
+   * Positions already searched, by FEN, kept across reviews by the caller.
+   *
+   * A review costs about a second a move, and the moves of a game barely
+   * change between one review and the next: adding a move to the end leaves
+   * every earlier position exactly as it was, and promoting a variation leaves
+   * everything before the branch. Without this, building a game by hand
+   * re-searched the whole of it after every single move.
+   *
+   * An evaluation belongs to a position rather than to a game, so entries stay
+   * valid across games and the map is never cleared.
+   */
+  cache?: Map<string, ReviewedPosition>
 }
 
 /** Terminal-position score without engine help (checkmate / drawn). */
@@ -451,6 +471,7 @@ export async function analyzeGame(
     movetimeMs = REVIEW_MOVETIME_CAP_MS,
     onProgress,
     signal,
+    cache,
   } = options
   const engine = new Engine()
   try {
@@ -459,28 +480,48 @@ export async function analyzeGame(
     const evalDepths: number[] = []
     const bestMoves: Array<{ uci: string | null; san: string | null; line: string[] }> = []
 
+    const take = (at: ReviewedPosition) => {
+      evals.push(at.score)
+      evalDepths.push(at.depth)
+      bestMoves.push(at.best)
+    }
+
     for (let i = 0; i < fens.length; i++) {
       if (signal?.cancelled) return null
+      const known = cache?.get(fens[i])
+      if (known) {
+        take(known)
+        onProgress?.(i + 1, fens.length)
+        continue
+      }
+
       const terminal = terminalScore(fens[i])
+      let at: ReviewedPosition
       if (terminal) {
-        evals.push(terminal)
         // Nothing to search and nothing deeper to find.
-        evalDepths.push(Number.POSITIVE_INFINITY)
-        bestMoves.push({ uci: null, san: null, line: [] })
+        at = {
+          score: terminal,
+          depth: Number.POSITIVE_INFINITY,
+          best: { uci: null, san: null, line: [] },
+        }
       } else {
         const result = await engine.analyze({ fen: fens[i], depth, movetimeMs, multiPv: 1 })
         const top = result.lines[0]
-        evals.push(top?.score ?? { cp: 0 })
-        // The depth reached, which the movetime cap can hold below `depth`.
-        evalDepths.push(top?.depth ?? 0)
-        bestMoves.push({
-          uci: result.bestMoveUci,
-          san: top?.pvSan[0] ?? null,
-          // The whole line, not just its first move: the move list and the
-          // exported PGN both show what the engine would have played on.
-          line: top?.pvSan ?? [],
-        })
+        at = {
+          score: top?.score ?? { cp: 0 },
+          // The depth reached, which the movetime cap can hold below `depth`.
+          depth: top?.depth ?? 0,
+          best: {
+            uci: result.bestMoveUci,
+            san: top?.pvSan[0] ?? null,
+            // The whole line, not just its first move: the move list and the
+            // exported PGN both show what the engine would have played on.
+            line: top?.pvSan ?? [],
+          },
+        }
       }
+      cache?.set(fens[i], at)
+      take(at)
       onProgress?.(i + 1, fens.length)
     }
 

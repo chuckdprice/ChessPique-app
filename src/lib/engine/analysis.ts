@@ -142,37 +142,6 @@ export function moveNote(move: MoveAnalysis): string | null {
   return move.bestMoveSan ? `${label}. ${move.bestMoveSan} was best.` : `${label}.`
 }
 
-/**
- * A SAN line written as numbered movetext — "5. Bb5 Nd7 6. Bxc6" — starting at
- * the given move number and side.
- *
- * Black's first move takes the "5..." form, and only that one: once the line is
- * under way the numbers alternate normally.
- */
-export function formatVariation(
-  sans: string[],
-  startNumber: number,
-  startColor: 'w' | 'b',
-): string {
-  let number = startNumber
-  let white = startColor === 'w'
-  const parts: string[] = []
-  for (const [i, san] of sans.entries()) {
-    if (white) parts.push(`${number}. ${san}`)
-    else if (i === 0) parts.push(`${number}... ${san}`)
-    else parts.push(san)
-    if (!white) number += 1
-    white = !white
-  }
-  return parts.join(' ')
-}
-
-/** The engine's line for a flagged move, numbered; empty when there is none. */
-export function moveVariation(move: MoveAnalysis): string {
-  if (!NEEDS_ADVICE.includes(move.classification) || move.bestLineSan.length === 0) return ''
-  return formatVariation(move.bestLineSan, Math.ceil(move.ply / 2), move.color)
-}
-
 /** A position's evaluation together with the depth that produced it. */
 export interface RefinedEval {
   score: Score
@@ -514,8 +483,8 @@ export async function analyzeGame(
           best: {
             uci: result.bestMoveUci,
             san: top?.pvSan[0] ?? null,
-            // The whole line, not just its first move: the move list and the
-            // exported PGN both show what the engine would have played on.
+            // The whole line, not just its first move: the move list shows
+            // what the engine would have played on, and it goes into the tree.
             line: top?.pvSan ?? [],
           },
         }

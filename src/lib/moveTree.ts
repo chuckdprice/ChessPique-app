@@ -276,6 +276,29 @@ export function promoteToMainline(tree: MoveTree, nodeId: string): MoveTree {
   return next
 }
 
+/**
+ * Play a run of SAN moves onto a position as one line.
+ *
+ * Moves that are already there are walked into rather than repeated, so a line
+ * that agrees with the game for a few moves and then diverges joins it at the
+ * point it diverges. An unplayable move ends the line and leaves what came
+ * before it.
+ *
+ * This is how the engine's recommendations become part of the tree: they were
+ * text under a move, which could be read but not walked.
+ */
+export function addLine(tree: MoveTree, parentId: string, sans: string[]): MoveTree {
+  let next = tree
+  let at = parentId
+  for (const san of sans) {
+    const added = addMoveSan(next, at, san)
+    if (!added) break
+    next = added.tree
+    at = added.nodeId
+  }
+  return next
+}
+
 /** Replace a node's comment, which is edited apart from the move itself. */
 export function setComment(tree: MoveTree, nodeId: string, comment: string): MoveTree {
   const node = tree.nodes.get(nodeId)
@@ -590,12 +613,6 @@ export interface TreeMovetextOptions {
   evals?: Map<string, string>
   /** The engine's verdict on a move, written as a comment of its own. */
   notes?: Map<string, string>
-  /**
-   * The engine's preferred line after a move, already numbered, written as a
-   * further variation. It is not part of the tree — nobody played it — so it
-   * arrives as text and goes in after whatever real variations the move has.
-   */
-  engineLines?: Map<string, string>
   /** Where to wrap. PGN allows any whitespace; readers expect short lines. */
   columns?: number
 }
@@ -670,12 +687,6 @@ export function formatTreeMovetext(
           out.push(...inner)
         }
         // Whatever follows the parentheses has to name itself again.
-        fresh = true
-      }
-
-      const engineLine = options.engineLines?.get(node.id)
-      if (engineLine) {
-        out.push(`(${engineLine.replace(/[()]/g, '')})`)
         fresh = true
       }
 

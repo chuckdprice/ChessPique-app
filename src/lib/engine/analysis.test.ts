@@ -14,9 +14,7 @@ import {
   pieceMaterial,
   playedLikeRating,
   PLAYED_LIKE_MAE,
-  formatVariation,
   moveNote,
-  moveVariation,
   scoreCp,
   winPct,
   withDeeperEval,
@@ -243,23 +241,7 @@ describe('withDeeperEval', () => {
   })
 })
 
-describe('formatVariation', () => {
-  it("numbers a line that starts on White's move", () => {
-    expect(formatVariation(['Bb5', 'Nd7', 'Bxc6', 'bxc6'], 5, 'w')).toBe(
-      '5. Bb5 Nd7 6. Bxc6 bxc6',
-    )
-  })
-
-  it("numbers a line that starts on Black's move, once", () => {
-    expect(formatVariation(['Ne4', 'O-O', 'h5', 'c4'], 6, 'b')).toBe('6... Ne4 7. O-O h5 8. c4')
-  })
-
-  it('has nothing to say about an empty line', () => {
-    expect(formatVariation([], 5, 'w')).toBe('')
-  })
-})
-
-describe('moveNote / moveVariation', () => {
+describe('moveNote', () => {
   const flagged = (overrides: Partial<MoveAnalysis> = {}): MoveAnalysis => ({
     ply: 9,
     color: 'w',
@@ -281,17 +263,5 @@ describe('moveNote / moveVariation', () => {
 
   it('says nothing about a move that needs no comment', () => {
     expect(moveNote(flagged({ classification: 'good' }))).toBeNull()
-    expect(moveVariation(flagged({ classification: 'best' }))).toBe('')
-  })
-
-  it('numbers the variation from the move it replaces', () => {
-    // Ply 9 is White's fifth move.
-    expect(moveVariation(flagged())).toBe('5. Bb5 Nd7 6. Bxc6')
-    // Ply 12 is Black's sixth.
-    expect(moveVariation(flagged({ ply: 12, color: 'b' }))).toBe('6... Bb5 7. Nd7 Bxc6')
-  })
-
-  it('has no variation to give when the search returned no line', () => {
-    expect(moveVariation(flagged({ bestLineSan: [] }))).toBe('')
   })
 })

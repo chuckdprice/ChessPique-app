@@ -223,7 +223,10 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               The engine review covers the mainline, so a move in a variation carries no
               accuracy or grade of its own. Turn the engine on and it will analyse whatever
               position the board is showing, variation or not — and promoting a line to the
-              mainline runs the review again over the game that has become.
+              mainline runs the review again over the game that has become. That second run is
+              quick: positions already searched are remembered, so only what is genuinely new
+              is worked out again. Adding a move to the end of a game costs one search, not a
+              whole review.
             </p>
             <p>
               Moves the engine had nothing to say about are left uncoloured, so the ones that
@@ -231,9 +234,10 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               stand out rather than competing with a wall of colour.
             </p>
             <p>
-              Under every inaccuracy, mistake, and blunder the list gives the engine's verdict
-              and, below it, the line it would have played instead. Those moves are shown rather
-              than clickable — they were never played, and the board follows the game.
+              Under every inaccuracy, mistake, and blunder the list gives the engine's verdict,
+              and the line it would have played instead is added to the game as a variation of
+              that move. It walks like any other line — click it, arrow through it, promote it
+              if you decide it was right — and it goes into the exported PGN with the rest.
             </p>
           </Section>
 

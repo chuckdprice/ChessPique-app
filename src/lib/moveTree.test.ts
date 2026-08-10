@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  addLine,
   addMove,
   addMoveSan,
   applyMainlineTiming,
@@ -154,6 +155,38 @@ describe('promoting and demoting', () => {
   it('does nothing to a line that is already the mainline throughout', () => {
     const { tree } = play(emptyTree(), ['e4', 'e5', 'Nf3'])
     expect(promoteToMainline(tree, 'n3')).toBe(tree)
+  })
+})
+
+describe('adding a whole line', () => {
+  it('plays it on as a variation of the move it replaces', () => {
+    const { tree } = parseMoveTree('1. e4 e5 2. Nf3 *')
+    const [, e5] = mainline(tree)
+    // The engine would rather have had 1... c5, and expects 2. Nf3 d6.
+    const with_ = addLine(tree, e5.parent!, ['c5', 'Nf3', 'd6'])
+    expect(sans(with_)).toEqual(['e4', 'e5', 'Nf3'])
+    expect(text(with_)).toBe('1. e4 e5 (1... c5 2. Nf3 d6) 2. Nf3 *')
+  })
+
+  it('joins a line that already exists rather than repeating it', () => {
+    const { tree } = parseMoveTree('1. e4 e5 (1... c5 2. Nf3) 2. Nf3 *')
+    const [, e5] = mainline(tree)
+    const with_ = addLine(tree, e5.parent!, ['c5', 'Nf3', 'd6'])
+    // One Sicilian, now three moves long — not a second one beside it.
+    expect(nodeOf(with_, e5.parent!)?.children).toHaveLength(2)
+    expect(text(with_)).toBe('1. e4 e5 (1... c5 2. Nf3 d6) 2. Nf3 *')
+  })
+
+  it('stops at a move it cannot play and keeps what came before', () => {
+    const { tree } = parseMoveTree('1. e4 e5 *')
+    const [, e5] = mainline(tree)
+    const with_ = addLine(tree, e5.parent!, ['c5', 'Qh4', 'd6'])
+    expect(text(with_)).toBe('1. e4 e5 (1... c5) *')
+  })
+
+  it('does nothing with an empty line', () => {
+    const { tree } = parseMoveTree('1. e4 e5 *')
+    expect(addLine(tree, tree.root, [])).toBe(tree)
   })
 })
 
@@ -337,16 +370,6 @@ describe('writing movetext', () => {
     // no brackets there is nothing to come out of.
     const { tree } = parseMoveTree('1. e4 e5 2. Nf3 (2. Bc4) Nc6 *')
     expect(formatTreeMovetext(tree, { variations: false })).toBe('1. e4 e5 2. Nf3 Nc6 *')
-  })
-
-  it('keeps the engine’s own line when the game’s variations are left out', () => {
-    // They are separate things: one is the game, the other an annotation of it.
-    const { tree } = parseMoveTree('1. e4 e5 (1... c5) *')
-    const out = formatTreeMovetext(tree, {
-      variations: false,
-      engineLines: new Map([['n1', '1... c6 2. d4']]),
-    })
-    expect(out).toBe('1. e4 (1... c6 2. d4) 1... e5 *')
   })
 
   it('wraps inside a long variation, not only around it', () => {

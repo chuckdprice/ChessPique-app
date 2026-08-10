@@ -93,8 +93,9 @@ On the analysis page you can:
   four show one pawn
 - Turn the engine on to get arrows for its top lines — shaded from best to worst — with the
   move actually played highlighted in gold
-- Read the engine's verdict under every inaccuracy, mistake, and blunder in the move list, with
-  the line it would have played instead
+- Read the engine's verdict under every inaccuracy, mistake, and blunder in the move list. The
+  line it would have played instead is added to the game as a variation of that move, so it can
+  be walked with the arrow keys, promoted, or deleted like any other
 - Review the game with Stockfish 18: an eval bar beside the board, per-move classification
   (Best, Inaccuracy → Blunder; Good and Excellent stay unmarked) in the move list, on the board
   and as dots on the evaluation graph, and five analysis tabs shown as icons that name
@@ -149,6 +150,10 @@ and reviewing all of them would pin the CPU for many minutes and start again on 
 a move in a variation carries no grade or accuracy of its own — turn the live engine on and it
 evaluates whatever position the board is showing, variation or not. Promoting a line to the
 mainline makes a different game, and the review runs again over the one it has become.
+
+Searched positions are remembered for as long as the tab is open, keyed by position rather than
+by game, so a review only pays for what is genuinely new. Adding a move to the end of a
+sixteen-move game took 21s before and 2s after.
 
 ### How the "played like" rating is calibrated — and its limits
 

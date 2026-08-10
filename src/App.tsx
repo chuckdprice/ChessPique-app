@@ -23,7 +23,7 @@ import type { Opening } from './lib/openings'
 import {
   analyzeGame,
   moveNote,
-  moveVariation,
+  NEEDS_ADVICE,
   PLAYED_LIKE_MAE,
   REVIEW_DEPTH,
   withDeeperEval,
@@ -33,6 +33,7 @@ import { formatEvalTag } from './lib/engine/uci'
 import type { Score } from './lib/engine/uci'
 import { buildChartRows } from './lib/gameModel'
 import {
+  addLine,
   addMove,
   applyMainlineTiming,
   deleteFrom,
@@ -119,6 +120,30 @@ function newGameHeaders(): Array<{ name: string; value: string }> {
     { name: 'Black', value: '?' },
     { name: 'Result', value: '*' },
   ]
+}
+
+/**
+ * The tree with the engine's recommendations played into it as variations.
+ *
+ * The review already worked out, for every move it faulted, the line it would
+ * rather have seen. That used to be text under the move: readable, but not
+ * walkable. As real nodes it is reachable with the same arrow keys, the same
+ * branch chooser and the same right-click menu as any other line — and it
+ * exports as an ordinary variation rather than as something written specially.
+ *
+ * Only faulted moves get one. Every move has a best line, and adding all of
+ * them would bury the game in the engine's opinion of it.
+ */
+function withEngineLines(tree: MoveTree, analysis: GameAnalysis): MoveTree {
+  const line = mainline(tree)
+  let next = tree
+  analysis.moves.forEach((info, i) => {
+    if (!NEEDS_ADVICE.includes(info.classification) || info.bestLineSan.length === 0) return
+    // The line replaces the move, so it branches from the position before it.
+    const parent = line[i]?.parent
+    if (parent) next = addLine(next, parent, info.bestLineSan)
+  })
+  return next
 }
 
 /** Nothing conversion worked out, for a game that was not converted at all. */
@@ -326,7 +351,11 @@ export default function App() {
       },
     })
       .then((result) => {
-        if (!signal.cancelled && result) setAnalysis(result)
+        if (signal.cancelled || !result) return
+        setAnalysis(result)
+        // Adding these touches no mainline move, so mainlineKey is unchanged
+        // and this cannot set the review going again.
+        setGame((prev) => (prev ? { ...prev, tree: withEngineLines(prev.tree, result) } : prev))
       })
       .catch((e) => {
         if (!signal.cancelled) {
@@ -633,7 +662,6 @@ export default function App() {
     const line = mainline(game.tree)
     const evals = new Map<string, string>()
     const notes = new Map<string, string>()
-    const engineLines = new Map<string, string>()
 
     if (analysis) {
       line.forEach((node, i) => {
@@ -650,10 +678,6 @@ export default function App() {
           const note = moveNote(info)
           if (note) notes.set(node.id, note)
         }
-        if (pgnExtras.variations) {
-          const suggested = moveVariation(info)
-          if (suggested) engineLines.set(node.id, suggested)
-        }
       })
     }
 
@@ -663,7 +687,6 @@ export default function App() {
       variations: pgnExtras.variations,
       evals,
       notes,
-      engineLines,
     })
     return pgnWithMovetext(withExtraTags(headers, generatedHeaders), movetext)
   }, [game, headers, generatedHeaders, analysis, deeperEvals, pgnExtras])

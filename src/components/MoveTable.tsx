@@ -3,7 +3,6 @@ import {
   CLASSIFICATION_LABEL,
   CLASSIFICATION_SYMBOL,
   hasMoveMarker,
-  moveVariation,
   NEEDS_ADVICE,
 } from '../lib/engine/analysis'
 import type { GameAnalysis, MoveAnalysis, RefinedEval } from '../lib/engine/analysis'
@@ -317,15 +316,14 @@ export default function MoveTable({
   )
 
   /**
-   * "Inaccuracy. c4 was best." beneath a flagged move, and under that the line
-   * the engine had in mind — the moves it expected to follow its own.
+   * "Inaccuracy. c4 was best." beneath a flagged move.
    *
-   * The line is not clickable. Those moves were never played, so making them
-   * look walkable would promise a branch of the tree that does not exist.
+   * The line the engine had in mind used to be printed under this as text.
+   * It is a variation of the move now, so it appears with the others below —
+   * saying it twice, once unwalkable, helped nobody.
    */
   const adviceRow = (node: MoveNode, info: MoveAnalysis) => {
     const color = classColor(info.classification)
-    const suggested = moveVariation(info)
     return (
       <tr key={`advice-${node.id}`}>
         <td />
@@ -348,11 +346,6 @@ export default function MoveTable({
               </>
             ) : null}
           </button>
-          {suggested && (
-            <p className="mt-0.5 pl-2 font-score text-[11px] leading-snug text-ink-mute">
-              {suggested}
-            </p>
-          )}
         </td>
       </tr>
     )

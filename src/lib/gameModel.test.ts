@@ -1,14 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Move } from './convert'
-import {
-  capturedMaterial,
-  explorationFen,
-  moveTargets,
-  playExploredMove,
-  replayGame,
-  startExploration,
-  takeBackExploredMove,
-} from './gameModel'
+import { capturedMaterial, moveTargets, replayGame } from './gameModel'
 
 function movesFrom(sans: string[]): Move[] {
   return sans.map((san, i) => ({
@@ -119,58 +111,5 @@ describe('moveTargets', () => {
   it('survives a square or a position it cannot read', () => {
     expect(moveTargets(fenAfter([]), 'z9')).toEqual([])
     expect(moveTargets('not a fen', 'e2')).toEqual([])
-  })
-})
-
-describe('exploring a line by hand', () => {
-  // After 1. e4 e5, with White to play move 2.
-  const branch = () => startExploration(fenAfter(['e4', 'e5']), 2)
-
-  it('records where it branched from and whose move it is', () => {
-    const line = branch()
-    expect(line.fromPly).toBe(2)
-    expect(line.branchNumber).toBe(2)
-    expect(line.branchColor).toBe('w')
-    expect(line.sans).toEqual([])
-    expect(line.lastMoveSquares).toBeNull()
-  })
-
-  it('plays a legal move and keeps the position it reaches', () => {
-    const line = playExploredMove(branch(), 'g1', 'f3')
-    expect(line?.sans).toEqual(['Nf3'])
-    expect(line?.lastMoveSquares).toEqual(['g1', 'f3'])
-    expect(explorationFen(line!)).toBe(fenAfter(['e4', 'e5', 'Nf3']))
-  })
-
-  it('refuses an illegal move, leaving the line alone', () => {
-    expect(playExploredMove(branch(), 'g1', 'g4')).toBeNull()
-    // A piece of the side not to move is just as illegal.
-    expect(playExploredMove(branch(), 'e5', 'e4')).toBeNull()
-  })
-
-  it('promotes a pawn to a queen', () => {
-    const line = startExploration('8/P7/8/4k3/8/8/8/4K3 w - - 0 1', 40)
-    const promoted = playExploredMove(line, 'a7', 'a8')
-    expect(promoted?.sans).toEqual(['a8=Q'])
-  })
-
-  it('takes back the last move, restoring the highlight to the one before', () => {
-    const two = playExploredMove(playExploredMove(branch(), 'g1', 'f3')!, 'b8', 'c6')!
-    const one = takeBackExploredMove(two)
-    expect(one?.sans).toEqual(['Nf3'])
-    expect(one?.lastMoveSquares).toEqual(['g1', 'f3'])
-    expect(explorationFen(one!)).toBe(fenAfter(['e4', 'e5', 'Nf3']))
-  })
-
-  it('takes back to the branch position, with nothing highlighted', () => {
-    const one = playExploredMove(branch(), 'g1', 'f3')!
-    const none = takeBackExploredMove(one)
-    expect(none?.sans).toEqual([])
-    expect(none?.lastMoveSquares).toBeNull()
-    expect(explorationFen(none!)).toBe(fenAfter(['e4', 'e5']))
-  })
-
-  it('has nothing left to take back at the branch', () => {
-    expect(takeBackExploredMove(branch())).toBeNull()
   })
 })

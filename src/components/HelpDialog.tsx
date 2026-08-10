@@ -59,7 +59,8 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               How to use this app
             </h2>
             <p className="mt-0.5 text-xs text-ink-mute">
-              Convert a ChessNoteR PGN, then review the game with Stockfish.
+              Convert a ChessNoteR PGN, review it with Stockfish, and build or edit a game by
+              hand.
             </p>
           </div>
           <button
@@ -84,6 +85,30 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
             <p>
               A PGN that already has <code>%clk</code> times works too, as does a plain move list
               with no clocks at all — you just won't get the timing charts.
+            </p>
+            <p>
+              From version 2 it is an editor as well. A game is held as a tree of moves rather
+              than a list, so a position can have more than one continuation: play a move onto
+              the board and it joins the game, keep several answers to the same position, write a
+              note against any of them, and decide which is the main line. That is what makes it
+              usable for an opening repertoire and not only for a game you played — and a game
+              need not come from a file at all, since <Ui>New game</Ui> starts an empty board.
+            </p>
+          </Section>
+
+          <Section title="Getting around">
+            <p>
+              The button at the top left opens the menu. It reaches both pages —{' '}
+              <Ui>PGN File</Ui> and <Ui>Game Analysis</Ui>, the same two the bar under the header
+              shows — plus <Ui>Appearance</Ui> for the theme, board and pieces,{' '}
+              <Ui>Settings</Ui> for how the engine searches, and this help. <Key>Esc</Key> closes
+              it, as does a click anywhere outside it.
+            </p>
+            <p>
+              <Ui>New game</Ui> on that menu starts an empty board with no moves, for building a
+              game or a repertoire by hand rather than importing one. It fills in the standard
+              tags for you — edit them on the <Ui>PGN Header Editor</Ui> — and the converted PGN
+              grows as you play. It asks first if the game already on the board has moves in it.
             </p>
           </Section>
 
@@ -111,10 +136,11 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               have the moves without them. <Ui>Evals</Ui> writes Stockfish's score on every move
               as <code>{'{[%eval 0.38]}'}</code>. <Ui>Comments</Ui> keeps any notes your source
               PGN had against its moves, and adds the engine's own verdict on a weak one —{' '}
-              <code>{'{Inaccuracy. Bb5 was best.}'}</code>. <Ui>Variations</Ui> writes the line
-              the engine preferred, in brackets after the move:{' '}
-              <code>(5. Bb5 Nd7 6. Bxc6 bxc6)</code>. The last three wait on the review from
-              step 2.
+              <code>{'{Inaccuracy. Bb5 was best.}'}</code>. <Ui>Variations</Ui> writes every
+              bracketed line — the game's own variations, and the one the engine preferred after
+              a weak move: <code>(5. Bb5 Nd7 6. Bxc6 bxc6)</code>. Off, the file is the mainline
+              alone. Evals, the engine's verdicts and its suggested lines all wait on the review
+              from step 2.
             </p>
             <p>
               Under the text: <Ui>Copy</Ui> and <Ui>Download</Ui> take the file;{' '}
@@ -147,6 +173,17 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               runs.
             </p>
             <p>
+              If the board itself ever stops drawing, a note takes its place and the rest of the
+              page carries on — the move list, the engine and the export are unaffected, and
+              stepping to another move draws it again.
+            </p>
+            <p>
+              If anything in the file did not come through as written, a note above the board says
+              so and names it — a variation with an unplayable move in it is dropped, and a move
+              with no elapsed time reuses the clock before it. The game is still usable either
+              way, so the note can be dismissed.
+            </p>
+            <p>
               Step through the game with the buttons under the board, by clicking a move in the
               list, or with the keyboard. The bar beside the board shows who stands better, and
               each player's own row shows the material they are up, just left of their clock — an
@@ -156,7 +193,9 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
             <p>
               Turn on <Ui>SF 18</Ui> for a live engine on the current position: its best lines are
               drawn as blue arrows, shaded from best to worst, with the move actually played in
-              orange. The gear beside it sets search time, number of lines, and memory.
+              orange. The gear beside it sets search time, number of lines, and memory — the same
+              three as <Ui>Settings</Ui> on the menu, which is where they live; the gear is
+              simply nearer to hand while you are looking at a position.
             </p>
             <p>
               Leaving the engine running on a move lets it search deeper than the whole-game
@@ -168,17 +207,31 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
             <p>
               You can also move the pieces yourself: drag one, or click it and then click where
               it should go. A clicked piece marks its legal squares — a dot to move to, a red
-              ring around a piece it can take — and clicking it again puts it back down. Either
-              way the board leaves the game to follow your line, with the engine analysing each
-              position as you reach it. A strip above the board shows the moves so far, with{' '}
-              <Ui>Take back</Ui> to unplay the last one and <Ui>Back to game</Ui> to return. Any
-              move of the navigation — a button, the move list, or an arrow key — returns as
-              well. Illegal moves snap back, and a pawn reaching the last rank always becomes a
-              queen.
+              ring around a piece it can take — and clicking it again puts it back down. Illegal
+              moves snap back, and a pawn reaching the last rank always becomes a queen.
             </p>
             <p>
-              Nothing you play this way touches the game: the move list, the accuracies, and the
-              PGN you export all still describe the moves that were actually played.
+              A move played at a position that already has one is kept as a <em>variation</em>{' '}
+              of it, listed under that move in the list and never displacing what was there. A
+              move that is already in the game is simply followed. So playing through a line you
+              have stored and branching off it are the same gesture, and nothing you try is lost
+              when you look at something else.
+            </p>
+            <p>
+              Right-click a move in the list — or hold it, on a touch screen — for what can be
+              done with the line it starts. <Ui>Promote</Ui> moves it up one place among the
+              alternatives, <Ui>Promote to mainline</Ui> makes it the game's own line all the way
+              back to the first move, <Ui>Demote</Ui> moves it down, and{' '}
+              <Ui>Delete from here</Ui> removes that move and everything after it.
+            </p>
+            <p>
+              The engine review covers the mainline, so a move in a variation carries no
+              accuracy or grade of its own. Turn the engine on and it will analyse whatever
+              position the board is showing, variation or not — and promoting a line to the
+              mainline runs the review again over the game that has become. That second run is
+              quick: positions already searched are remembered, so only what is genuinely new
+              is worked out again. Adding a move to the end of a game costs one search, not a
+              whole review.
             </p>
             <p>
               Moves the engine had nothing to say about are left uncoloured, so the ones that
@@ -186,9 +239,10 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               stand out rather than competing with a wall of colour.
             </p>
             <p>
-              Under every inaccuracy, mistake, and blunder the list gives the engine's verdict
-              and, below it, the line it would have played instead. Those moves are shown rather
-              than clickable — they were never played, and the board follows the game.
+              Under every inaccuracy, mistake, and blunder the list gives the engine's verdict,
+              and the line it would have played instead is added to the game as a variation of
+              that move. It walks like any other line — click it, arrow through it, promote it
+              if you decide it was right — and it goes into the exported PGN with the rest.
             </p>
           </Section>
 
@@ -215,17 +269,30 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               Black's.
             </p>
             <p>
-              <Ui>Comments</Ui> — a note on the move the board is showing. Write, change or
-              delete it and the move list follows as you type; it is the same text the converted
-              PGN carries in braces while its <Ui>Comments</Ui> switch is on. Comments already in
-              the file you loaded appear here to be edited.
+              <Ui>Comments</Ui> — a note on the move the board is showing, including a move
+              inside a variation, which is how the lines of a repertoire get their names. Write,
+              change or delete it and the move list follows as you type; it is the same text the
+              converted PGN carries in braces while its <Ui>Comments</Ui> switch is on. Comments
+              already in the file you loaded appear here to be edited.
             </p>
           </Section>
 
           <Section title="Keyboard">
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
               <Key>←</Key> <Key>→</Key> previous and next move · <Key>Home</Key> start ·{' '}
-              <Key>End</Key> final position · <Key>Esc</Key> closes this window.
+              <Key>End</Key> end of the line · <Key>Esc</Key> closes this window.
+            </p>
+            <p>
+              Forward follows the line the board is on rather than the main one, so arrowing
+              through a variation stays inside it; back steps out of it at the move it branched
+              from. The buttons under the board do the same.
+            </p>
+            <p>
+              Where the position has more than one continuation, going forward offers them in a
+              short list instead of choosing for you — the game's own line first, then its
+              variations. <Key>↑</Key> and <Key>↓</Key> move through them, <Key>→</Key> takes the
+              one marked, and <Key>Esc</Key> leaves the board where it is. Clicking one works too.
+              So a variation is reachable by walking to it, not only by finding it in the list.
             </p>
           </Section>
 

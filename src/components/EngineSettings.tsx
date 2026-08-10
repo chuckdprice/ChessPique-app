@@ -6,7 +6,8 @@ interface EngineSettingsPanelProps {
   onClose: () => void
 }
 
-function SliderRow({
+/** Exported so the Settings page offers the same controls as this popover. */
+export function SliderRow({
   label,
   display,
   min,

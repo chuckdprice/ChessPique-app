@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Move } from '../lib/convert'
 import type { GameAnalysis } from '../lib/engine/analysis'
 import type { ChartRow } from '../lib/gameModel'
+import type { MoveNode } from '../lib/moveTree'
 import type { Opening } from '../lib/openings'
 import ClassificationTable from './ClassificationTable'
 import ClockChart from './ClockChart'
@@ -27,7 +28,9 @@ interface AnalysisTabsProps {
   whiteElo: string | null
   blackElo: string | null
   playedLikeTooltip: string
-  onCommentChange: (ply: number, comment: string) => void
+  /** The move the comment tab edits — the board's own node. */
+  commentNode: MoveNode
+  onCommentChange: (nodeId: string, comment: string) => void
 }
 
 /**
@@ -118,17 +121,22 @@ function ScrollHint({ side, show }: { side: 'left' | 'right'; show: boolean }) {
 function AnalysisPending({
   progress,
   error,
+  empty,
 }: {
   progress: { done: number; total: number } | null
   error: string | null
+  /** A game with no moves yet — there is nothing to wait for, only to play. */
+  empty: boolean
 }) {
   return (
     <p className="px-6 py-10 text-center text-sm text-ink-mute">
-      {error
-        ? `Engine review unavailable: ${error}`
-        : progress && progress.total > 0
-          ? `Waiting for the engine review — ${progress.done} of ${progress.total} positions done.`
-          : 'Waiting for the engine review to start…'}
+      {empty
+        ? 'Play a move on the board to start the game.'
+        : error
+          ? `Engine review unavailable: ${error}`
+          : progress && progress.total > 0
+            ? `Waiting for the engine review — ${progress.done} of ${progress.total} positions done.`
+            : 'Waiting for the engine review to start…'}
     </p>
   )
 }
@@ -140,6 +148,7 @@ export default function AnalysisTabs({
   moves,
   ply,
   onPlyChange,
+  commentNode,
   chartRows,
   startSeconds,
   opening,
@@ -254,7 +263,11 @@ export default function AnalysisTabs({
               opening={opening}
             />
           ) : (
-            <AnalysisPending progress={progress} error={analysisError} />
+            <AnalysisPending
+              progress={progress}
+              error={analysisError}
+              empty={moves.length === 0}
+            />
           ))}
         {tab === 'phases' &&
           (analysis ? (
@@ -264,7 +277,11 @@ export default function AnalysisTabs({
               blackName={blackName}
             />
           ) : (
-            <AnalysisPending progress={progress} error={analysisError} />
+            <AnalysisPending
+              progress={progress}
+              error={analysisError}
+              empty={moves.length === 0}
+            />
           ))}
         {tab === 'classification' &&
           (analysis ? (
@@ -277,10 +294,14 @@ export default function AnalysisTabs({
               playedLikeTooltip={playedLikeTooltip}
             />
           ) : (
-            <AnalysisPending progress={progress} error={analysisError} />
+            <AnalysisPending
+              progress={progress}
+              error={analysisError}
+              empty={moves.length === 0}
+            />
           ))}
         {tab === 'comments' && (
-          <CommentEditor moves={moves} ply={ply} onCommentChange={onCommentChange} />
+          <CommentEditor node={commentNode} onCommentChange={onCommentChange} />
         )}
         {tab === 'times' && (
           <ClockChart

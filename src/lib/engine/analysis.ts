@@ -142,37 +142,6 @@ export function moveNote(move: MoveAnalysis): string | null {
   return move.bestMoveSan ? `${label}. ${move.bestMoveSan} was best.` : `${label}.`
 }
 
-/**
- * A SAN line written as numbered movetext — "5. Bb5 Nd7 6. Bxc6" — starting at
- * the given move number and side.
- *
- * Black's first move takes the "5..." form, and only that one: once the line is
- * under way the numbers alternate normally.
- */
-export function formatVariation(
-  sans: string[],
-  startNumber: number,
-  startColor: 'w' | 'b',
-): string {
-  let number = startNumber
-  let white = startColor === 'w'
-  const parts: string[] = []
-  for (const [i, san] of sans.entries()) {
-    if (white) parts.push(`${number}. ${san}`)
-    else if (i === 0) parts.push(`${number}... ${san}`)
-    else parts.push(san)
-    if (!white) number += 1
-    white = !white
-  }
-  return parts.join(' ')
-}
-
-/** The engine's line for a flagged move, numbered; empty when there is none. */
-export function moveVariation(move: MoveAnalysis): string {
-  if (!NEEDS_ADVICE.includes(move.classification) || move.bestLineSan.length === 0) return ''
-  return formatVariation(move.bestLineSan, Math.ceil(move.ply / 2), move.color)
-}
-
 /** A position's evaluation together with the depth that produced it. */
 export interface RefinedEval {
   score: Score
@@ -180,7 +149,10 @@ export interface RefinedEval {
 }
 
 /**
- * Fold a live engine result into the deepened evaluations, keyed by ply.
+ * Fold a live engine result into the deepened evaluations.
+ *
+ * Keyed by whatever names a position — a ply while the game was a list, a node
+ * id now that it is a tree — since this only ever compares depths.
  *
  * The whole-game review runs at a fixed depth, but the live engine is left to
  * think for as long as the user stands on a position and routinely passes it.
@@ -191,16 +163,16 @@ export interface RefinedEval {
  * Shallower or equal results are dropped, and the map is returned unchanged so
  * a re-render costs nothing.
  */
-export function withDeeperEval(
-  refined: Map<number, RefinedEval>,
-  ply: number,
+export function withDeeperEval<K>(
+  refined: Map<K, RefinedEval>,
+  at: K,
   candidate: RefinedEval,
   reviewDepth: number,
-): Map<number, RefinedEval> {
-  const shown = refined.get(ply)?.depth ?? reviewDepth
+): Map<K, RefinedEval> {
+  const shown = refined.get(at)?.depth ?? reviewDepth
   if (!(candidate.depth > shown)) return refined
   const next = new Map(refined)
-  next.set(ply, candidate)
+  next.set(at, candidate)
   return next
 }
 
@@ -419,12 +391,32 @@ export function buildGameAnalysis(
 export const REVIEW_DEPTH = 20
 export const REVIEW_MOVETIME_CAP_MS = 2500
 
+/** What the review learned about one position, and all it needs to keep. */
+export interface ReviewedPosition {
+  score: Score
+  depth: number
+  best: { uci: string | null; san: string | null; line: string[] }
+}
+
 export interface AnalyzeGameOptions {
   depth?: number
   movetimeMs?: number
   onProgress?: (done: number, total: number) => void
   /** Flip to true to abort; the promise then resolves null. */
   signal?: { cancelled: boolean }
+  /**
+   * Positions already searched, by FEN, kept across reviews by the caller.
+   *
+   * A review costs about a second a move, and the moves of a game barely
+   * change between one review and the next: adding a move to the end leaves
+   * every earlier position exactly as it was, and promoting a variation leaves
+   * everything before the branch. Without this, building a game by hand
+   * re-searched the whole of it after every single move.
+   *
+   * An evaluation belongs to a position rather than to a game, so entries stay
+   * valid across games and the map is never cleared.
+   */
+  cache?: Map<string, ReviewedPosition>
 }
 
 /** Terminal-position score without engine help (checkmate / drawn). */
@@ -448,6 +440,7 @@ export async function analyzeGame(
     movetimeMs = REVIEW_MOVETIME_CAP_MS,
     onProgress,
     signal,
+    cache,
   } = options
   const engine = new Engine()
   try {
@@ -456,28 +449,48 @@ export async function analyzeGame(
     const evalDepths: number[] = []
     const bestMoves: Array<{ uci: string | null; san: string | null; line: string[] }> = []
 
+    const take = (at: ReviewedPosition) => {
+      evals.push(at.score)
+      evalDepths.push(at.depth)
+      bestMoves.push(at.best)
+    }
+
     for (let i = 0; i < fens.length; i++) {
       if (signal?.cancelled) return null
+      const known = cache?.get(fens[i])
+      if (known) {
+        take(known)
+        onProgress?.(i + 1, fens.length)
+        continue
+      }
+
       const terminal = terminalScore(fens[i])
+      let at: ReviewedPosition
       if (terminal) {
-        evals.push(terminal)
         // Nothing to search and nothing deeper to find.
-        evalDepths.push(Number.POSITIVE_INFINITY)
-        bestMoves.push({ uci: null, san: null, line: [] })
+        at = {
+          score: terminal,
+          depth: Number.POSITIVE_INFINITY,
+          best: { uci: null, san: null, line: [] },
+        }
       } else {
         const result = await engine.analyze({ fen: fens[i], depth, movetimeMs, multiPv: 1 })
         const top = result.lines[0]
-        evals.push(top?.score ?? { cp: 0 })
-        // The depth reached, which the movetime cap can hold below `depth`.
-        evalDepths.push(top?.depth ?? 0)
-        bestMoves.push({
-          uci: result.bestMoveUci,
-          san: top?.pvSan[0] ?? null,
-          // The whole line, not just its first move: the move list and the
-          // exported PGN both show what the engine would have played on.
-          line: top?.pvSan ?? [],
-        })
+        at = {
+          score: top?.score ?? { cp: 0 },
+          // The depth reached, which the movetime cap can hold below `depth`.
+          depth: top?.depth ?? 0,
+          best: {
+            uci: result.bestMoveUci,
+            san: top?.pvSan[0] ?? null,
+            // The whole line, not just its first move: the move list shows
+            // what the engine would have played on, and it goes into the tree.
+            line: top?.pvSan ?? [],
+          },
+        }
       }
+      cache?.set(fens[i], at)
+      take(at)
       onProgress?.(i + 1, fens.length)
     }
 

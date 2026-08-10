@@ -36,66 +36,6 @@ export function replayGame(moves: Move[]): ReplayedGame {
   return { fens, lastMoveSquares, ucis }
 }
 
-/**
- * A line the user is playing out by hand from some position in the game.
- *
- * Kept apart from the game itself: the moves played are the record, and
- * trying an idea must never be mistaken for editing it. Everything here hangs
- * off `fromPly`, so returning to the game is a matter of dropping this object.
- */
-export interface Exploration {
-  /** Ply of the game position this line branches from. */
-  fromPly: number
-  /** The hand-played moves in SAN. */
-  sans: string[]
-  /** fens[0] is the branch position; fens[i] follows sans[i - 1]. */
-  fens: string[]
-  /** Squares of the most recent hand-played move, for highlighting. */
-  lastMoveSquares: [string, string] | null
-  /** Colour to move in the branch position, so the line can be numbered. */
-  branchColor: 'w' | 'b'
-  /** Full move number in the branch position. */
-  branchNumber: number
-}
-
-/** Begin a line from a game position. */
-export function startExploration(fen: string, fromPly: number): Exploration {
-  const parts = fen.split(' ')
-  return {
-    fromPly,
-    sans: [],
-    fens: [fen],
-    lastMoveSquares: null,
-    branchColor: parts[1] === 'b' ? 'b' : 'w',
-    branchNumber: parseInt(parts[5] ?? '1', 10) || 1,
-  }
-}
-
-/**
- * Play one move onto a line, or return null when it is not legal.
- *
- * A pawn reaching the last rank always becomes a queen. Anything else needs a
- * chooser on the board, and underpromotion is not what this is for.
- */
-export function playExploredMove(
-  exploration: Exploration,
-  from: string,
-  to: string,
-): Exploration | null {
-  const chess = new Chess(exploration.fens[exploration.fens.length - 1])
-  try {
-    const played = chess.move({ from, to, promotion: 'q' })
-    return {
-      ...exploration,
-      sans: [...exploration.sans, played.san],
-      fens: [...exploration.fens, chess.fen()],
-      lastMoveSquares: [played.from, played.to],
-    }
-  } catch {
-    return null
-  }
-}
-
 /** Somewhere the piece on a chosen square may go, for the board's markers. */
 export interface MoveTarget {
   to: string
@@ -125,25 +65,6 @@ export function moveTargets(fen: string, square: string): MoveTarget[] {
     byTo.set(move.to, { to: move.to, capture: move.captured != null })
   }
   return [...byTo.values()]
-}
-
-/** Undo the last hand-played move; null once the line is back to its branch. */
-export function takeBackExploredMove(exploration: Exploration): Exploration | null {
-  if (exploration.sans.length === 0) return null
-  const fens = exploration.fens.slice(0, -1)
-  const sans = exploration.sans.slice(0, -1)
-  if (sans.length === 0) {
-    return { ...exploration, sans, fens, lastMoveSquares: null }
-  }
-  // The move before the one just removed, re-derived for its from/to squares.
-  const chess = new Chess(fens[fens.length - 2])
-  const previous = chess.move(sans[sans.length - 1])
-  return { ...exploration, sans, fens, lastMoveSquares: [previous.from, previous.to] }
-}
-
-/** The position currently on the board in this line. */
-export function explorationFen(exploration: Exploration): string {
-  return exploration.fens[exploration.fens.length - 1]
 }
 
 /**

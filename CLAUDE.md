@@ -31,10 +31,29 @@ measurement, not folklore:
 | `getComputedStyle` — returns stale values, even for a literal inline colour | screenshot the pixels |
 | `window.open` — becomes a same-tab navigation | reason about it; test the parts |
 | `navigator.clipboard.readText` — "Document is not focused" | stub `writeText` and assert its argument |
+| `computer` key presses — arrows never reach the page | dispatch a `KeyboardEvent` on `window` |
 
 `getBoundingClientRect` and DOM attribute reads *are* reliable. So are
 screenshots. `computer` clicks and scrolls land even when the call reports a
 timeout — re-query the DOM afterwards rather than assuming it failed.
+
+**Click coordinates go wrong after a custom `resize_window`.** They are
+screenshot pixels scaled by viewport ÷ screenshot width — 1.6 at the desktop
+preset. After `resize_window` with an arbitrary width the factor became 5.74
+and every click landed somewhere else, silently: the drawer test looked like an
+app bug for several minutes. Use the `mobile` / `tablet` / `desktop` presets,
+and if a click does nothing, calibrate before debugging the app — attach a
+capturing `click` listener, click a known point, and compare.
+
+**The board can throw, and it is wrapped so that it does not take the page.**
+react-chessboard measures a square to animate a move and throws "Square width
+not found" when it has no layout to measure — which the browser pane does to it
+regularly once it stops painting. An uncaught error unmounts the whole React
+tree, so this used to blank the app mid-session and lose the game. `BoardBoundary`
+catches it and clears itself when `currentId` changes, so navigating recovers.
+If the app goes blank while you are testing, check the console for that message
+before suspecting whatever you just changed — it reproduces on an untouched
+checkout.
 
 **The chessboard needs pointer events.** react-chessboard v5 uses dnd-kit, so
 the harness's drag tool (mouse events) cannot move a piece. Drive it with a
@@ -42,10 +61,21 @@ the harness's drag tool (mouse events) cannot move a piece. Drive it with a
 
 ## Things that will bite
 
-- **Never put per-move edits into `game` state.** The whole-game Stockfish
-  review keys off that object's identity, so a keystroke there restarts about a
-  minute of engine work. Comment edits live in a separate map in `App` and are
-  folded into a derived `moves` array; do the same for anything similar.
+- **The engine review must never key off the game object's identity.** It costs
+  about a minute, and everything about a game — including every comment — now
+  lives in one `MoveTree` that a keystroke replaces. The effect depends on
+  `mainlineKey` instead, a string of the mainline's UCIs: it changes when the
+  moves change and not when anything else does, and React compares dependencies
+  by value. Anything else that is expensive and only about the moves belongs on
+  that same key. (Comment edits used to be held in a separate ply-keyed map for
+  this reason; that is gone, and a ply cannot name a move in a variation anyway.)
+- **A ply does not identify a position any more.** The game is a tree, so the
+  cursor is a node id (`currentId`) and so are the keys of `deeperEvals`. Plies
+  still name mainline moves, and the charts and accuracies still use them
+  because they are only ever about the mainline — `App` translates at that one
+  boundary with `mainlinePlyOf` and `nodeAtMainlinePly`. Looking analysis up by
+  a ply you did not check is on the mainline is a real bug that has happened
+  once: a variation move quietly borrowed the mainline's verdict at that depth.
 - **Don't run `npx prettier`.** There is no config, so it applies its own
   defaults — semicolons and double quotes — and reformats an entire file against
   the house style (no semicolons, single quotes). It produced a 220-line diff
@@ -73,14 +103,40 @@ the harness's drag tool (mouse events) cannot move a piece. Drive it with a
   `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>` line.
 - Commit and push only when Chuck asks. He asks explicitly, usually right after
   reviewing.
-- `npm run build && npm test` before every commit. 125 tests as of this writing;
+- `npm run build && npm test` before every commit. 180 tests as of this writing;
   they cover `src/lib` only — the UI is verified in the browser.
+- **Bump the version with `npm version`, never by editing `package.json`.** Only
+  major and minor are read (`vite.config.ts` derives the build number from the
+  commit timestamp), but the lockfile carries the version too, and hand-editing
+  drifted the two apart for five minor releases before anyone noticed. Add
+  `--no-git-tag-version` to leave the change uncommitted for review; without it
+  npm makes the commit and tag itself, which bypasses the rule above about
+  committing only when asked.
 
 ## State of play
 
 Deployed at <https://chessnoter.vercel.app> from `main` (auto-deploy on push).
 The version in the header is `major.minor` from `package.json` plus a build
 number derived from the commit's timestamp, so it changes on every commit.
+
+**v2.0 is in progress on the `v2.0` branch**, which is where the work is. `main`
+still holds v1 and still serves production; the tag `v1.6-final` marks the last
+v1 release and the point v2 branched from. Pushes to `v2.0` get preview
+deployments, not production — merging to `main` is what makes v2 live, and Chuck
+means it to replace v1 rather than run alongside it.
+
+Every feature on the original v2 list is done: the left-nav menu, a Settings
+page, Appearance moved onto the nav, the move tree with variation editing, and
+starting a game from nothing. What is left is Chuck trying it himself and the
+merge to `main`.
+
+Two things about the review that a session should not undo. It only covers the
+mainline — reviewing every variation would pin the CPU for minutes on a
+repertoire and start again on every edit — and its searches are cached by FEN
+for the life of the tab, so adding a move costs one search rather than a whole
+review. The engine's recommended line for a faulted move is played into the
+tree as a real variation, which is why nothing writes it into the PGN
+separately any more.
 
 The Lichess sign-in and study import work: Chuck confirmed the whole flow
 against his own account on 6 August 2026, after the pop-up handoff was changed

@@ -4,34 +4,50 @@ import type { ConvertResult, Move } from '../lib/convert'
 import type { GameAnalysis, RefinedEval } from '../lib/engine/analysis'
 import type { Score } from '../lib/engine/uci'
 import type { EngineSettings } from '../lib/settings'
-import type { ChartRow, ReplayedGame } from '../lib/gameModel'
-import { capturedMaterial, clockAtPly, explorationFen } from '../lib/gameModel'
-import type { Exploration } from '../lib/gameModel'
+import type { ChartRow } from '../lib/gameModel'
+import { capturedMaterial, clockAtPly } from '../lib/gameModel'
+import type { MoveTree } from '../lib/moveTree'
 import type { Opening } from '../lib/openings'
 import AnalysisProgress from './AnalysisProgress'
 import AnalysisTabs from './AnalysisTabs'
-import BoardViewer, { BoardNav, ExploreBar, PlayerPlateRow } from './BoardViewer'
+import BoardBoundary from './BoardBoundary'
+import BoardViewer, { BoardNav, PlayerPlateRow } from './BoardViewer'
 import type { PlayerPlate } from './BoardViewer'
 import EnginePanel from './EnginePanel'
 import EvalBar from './EvalBar'
+import FileWarnings from './FileWarnings'
 import MoveTable from './MoveTable'
 
 interface AnalysisPageProps {
   result: ConvertResult
-  replay: ReplayedGame
+  /** The game, variations and all. */
+  tree: MoveTree
+  /** The node the board is showing. */
+  currentId: string
+  onNavigate: (nodeId: string) => void
+  /** The mainline as a list, for the charts and the clocks. */
   moves: Move[]
+  /** Where the current position sits on the mainline; 0 inside a variation. */
   ply: number
   onPlyChange: (ply: number) => void
   analysis: GameAnalysis | null
-  /** Evals the live engine has searched deeper than the review did, by ply. */
-  deeperEvals: Map<number, RefinedEval>
+  /** Evals the live engine has searched deeper than the review did, by node. */
+  deeperEvals: Map<string, RefinedEval>
   /** Named opening for the evaluation chart's caption; null while it loads. */
   opening: Opening | null
-  /** A line being tried out by hand; it owns the board and the engine while set. */
-  exploration: Exploration | null
   onPieceMove: (from: string, to: string) => boolean
-  onExplorationTakeBack: () => void
-  onExplorationExit: () => void
+  onPromote: (nodeId: string, toMainline: boolean) => void
+  onDemote: (nodeId: string) => void
+  onDelete: (nodeId: string) => void
+  /** Step forward, which asks which way when the position has a choice. */
+  onStepForward: () => void
+  branch: { atId: string; index: number } | null
+  onBranchIndexChange: (index: number) => void
+  onBranchChoose: (nodeId: string) => void
+  onBranchClose: () => void
+  /** What the file could not be read as written; empty once dismissed. */
+  warnings: string[]
+  onDismissWarnings: () => void
   analysisProgress: { done: number; total: number } | null
   analysisError: string | null
   chartRows: ChartRow[]
@@ -48,7 +64,7 @@ interface AnalysisPageProps {
   onEngineSettingsChange: (next: EngineSettings) => void
   onTopScore: (score: Score | null, depth: number) => void
   onEngineMoves: (ucis: string[]) => void
-  onCommentChange: (ply: number, comment: string) => void
+  onCommentChange: (nodeId: string, comment: string) => void
   arrows: Arrow[]
   /** Piece set id from the appearance settings. */
   pieceSet: string
@@ -62,17 +78,26 @@ interface AnalysisPageProps {
  */
 export default function AnalysisPage({
   result,
-  replay,
+  tree,
+  currentId,
+  onNavigate,
   moves,
   ply,
   onPlyChange,
   analysis,
   deeperEvals,
   opening,
-  exploration,
   onPieceMove,
-  onExplorationTakeBack,
-  onExplorationExit,
+  onPromote,
+  onDemote,
+  onDelete,
+  onStepForward,
+  branch,
+  onBranchIndexChange,
+  onBranchChoose,
+  onBranchClose,
+  warnings,
+  onDismissWarnings,
   analysisProgress,
   analysisError,
   chartRows,
@@ -93,10 +118,10 @@ export default function AnalysisPage({
   pieceSet,
 }: AnalysisPageProps) {
   const [orientation, setOrientation] = useState<'white' | 'black'>('white')
-  const lastPly = replay.fens.length - 1
-  // One position drives the board, the engine and the captured strip, whether
-  // it came from the game or from the line being tried.
-  const shownFen = exploration ? explorationFen(exploration) : replay.fens[ply]
+  const current = tree.nodes.get(currentId) ?? tree.nodes.get(tree.root)!
+  // One position drives the board, the engine and the captured strip, wherever
+  // in the tree it sits.
+  const shownFen = current.fen
   // A game with no clocks anywhere shows none: falling back to the time control
   // would pin a full starting clock beside both players for every move.
   const hasClocks = moves.some((m) => m.clkSeconds != null)
@@ -123,21 +148,15 @@ export default function AnalysisPage({
   const topColor = orientation === 'white' ? 'b' : 'w'
   const bottomColor = orientation === 'white' ? 'w' : 'b'
 
-  const reviewing = !analysis || analysisError
+  // A game with no moves has nothing to review, so the banner would sit there
+  // claiming a search was starting that never will.
+  const reviewing = moves.length > 0 && (!analysis || analysisError)
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       {reviewing && <AnalysisProgress progress={analysisProgress} error={analysisError} />}
 
-      {/* Full width, above the grid: the nav column is only as wide as the
-          board, which left the line itself no room to be read. */}
-      {exploration && (
-        <ExploreBar
-          exploration={exploration}
-          onTakeBack={onExplorationTakeBack}
-          onExit={onExplorationExit}
-        />
-      )}
+      <FileWarnings warnings={warnings} onDismiss={onDismissWarnings} />
 
       {/* Shape lives in .analysis-grid in index.css so it can change at lg. */}
       <div className="analysis-grid min-h-0 lg:flex-1">
@@ -150,16 +169,17 @@ export default function AnalysisPage({
         </div>
 
         <div className="area-board">
-          <BoardViewer
-            replay={replay}
-            ply={ply}
-            orientation={orientation}
-            analysis={analysis}
-            arrows={arrows}
-            exploration={exploration}
-            onPieceMove={onPieceMove}
-            pieceSet={pieceSet}
-          />
+          <BoardBoundary resetKey={currentId}>
+            <BoardViewer
+              tree={tree}
+              currentId={currentId}
+              orientation={orientation}
+              analysis={analysis}
+              arrows={arrows}
+              onPieceMove={onPieceMove}
+              pieceSet={pieceSet}
+            />
+          </BoardBoundary>
         </div>
 
         {/* On lg this spans rows 1-3, so the engine pane's top lines up with the
@@ -179,12 +199,18 @@ export default function AnalysisPage({
             onFirstMoves={onEngineMoves}
           />
           <MoveTable
-            moves={moves}
-            result={result.result}
-            ply={ply}
-            onPlyChange={onPlyChange}
+            tree={tree}
+            currentId={currentId}
+            onNavigate={onNavigate}
             analysis={analysis}
             deeperEvals={deeperEvals}
+            onPromote={onPromote}
+            onDemote={onDemote}
+            onDelete={onDelete}
+            branch={branch}
+            onBranchIndexChange={onBranchIndexChange}
+            onBranchChoose={onBranchChoose}
+            onBranchClose={onBranchClose}
           />
         </div>
 
@@ -194,10 +220,10 @@ export default function AnalysisPage({
 
         <div className="area-nav flex min-w-0 pt-1">
           <BoardNav
-            moves={moves}
-            ply={ply}
-            lastPly={lastPly}
-            onPlyChange={onPlyChange}
+            tree={tree}
+            currentId={currentId}
+            onNavigate={onNavigate}
+            onStepForward={onStepForward}
             onRotate={() => setOrientation((o) => (o === 'white' ? 'black' : 'white'))}
             orientation={orientation}
           />
@@ -212,6 +238,7 @@ export default function AnalysisPage({
             moves={moves}
             ply={ply}
             onPlyChange={onPlyChange}
+            commentNode={current}
             chartRows={chartRows}
             startSeconds={startSeconds}
             opening={opening}

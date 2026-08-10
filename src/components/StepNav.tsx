@@ -1,15 +1,19 @@
-export type Page = 'pgn' | 'analysis'
+import type { Page } from '../lib/pages'
+
+/** The two-stage workflow. Other pages reach the app through the left-nav. */
+type Step = Extract<Page, 'pgn' | 'analysis'>
 
 interface StepNavProps {
+  /** The app's page; on one that is not a step, neither reads as current. */
   page: Page
-  onPageChange: (page: Page) => void
+  onPageChange: (page: Step) => void
   /** Analysis is unreachable until a game has been converted. */
   gameLoaded: boolean
   /** 0-100 while the engine review runs; null when idle or finished. */
   analysisPercent: number | null
 }
 
-const STEPS: Array<{ id: Page; label: string }> = [
+const STEPS: Array<{ id: Step; label: string }> = [
   { id: 'pgn', label: 'PGN File' },
   { id: 'analysis', label: 'Game Analysis' },
 ]

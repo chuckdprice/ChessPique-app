@@ -1,15 +1,27 @@
 # ChessNoteR Game Analysis
 
-A static web app that converts PGN files exported by the [ChessNoteR](https://chessnoter.com)
-e-notation device into standard PGNs that Lichess and Chess.com can use, then reviews the
-game with Stockfish.
+A static web app for chess games and opening repertoires: it converts PGN files exported by
+the [ChessNoteR](https://chessnoter.com) e-notation device into standard PGNs that Lichess and
+Chess.com can use, reviews the game with Stockfish, and lets you edit the moves — including
+variations — and export the result.
 
 ChessNoteR writes elapsed-move-time comments like `{[%emt 0:01:23]}` and occasional bare
 clock readings like `{56:00}`. This app converts them into one `{[%clk h:mm:ss]}` comment
-per move, normalizes the `TimeControl` tag (for example `G70/d10` → `4200d10`), and lets you:
+per move and normalizes the `TimeControl` tag (for example `G70/d10` → `4200d10`).
 
-The app is a two-step flow shown as chevron tabs across the top — **PGN File → Game Analysis** —
-sized so a 1440×900 desktop window needs no scrolling on either step.
+A game is held as a **tree of moves** rather than a list, so a position can have more than one
+continuation. That is what makes an opening repertoire editable here: alternatives sit under
+the move they answer, any of them can be promoted to the mainline, and the whole tree is read
+from and written back to PGN without loss.
+
+A game does not have to come from a file: **New game** on the menu starts an empty board, and
+the moves you play on it become the game, ready to export. Everything else works the same way
+on it — the engine review, the opening book, comments and variations.
+
+The two main pages are shown as chevron tabs across the top — **PGN File → Game Analysis** —
+sized so a 1440×900 desktop window needs no scrolling on either step. The button at the top
+left opens a menu reaching both of them, plus **New game**, **Appearance**, **Settings** and
+the help.
 
 - **PGN File**: two panes. The left holds the game coming in, under two tabs — *Original PGN*
   (a prominent drop zone, the time-control override, the paste box and Convert) and
@@ -17,6 +29,11 @@ sized so a 1440×900 desktop window needs no scrolling on either step.
   holds the `%clk` output with the switches for what goes into it above, and beneath it the
   ways out: copy, download, open on Lichess or Chess.com, or save into a Lichess study.
 - **Game Analysis**: board, engine, move list, and charts in one screen.
+- **Settings**: how the engine searches — search time, number of lines, memory. The same
+  values as the gear on the analysis page, which stays as the shortcut for while you are
+  looking at a position.
+- **New game**: an empty board, seeded with the Seven Tag Roster and today's date so the file
+  is valid from its first move. It asks before replacing a game that has moves in it.
 
 ### What goes into the converted PGN
 
@@ -46,12 +63,16 @@ Four switches above the converted text decide the rest — all on by default:
   plus the engine's verdict on a weak move as a comment of its own:
   `{Inaccuracy. Bb5 was best.}`. Timing commands and bare clock readings are not comments and
   are always rewritten.
-- **Variations** — the line the engine preferred, after the move it replaces:
-  `(5. Bb5 Nd7 6. Bxc6 bxc6)`. Black's reply then resumes as `5... e6`, so a reader coming out
-  of the brackets is never left guessing whose move it is.
+- **Variations** — every parenthesised line: the game's own variations, and the line the engine
+  preferred after the move it replaces, `(5. Bb5 Nd7 6. Bxc6 bxc6)`. Off writes the mainline
+  alone, for a reader who wants the moves as played and nothing else.
 
-A converted file can be fed straight back in: the parser skips parenthesised lines, so the move
-list that comes back is the game as played.
+Black's reply after a bracket resumes as `5... e6`, so a reader coming out of one is never left
+guessing whose move it is — and with variations off there are no brackets, so it does not.
+
+A converted file can be fed straight back in and comes back the same, variations and all —
+comments, NAGs and nesting included. (Before v2.0 the parser discarded parenthesised lines, so
+a repertoire opened here lost every variation in it.)
 
 A tag the game already carries is overwritten in place, keeping PGN's usual tag order; a tag it
 lacks is appended.
@@ -59,7 +80,11 @@ lacks is appended.
 On the analysis page you can:
 
 - Step through the game with the navigation buttons (which name the previous and next moves),
-  the move list, or ← → keys, and flip the board to either player's perspective
+  the move list, or ← → keys, and flip the board to either player's perspective. Forward follows
+  the line the board is on, so walking a variation stays in it
+- Choose which way to go where a position has several continuations: going forward opens a short
+  list — the mainline first, then the variations — with ↑ ↓ to move through it, → to take the
+  one marked, and Esc to stay put
 - See each player's remaining clock beside their name (accuracy, rating and the estimated
   "played like" rating live in the Move Classification tab)
 - Follow the material balance on the players' own rows: the pieces each is *up* sit just left of
@@ -68,8 +93,9 @@ On the analysis page you can:
   four show one pawn
 - Turn the engine on to get arrows for its top lines — shaded from best to worst — with the
   move actually played highlighted in gold
-- Read the engine's verdict under every inaccuracy, mistake, and blunder in the move list, with
-  the line it would have played instead
+- Read the engine's verdict under every inaccuracy, mistake, and blunder in the move list. The
+  line it would have played instead is added to the game as a variation of that move, so it can
+  be walked with the arrow keys, promoted, or deleted like any other
 - Review the game with Stockfish 18: an eval bar beside the board, per-move classification
   (Best, Inaccuracy → Blunder; Good and Excellent stay unmarked) in the move list, on the board
   and as dots on the evaluation graph, and five analysis tabs shown as icons that name
@@ -80,14 +106,23 @@ On the analysis page you can:
 - See which opening was played, named over the evaluation chart as `ECO: Name`
 - Click either chart to jump the board to that move — on the Move Times chart, the left half
   of a move is White's and the right half is Black's
-- Try a line by hand: drag the pieces and the board leaves the game to follow you, with the
-  engine evaluating each position as you reach it. *Take back* unplays a move, *Back to game*
-  returns, and so does any use of the navigation. Nothing played this way touches the game —
-  the move list, the accuracies, and the exported PGN still describe the moves actually played
+- Play moves yourself: drag a piece, or click it and then click where it should go — a clicked
+  piece marks its legal squares, a dot to move to and a red ring around a piece it can take.
+  A move played at a position that already has one is kept as a **variation** of it, listed
+  under that move and never displacing what was there; a move already in the game is simply
+  followed. So replaying a stored line and branching off it are the same gesture
+- Right-click a move in the list — or hold it, on a touch screen — for what can be done with
+  the line it starts: **Promote** moves it up one place among the alternatives, **Promote to
+  mainline** makes it the game's own line all the way back to the first move, **Demote** moves
+  it down, and **Delete from here** removes that move and everything after it
 - Turn on the live engine panel for a continuously updating evaluation of the current
   position, with configurable search time, number of lines, and memory
-- Write a note against any move on the *Comments* tab: the move list follows as you type, and
-  the text is what the converted PGN carries in braces
+- Write a note against any move on the *Comments* tab — including a move in a variation, which
+  is how a repertoire's lines get their names. The move list follows as you type, and the text
+  is what the converted PGN carries in braces
+- See what the file could not give you: a note above the board names any variation dropped for
+  containing an unplayable move, and any move whose clock had to be reused because it carried no
+  elapsed time. Dismissible — neither stops the game being used
 - Download the converted PGN with your edited tags
 
 Everything — conversion and engine analysis alike — runs entirely in the browser; games are
@@ -99,8 +134,8 @@ The app bundles the **single-threaded lite build of Stockfish 18 (WASM)**, copie
 `public/stockfish/` by `scripts/copy-stockfish.mjs` on `npm install`. Single-threaded means no
 `SharedArrayBuffer`, so no COOP/COEP headers are needed and it deploys as a plain static site.
 
-When a game loads, every position is evaluated with a **depth-20 search** (capped at 2.5 s per
-position, typically ~0.6 s) to produce:
+When a game loads, every position **on the mainline** is evaluated with a **depth-20 search**
+(capped at 2.5 s per position, typically ~0.6 s) to produce:
 
 - **Move classification** — the engine's own move is *Best*; otherwise the move is graded by
   how much win probability it gave up: ≤2% *Excellent*, ≤5% *Good*, ≤10% *Inaccuracy*,
@@ -109,6 +144,16 @@ position, typically ~0.6 s) to produce:
 - **"Played like" rating**, shown in the Move Classification tab under each player's own rating:
   `719 Price, Chuck (87.3%)` over `played like ~1600 Lichess Rapid`. See below for how it is
   calibrated and how much to trust it.
+
+Variations are deliberately left out of that pass. A repertoire can hold hundreds of positions,
+and reviewing all of them would pin the CPU for many minutes and start again on every edit. So
+a move in a variation carries no grade or accuracy of its own — turn the live engine on and it
+evaluates whatever position the board is showing, variation or not. Promoting a line to the
+mainline makes a different game, and the review runs again over the one it has become.
+
+Searched positions are remembered for as long as the tab is open, keyed by position rather than
+by game, so a review only pays for what is genuinely new. Adding a move to the end of a
+sixteen-move game took 21s before and 2s after.
 
 ### How the "played like" rating is calibrated — and its limits
 
@@ -226,7 +271,7 @@ upright and 19 on a tablet, and a desktop window is filled as before.
 
 ## Appearance
 
-The palette icon in the header opens a dialog with three tabs — **Theme**, **Board** and
+**Appearance** on the menu opens a dialog with three tabs — **Theme**, **Board** and
 **Pieces**. Every pick previews live on the page behind the dialog; **Save** keeps it,
 **Cancel** puts back whatever was showing when the dialog opened. The choice persists in
 `localStorage`.

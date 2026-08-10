@@ -59,7 +59,8 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               How to use this app
             </h2>
             <p className="mt-0.5 text-xs text-ink-mute">
-              Convert a ChessNoteR PGN, then review the game with Stockfish.
+              Convert a ChessNoteR PGN, review it with Stockfish, and build or edit a game by
+              hand.
             </p>
           </div>
           <button
@@ -84,6 +85,14 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
             <p>
               A PGN that already has <code>%clk</code> times works too, as does a plain move list
               with no clocks at all — you just won't get the timing charts.
+            </p>
+            <p>
+              From version 2 it is an editor as well. A game is held as a tree of moves rather
+              than a list, so a position can have more than one continuation: play a move onto
+              the board and it joins the game, keep several answers to the same position, write a
+              note against any of them, and decide which is the main line. That is what makes it
+              usable for an opening repertoire and not only for a game you played — and a game
+              need not come from a file at all, since <Ui>New game</Ui> starts an empty board.
             </p>
           </Section>
 
@@ -179,7 +188,9 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
             <p>
               Turn on <Ui>SF 18</Ui> for a live engine on the current position: its best lines are
               drawn as blue arrows, shaded from best to worst, with the move actually played in
-              orange. The gear beside it sets search time, number of lines, and memory.
+              orange. The gear beside it sets search time, number of lines, and memory — the same
+              three as <Ui>Settings</Ui> on the menu, which is where they live; the gear is
+              simply nearer to hand while you are looking at a position.
             </p>
             <p>
               Leaving the engine running on a move lets it search deeper than the whole-game
@@ -249,17 +260,23 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               Black's.
             </p>
             <p>
-              <Ui>Comments</Ui> — a note on the move the board is showing. Write, change or
-              delete it and the move list follows as you type; it is the same text the converted
-              PGN carries in braces while its <Ui>Comments</Ui> switch is on. Comments already in
-              the file you loaded appear here to be edited.
+              <Ui>Comments</Ui> — a note on the move the board is showing, including a move
+              inside a variation, which is how the lines of a repertoire get their names. Write,
+              change or delete it and the move list follows as you type; it is the same text the
+              converted PGN carries in braces while its <Ui>Comments</Ui> switch is on. Comments
+              already in the file you loaded appear here to be edited.
             </p>
           </Section>
 
           <Section title="Keyboard">
             <p className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
               <Key>←</Key> <Key>→</Key> previous and next move · <Key>Home</Key> start ·{' '}
-              <Key>End</Key> final position · <Key>Esc</Key> closes this window.
+              <Key>End</Key> end of the line · <Key>Esc</Key> closes this window.
+            </p>
+            <p>
+              Forward follows the line the board is on rather than the main one, so arrowing
+              through a variation stays inside it; back steps out of it at the move it branched
+              from. The buttons under the board do the same.
             </p>
           </Section>
 

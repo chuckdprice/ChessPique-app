@@ -164,6 +164,12 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               runs.
             </p>
             <p>
+              If anything in the file did not come through as written, a note above the board says
+              so and names it — a variation with an unplayable move in it is dropped, and a move
+              with no elapsed time reuses the clock before it. The game is still usable either
+              way, so the note can be dismissed.
+            </p>
+            <p>
               Step through the game with the buttons under the board, by clicking a move in the
               list, or with the keyboard. The bar beside the board shows who stands better, and
               each player's own row shows the material they are up, just left of their clock — an

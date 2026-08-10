@@ -115,6 +115,9 @@ On the analysis page you can:
 - Write a note against any move on the *Comments* tab — including a move in a variation, which
   is how a repertoire's lines get their names. The move list follows as you type, and the text
   is what the converted PGN carries in braces
+- See what the file could not give you: a note above the board names any variation dropped for
+  containing an unplayable move, and any move whose clock had to be reused because it carried no
+  elapsed time. Dismissible — neither stops the game being used
 - Download the converted PGN with your edited tags
 
 Everything — conversion and engine analysis alike — runs entirely in the browser; games are

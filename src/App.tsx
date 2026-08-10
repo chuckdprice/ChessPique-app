@@ -170,6 +170,8 @@ export default function App() {
   const [navOpen, setNavOpen] = useState(false)
   // Asking before a new game throws the current one away.
   const [confirmNew, setConfirmNew] = useState(false)
+  // Warnings are per file, so a new one starts them showing again.
+  const [warningsDismissed, setWarningsDismissed] = useState(false)
   const [appearanceOpen, setAppearanceOpen] = useState(false)
   // What the app is currently wearing. While the dialog is open this holds the
   // draft, so a pick is seen on the page behind it; only Save writes it down.
@@ -230,7 +232,13 @@ export default function App() {
       setAnalysisError(null)
       setLiveScore(null)
       setEngineMoves([])
-      setGame({ result: { ...result, warnings: [...result.warnings, ...parsed.warnings] }, tree })
+      // The parser's warnings lead: a dropped line is lost work, where a
+      // reused clock is only an approximation the file did not give.
+      setGame({
+        result: { ...result, warnings: [...parsed.warnings, ...result.warnings] },
+        tree,
+      })
+      setWarningsDismissed(false)
       setHeaders(result.headers)
       setCurrentId(tree.root)
       setError(null)
@@ -359,6 +367,7 @@ export default function App() {
     setLiveScore(null)
     setEngineMoves([])
     setGame({ result: NO_CONVERSION, tree })
+    setWarningsDismissed(false)
     setHeaders(newGameHeaders())
     setCurrentId(tree.root)
     setError(null)
@@ -813,6 +822,8 @@ export default function App() {
               onPromote={handlePromote}
               onDemote={handleDemote}
               onDelete={handleDelete}
+              warnings={warningsDismissed ? [] : game.result.warnings}
+              onDismissWarnings={() => setWarningsDismissed(true)}
               analysisProgress={analysisProgress}
               analysisError={analysisError}
               chartRows={chartRows}

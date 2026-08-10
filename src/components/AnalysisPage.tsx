@@ -14,6 +14,7 @@ import BoardViewer, { BoardNav, PlayerPlateRow } from './BoardViewer'
 import type { PlayerPlate } from './BoardViewer'
 import EnginePanel from './EnginePanel'
 import EvalBar from './EvalBar'
+import FileWarnings from './FileWarnings'
 import MoveTable from './MoveTable'
 
 interface AnalysisPageProps {
@@ -37,6 +38,9 @@ interface AnalysisPageProps {
   onPromote: (nodeId: string, toMainline: boolean) => void
   onDemote: (nodeId: string) => void
   onDelete: (nodeId: string) => void
+  /** What the file could not be read as written; empty once dismissed. */
+  warnings: string[]
+  onDismissWarnings: () => void
   analysisProgress: { done: number; total: number } | null
   analysisError: string | null
   chartRows: ChartRow[]
@@ -80,6 +84,8 @@ export default function AnalysisPage({
   onPromote,
   onDemote,
   onDelete,
+  warnings,
+  onDismissWarnings,
   analysisProgress,
   analysisError,
   chartRows,
@@ -137,6 +143,8 @@ export default function AnalysisPage({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       {reviewing && <AnalysisProgress progress={analysisProgress} error={analysisError} />}
+
+      <FileWarnings warnings={warnings} onDismiss={onDismissWarnings} />
 
       {/* Shape lives in .analysis-grid in index.css so it can change at lg. */}
       <div className="analysis-grid min-h-0 lg:flex-1">

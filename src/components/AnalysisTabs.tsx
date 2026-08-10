@@ -121,17 +121,22 @@ function ScrollHint({ side, show }: { side: 'left' | 'right'; show: boolean }) {
 function AnalysisPending({
   progress,
   error,
+  empty,
 }: {
   progress: { done: number; total: number } | null
   error: string | null
+  /** A game with no moves yet — there is nothing to wait for, only to play. */
+  empty: boolean
 }) {
   return (
     <p className="px-6 py-10 text-center text-sm text-ink-mute">
-      {error
-        ? `Engine review unavailable: ${error}`
-        : progress && progress.total > 0
-          ? `Waiting for the engine review — ${progress.done} of ${progress.total} positions done.`
-          : 'Waiting for the engine review to start…'}
+      {empty
+        ? 'Play a move on the board to start the game.'
+        : error
+          ? `Engine review unavailable: ${error}`
+          : progress && progress.total > 0
+            ? `Waiting for the engine review — ${progress.done} of ${progress.total} positions done.`
+            : 'Waiting for the engine review to start…'}
     </p>
   )
 }
@@ -258,7 +263,11 @@ export default function AnalysisTabs({
               opening={opening}
             />
           ) : (
-            <AnalysisPending progress={progress} error={analysisError} />
+            <AnalysisPending
+              progress={progress}
+              error={analysisError}
+              empty={moves.length === 0}
+            />
           ))}
         {tab === 'phases' &&
           (analysis ? (
@@ -268,7 +277,11 @@ export default function AnalysisTabs({
               blackName={blackName}
             />
           ) : (
-            <AnalysisPending progress={progress} error={analysisError} />
+            <AnalysisPending
+              progress={progress}
+              error={analysisError}
+              empty={moves.length === 0}
+            />
           ))}
         {tab === 'classification' &&
           (analysis ? (
@@ -281,7 +294,11 @@ export default function AnalysisTabs({
               playedLikeTooltip={playedLikeTooltip}
             />
           ) : (
-            <AnalysisPending progress={progress} error={analysisError} />
+            <AnalysisPending
+              progress={progress}
+              error={analysisError}
+              empty={moves.length === 0}
+            />
           ))}
         {tab === 'comments' && (
           <CommentEditor node={commentNode} onCommentChange={onCommentChange} />

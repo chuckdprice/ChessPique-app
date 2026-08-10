@@ -130,7 +130,9 @@ export default function AnalysisPage({
   const topColor = orientation === 'white' ? 'b' : 'w'
   const bottomColor = orientation === 'white' ? 'w' : 'b'
 
-  const reviewing = !analysis || analysisError
+  // A game with no moves has nothing to review, so the banner would sit there
+  // claiming a search was starting that never will.
+  const reviewing = moves.length > 0 && (!analysis || analysisError)
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">

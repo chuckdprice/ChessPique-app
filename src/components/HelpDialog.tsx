@@ -95,6 +95,12 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               <Ui>Settings</Ui> for how the engine searches, and this help. <Key>Esc</Key> closes
               it, as does a click anywhere outside it.
             </p>
+            <p>
+              <Ui>New game</Ui> on that menu starts an empty board with no moves, for building a
+              game or a repertoire by hand rather than importing one. It fills in the standard
+              tags for you — edit them on the <Ui>PGN Header Editor</Ui> — and the converted PGN
+              grows as you play. It asks first if the game already on the board has moves in it.
+            </p>
           </Section>
 
           <Section title="Step 1 — PGN File">

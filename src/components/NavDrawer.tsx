@@ -6,6 +6,8 @@ interface NavDrawerProps {
   /** Go to a page. The drawer closes itself afterwards. */
   onNavigate: (page: Page) => void
   onClose: () => void
+  /** Start an empty game to build on the board. */
+  onNewGame: () => void
   /** Analysis is unreachable until a game has been converted. */
   gameLoaded: boolean
   /** Appearance stays a modal; the nav is only how it is reached now. */
@@ -33,6 +35,7 @@ function Icon({ d, fills }: { d: string; fills?: React.ReactNode }) {
 }
 
 const ICON = {
+  newGame: 'M12 5v14M5 12h14',
   pgn: 'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Zm0 0v5h5M9 13h6M9 17h4',
   analysis: 'M4 20h16M7 20v-6M12 20V8M17 20v-9',
   appearance:
@@ -122,6 +125,7 @@ export default function NavDrawer({
   page,
   onNavigate,
   onClose,
+  onNewGame,
   gameLoaded,
   onAppearance,
   onHelp,
@@ -172,6 +176,13 @@ export default function NavDrawer({
           <Group>Game</Group>
           <Item
             innerRef={firstRef}
+            label="New game"
+            icon={<Icon d={ICON.newGame} />}
+            hint="empty board"
+            onSelect={onNewGame}
+            onClose={onClose}
+          />
+          <Item
             label="PGN File"
             icon={<Icon d={ICON.pgn} />}
             current={page === 'pgn'}

@@ -14,9 +14,14 @@ continuation. That is what makes an opening repertoire editable here: alternativ
 the move they answer, any of them can be promoted to the mainline, and the whole tree is read
 from and written back to PGN without loss.
 
+A game does not have to come from a file: **New game** on the menu starts an empty board, and
+the moves you play on it become the game, ready to export. Everything else works the same way
+on it — the engine review, the opening book, comments and variations.
+
 The two main pages are shown as chevron tabs across the top — **PGN File → Game Analysis** —
 sized so a 1440×900 desktop window needs no scrolling on either step. The button at the top
-left opens a menu reaching both of them plus **Appearance**, **Settings** and the help.
+left opens a menu reaching both of them, plus **New game**, **Appearance**, **Settings** and
+the help.
 
 - **PGN File**: two panes. The left holds the game coming in, under two tabs — *Original PGN*
   (a prominent drop zone, the time-control override, the paste box and Convert) and
@@ -27,6 +32,8 @@ left opens a menu reaching both of them plus **Appearance**, **Settings** and th
 - **Settings**: how the engine searches — search time, number of lines, memory. The same
   values as the gear on the analysis page, which stays as the shortcut for while you are
   looking at a position.
+- **New game**: an empty board, seeded with the Seven Tag Roster and today's date so the file
+  is valid from its first move. It asks before replacing a game that has moves in it.
 
 ### What goes into the converted PGN
 

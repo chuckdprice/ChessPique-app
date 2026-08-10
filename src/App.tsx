@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import type { Arrow } from 'react-chessboard'
 import AppearanceDialog from './components/AppearanceDialog'
 import BrandMark from './components/BrandMark'
+import ConfirmDialog from './components/ConfirmDialog'
 import HelpDialog from './components/HelpDialog'
 import NavDrawer, { NavToggle } from './components/NavDrawer'
 import PgnFilePage from './components/PgnFilePage'
@@ -36,6 +37,7 @@ import {
   applyMainlineTiming,
   deleteFrom,
   demote,
+  emptyTree,
   formatTreeMovetext,
   isMainline,
   lineEndId,
@@ -94,6 +96,41 @@ const NEXT_MOVE_ARROW = 'rgba(244, 130, 32, 0.95)'
 /** Credited in every converted PGN, so a shared file says where it came from. */
 const ANNOTATOR_URL = 'https://chessnoter.vercel.app/'
 
+/**
+ * The Seven Tag Roster a game started here begins with.
+ *
+ * PGN wants all seven present and spells unknown as "?", so a file built here
+ * is valid the moment it has a move — and the tag editor has something to edit
+ * rather than an empty list and a picker to work through.
+ */
+function newGameHeaders(): Array<{ name: string; value: string }> {
+  const now = new Date()
+  const date = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0'),
+  ].join('.')
+  return [
+    { name: 'Event', value: '?' },
+    { name: 'Site', value: '?' },
+    { name: 'Date', value: date },
+    { name: 'Round', value: '?' },
+    { name: 'White', value: '?' },
+    { name: 'Black', value: '?' },
+    { name: 'Result', value: '*' },
+  ]
+}
+
+/** Nothing conversion worked out, for a game that was not converted at all. */
+const NO_CONVERSION: ConvertResult = {
+  pgn: '',
+  headers: [],
+  moves: [],
+  result: null,
+  timeControl: null,
+  warnings: [],
+}
+
 /** The game's opening, once the book has loaded; null until then and if unnamed. */
 function useOpening(fens: string[] | null): Opening | null {
   const [opening, setOpening] = useState<Opening | null>(null)
@@ -131,6 +168,8 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const [helpOpen, setHelpOpen] = useState(false)
   const [navOpen, setNavOpen] = useState(false)
+  // Asking before a new game throws the current one away.
+  const [confirmNew, setConfirmNew] = useState(false)
   const [appearanceOpen, setAppearanceOpen] = useState(false)
   // What the app is currently wearing. While the dialog is open this holds the
   // draft, so a pick is seen on the page behind it; only Save writes it down.
@@ -301,6 +340,39 @@ export default function App() {
 
   /** Move the board to a node. Navigation never changes the game. */
   const handleNavigate = useCallback((nodeId: string) => setCurrentId(nodeId), [])
+
+  /**
+   * Start a game with no moves in it, to be built on the board.
+   *
+   * The tree has always been able to start empty; this is the way to ask for
+   * one. Everything downstream already copes — the review has nothing to review
+   * until there is a move, and the converted PGN grows as the game does.
+   */
+  const startNewGame = useCallback(() => {
+    // "*" — game in progress. PGN requires a termination marker, so without
+    // one the file a new game exports is invalid from its first move.
+    const tree = { ...emptyTree(), result: '*' }
+    if (analysisSignal.current) analysisSignal.current.cancelled = true
+    setAnalysis(null)
+    setAnalysisProgress(null)
+    setAnalysisError(null)
+    setLiveScore(null)
+    setEngineMoves([])
+    setGame({ result: NO_CONVERSION, tree })
+    setHeaders(newGameHeaders())
+    setCurrentId(tree.root)
+    setError(null)
+    setPage('analysis')
+  }, [])
+
+  /**
+   * A new game throws the current one away, so it asks first — but only when
+   * there is something to lose. A game with no moves is not worth a dialog.
+   */
+  const handleNewGame = useCallback(() => {
+    if (game && mainline(game.tree).length > 0) setConfirmNew(true)
+    else startNewGame()
+  }, [game, startNewGame])
 
   /**
    * The charts and the tabs still speak in plies, because they are about the
@@ -508,9 +580,16 @@ export default function App() {
   }, [game, headers, generatedHeaders, analysis, deeperEvals, pgnExtras])
 
   const downloadName = useMemo(() => {
-    const white = findHeader(headers, 'White') ?? 'White'
-    const black = findHeader(headers, 'Black') ?? 'Black'
-    const date = findHeader(headers, 'Date') ?? ''
+    // "?" is how PGN spells an unfilled tag, and a game started here begins
+    // with a roster full of them. Left alone they were stripped as illegal
+    // filename characters and the download came out " vs  2026-08-09.pgn".
+    const named = (name: string, fallback: string) => {
+      const value = findHeader(headers, name)
+      return !value || value === '?' ? fallback : value
+    }
+    const white = named('White', 'White')
+    const black = named('Black', 'Black')
+    const date = named('Date', '')
     const stem = `${white} vs ${black}${date ? ` ${date.replaceAll('.', '-')}` : ''}`
       .replace(/[\\/:*?"<>|]/g, '')
       .trim()
@@ -762,6 +841,7 @@ export default function App() {
           page={page}
           onNavigate={setPage}
           onClose={() => setNavOpen(false)}
+          onNewGame={handleNewGame}
           gameLoaded={!!game}
           onAppearance={handleAppearanceOpen}
           onHelp={() => setHelpOpen(true)}
@@ -782,6 +862,26 @@ export default function App() {
             setAppearance(savedAppearance.current)
             setAppearanceOpen(false)
           }}
+        />
+      )}
+
+      {confirmNew && (
+        <ConfirmDialog
+          title="Start a new game?"
+          body={
+            <>
+              The game on the board will be replaced, along with any variations and notes you
+              have added to it. If it came from a PGN, that text is still on the{' '}
+              <span className="font-medium text-ink">PGN File</span> page and can be converted
+              again — anything built here by hand cannot.
+            </>
+          }
+          confirmLabel="Start new game"
+          onConfirm={() => {
+            setConfirmNew(false)
+            startNewGame()
+          }}
+          onCancel={() => setConfirmNew(false)}
         />
       )}
 

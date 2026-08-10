@@ -38,6 +38,12 @@ interface AnalysisPageProps {
   onPromote: (nodeId: string, toMainline: boolean) => void
   onDemote: (nodeId: string) => void
   onDelete: (nodeId: string) => void
+  /** Step forward, which asks which way when the position has a choice. */
+  onStepForward: () => void
+  branch: { atId: string; index: number } | null
+  onBranchIndexChange: (index: number) => void
+  onBranchChoose: (nodeId: string) => void
+  onBranchClose: () => void
   /** What the file could not be read as written; empty once dismissed. */
   warnings: string[]
   onDismissWarnings: () => void
@@ -84,6 +90,11 @@ export default function AnalysisPage({
   onPromote,
   onDemote,
   onDelete,
+  onStepForward,
+  branch,
+  onBranchIndexChange,
+  onBranchChoose,
+  onBranchClose,
   warnings,
   onDismissWarnings,
   analysisProgress,
@@ -193,6 +204,10 @@ export default function AnalysisPage({
             onPromote={onPromote}
             onDemote={onDemote}
             onDelete={onDelete}
+            branch={branch}
+            onBranchIndexChange={onBranchIndexChange}
+            onBranchChoose={onBranchChoose}
+            onBranchClose={onBranchClose}
           />
         </div>
 
@@ -205,6 +220,7 @@ export default function AnalysisPage({
             tree={tree}
             currentId={currentId}
             onNavigate={onNavigate}
+            onStepForward={onStepForward}
             onRotate={() => setOrientation((o) => (o === 'white' ? 'black' : 'white'))}
             orientation={orientation}
           />

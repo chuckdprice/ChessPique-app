@@ -232,6 +232,8 @@ interface BoardNavProps {
   tree: MoveTree
   currentId: string
   onNavigate: (nodeId: string) => void
+  /** Forward is not always one place: at a branch it asks which way first. */
+  onStepForward: () => void
   onRotate: () => void
   orientation: 'white' | 'black'
 }
@@ -247,6 +249,7 @@ export function BoardNav({
   tree,
   currentId,
   onNavigate,
+  onStepForward,
   onRotate,
   orientation,
 }: BoardNavProps) {
@@ -304,7 +307,7 @@ export function BoardNav({
         <button
           type="button"
           className={seg}
-          onClick={() => next && onNavigate(next)}
+          onClick={onStepForward}
           disabled={!next}
           title={nextLabel ?? undefined}
           aria-label={nextLabel ? `Next move: ${nextLabel}` : 'Next move'}

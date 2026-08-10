@@ -278,6 +278,13 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               through a variation stays inside it; back steps out of it at the move it branched
               from. The buttons under the board do the same.
             </p>
+            <p>
+              Where the position has more than one continuation, going forward offers them in a
+              short list instead of choosing for you — the game's own line first, then its
+              variations. <Key>↑</Key> and <Key>↓</Key> move through them, <Key>→</Key> takes the
+              one marked, and <Key>Esc</Key> leaves the board where it is. Clicking one works too.
+              So a variation is reachable by walking to it, not only by finding it in the list.
+            </p>
           </Section>
 
           <Section title="About the ratings">

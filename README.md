@@ -80,7 +80,11 @@ lacks is appended.
 On the analysis page you can:
 
 - Step through the game with the navigation buttons (which name the previous and next moves),
-  the move list, or ← → keys, and flip the board to either player's perspective
+  the move list, or ← → keys, and flip the board to either player's perspective. Forward follows
+  the line the board is on, so walking a variation stays in it
+- Choose which way to go where a position has several continuations: going forward opens a short
+  list — the mainline first, then the variations — with ↑ ↓ to move through it, → to take the
+  one marked, and Esc to stay put
 - See each player's remaining clock beside their name (accuracy, rating and the estimated
   "played like" rating live in the Move Classification tab)
 - Follow the material balance on the players' own rows: the pieces each is *up* sit just left of

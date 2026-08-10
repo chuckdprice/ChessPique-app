@@ -172,6 +172,14 @@ export default function App() {
   const [confirmNew, setConfirmNew] = useState(false)
   // Warnings are per file, so a new one starts them showing again.
   const [warningsDismissed, setWarningsDismissed] = useState(false)
+  /**
+   * The choice offered when stepping forward has more than one way to go.
+   *
+   * Carries the move it was opened at, so moving the board by any other route
+   * — a click in the list, an arrow back — leaves it behind without anything
+   * having to close it.
+   */
+  const [branch, setBranch] = useState<{ atId: string; index: number } | null>(null)
   const [appearanceOpen, setAppearanceOpen] = useState(false)
   // What the app is currently wearing. While the dialog is open this holds the
   // draft, so a pick is seen on the page behind it; only Save writes it down.
@@ -260,6 +268,8 @@ export default function App() {
   // change, and the panel's search is not restarted by a new callback identity.
   const currentIdRef = useRef(currentId)
   currentIdRef.current = currentId
+  const branchRef = useRef(branch)
+  branchRef.current = branch
   const analysisRef = useRef(analysis)
   analysisRef.current = analysis
   const gameRef = useRef(game)
@@ -348,6 +358,29 @@ export default function App() {
 
   /** Move the board to a node. Navigation never changes the game. */
   const handleNavigate = useCallback((nodeId: string) => setCurrentId(nodeId), [])
+
+  /**
+   * Forward one move — or, where the position has several continuations, an
+   * offer of which. Taking the mainline silently would leave a variation
+   * reachable only by finding it in the list.
+   */
+  const handleStepForward = useCallback(() => {
+    const tree = gameRef.current?.tree
+    if (!tree) return
+    const at = currentIdRef.current
+    const node = tree.nodes.get(at)
+    if (!node) return
+    if (node.children.length > 1) {
+      setBranch({ atId: at, index: 0 })
+      return
+    }
+    if (node.children[0]) setCurrentId(node.children[0])
+  }, [])
+
+  const handleBranchChoose = useCallback((nodeId: string) => {
+    setCurrentId(nodeId)
+    setBranch(null)
+  }, [])
 
   /**
    * Start a game with no moves in it, to be built on the board.
@@ -487,12 +520,41 @@ export default function App() {
       ) {
         return
       }
+      // While the branch chooser is up it owns the arrows: it was opened by
+      // one and the whole point is to answer it with the same hand.
+      const open =
+        branchRef.current && branchRef.current.atId === currentIdRef.current
+          ? branchRef.current
+          : null
+      if (open) {
+        const count = tree.nodes.get(open.atId)?.children.length ?? 0
+        const move = (by: number) => {
+          e.preventDefault()
+          // Wrapping, because a list this short is quicker to go round than
+          // to run to the end of.
+          setBranch({ atId: open.atId, index: (open.index + by + count) % count })
+        }
+        if (e.key === 'ArrowDown') return move(1)
+        if (e.key === 'ArrowUp') return move(-1)
+        if (e.key === 'ArrowRight' || e.key === 'Enter') {
+          e.preventDefault()
+          const to = tree.nodes.get(open.atId)?.children[open.index]
+          if (to) handleBranchChoose(to)
+          return
+        }
+        if (e.key === 'Escape' || e.key === 'ArrowLeft') {
+          e.preventDefault()
+          setBranch(null)
+          return
+        }
+      }
+
       if (e.key === 'ArrowLeft') {
         e.preventDefault()
         step((at) => previousId(tree, at))
       } else if (e.key === 'ArrowRight') {
         e.preventDefault()
-        step((at) => nextId(tree, at))
+        handleStepForward()
       } else if (e.key === 'Home') {
         e.preventDefault()
         step(() => tree.root)
@@ -503,7 +565,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [game, page, helpOpen, navOpen, appearanceOpen])
+  }, [game, page, helpOpen, navOpen, appearanceOpen, handleStepForward, handleBranchChoose])
 
   /**
    * The mainline as a flat list, which is what the charts, the clocks and the
@@ -517,6 +579,8 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const mainlineFenList = useMemo(() => (game ? mainlineFens(game.tree) : null), [mainlineKey])
   const opening = useOpening(mainlineFenList)
+
+  const openBranch = branch && branch.atId === currentId ? branch : null
 
   /** How the position the board is on sits in the game. */
   const onMainline = game ? isMainline(game.tree, currentId) : true
@@ -822,6 +886,13 @@ export default function App() {
               onPromote={handlePromote}
               onDemote={handleDemote}
               onDelete={handleDelete}
+              onStepForward={handleStepForward}
+              branch={openBranch}
+              onBranchIndexChange={(index) =>
+                setBranch((prev) => (prev ? { ...prev, index } : prev))
+              }
+              onBranchChoose={handleBranchChoose}
+              onBranchClose={() => setBranch(null)}
               warnings={warningsDismissed ? [] : game.result.warnings}
               onDismissWarnings={() => setWarningsDismissed(true)}
               analysisProgress={analysisProgress}

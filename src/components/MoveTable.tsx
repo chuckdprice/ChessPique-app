@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
   CLASSIFICATION_LABEL,
   CLASSIFICATION_SYMBOL,
@@ -11,6 +11,7 @@ import { formatScore } from '../lib/engine/uci'
 import type { Score } from '../lib/engine/uci'
 import { mainline } from '../lib/moveTree'
 import type { MoveNode, MoveTree } from '../lib/moveTree'
+import BranchChooser from './BranchChooser'
 import { classColor } from './ClassBadge'
 import MoveMenu from './MoveMenu'
 
@@ -25,6 +26,11 @@ interface MoveTableProps {
   onPromote: (nodeId: string, toMainline: boolean) => void
   onDemote: (nodeId: string) => void
   onDelete: (nodeId: string) => void
+  /** Open when stepping forward has more than one continuation to offer. */
+  branch: { atId: string; index: number } | null
+  onBranchIndexChange: (index: number) => void
+  onBranchChoose: (nodeId: string) => void
+  onBranchClose: () => void
 }
 
 interface Row {
@@ -42,11 +48,17 @@ export default function MoveTable({
   onPromote,
   onDemote,
   onDelete,
+  branch,
+  onBranchIndexChange,
+  onBranchChoose,
+  onBranchClose,
 }: MoveTableProps) {
   const listRef = useRef<HTMLDivElement>(null)
   const currentRef = useRef<HTMLButtonElement>(null)
   /** The move whose menu is open, and where to draw it. */
   const [menu, setMenu] = useState<{ nodeId: string; x: number; y: number } | null>(null)
+  /** Where to hang the branch chooser: under the move the board is on. */
+  const [branchAnchor, setBranchAnchor] = useState<{ left: number; bottom: number } | null>(null)
 
   /** Rows of the game kept visible above the current move. */
   const CONTEXT_ROWS = 2
@@ -78,6 +90,20 @@ export default function MoveTable({
     const target = list.scrollTop + (moveBox.top - listBox.top) - CONTEXT_ROWS * moveBox.height
     list.scrollTop = Math.max(0, target)
   }, [currentId])
+
+  // Measured when the chooser opens rather than at render: the move is a
+  // button inside a table cell, so only its rect gives a usable position.
+  const branchAt = branch?.atId ?? null
+  useLayoutEffect(() => {
+    if (!branchAt) {
+      setBranchAnchor(null)
+      return
+    }
+    // At the starting position there is no move to hang it on, so it goes
+    // under the top of the list instead.
+    const box = (currentRef.current ?? listRef.current)?.getBoundingClientRect()
+    setBranchAnchor(box ? { left: box.left, bottom: box.bottom + 2 } : null)
+  }, [branchAt])
 
   const line = mainline(tree)
   const rows: Row[] = []
@@ -385,6 +411,18 @@ export default function MoveTable({
           </p>
         )}
       </div>
+
+      {branch && (
+        <BranchChooser
+          tree={tree}
+          atId={branch.atId}
+          index={branch.index}
+          onIndexChange={onBranchIndexChange}
+          onChoose={onBranchChoose}
+          onClose={onBranchClose}
+          anchor={branchAnchor}
+        />
+      )}
 
       {menu && (
         <MoveMenu

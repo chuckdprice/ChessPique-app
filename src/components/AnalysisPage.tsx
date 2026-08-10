@@ -8,7 +8,6 @@ import type { ChartRow } from '../lib/gameModel'
 import { capturedMaterial, clockAtPly } from '../lib/gameModel'
 import type { MoveTree } from '../lib/moveTree'
 import type { Opening } from '../lib/openings'
-import AnalysisProgress from './AnalysisProgress'
 import AnalysisTabs from './AnalysisTabs'
 import BoardBoundary from './BoardBoundary'
 import BoardViewer, { BoardNav, PlayerPlateRow } from './BoardViewer'
@@ -17,6 +16,7 @@ import EnginePanel from './EnginePanel'
 import EvalBar from './EvalBar'
 import FileWarnings from './FileWarnings'
 import MoveTable from './MoveTable'
+import ReviewError from './ReviewError'
 
 interface AnalysisPageProps {
   result: ConvertResult
@@ -148,13 +148,14 @@ export default function AnalysisPage({
   const topColor = orientation === 'white' ? 'b' : 'w'
   const bottomColor = orientation === 'white' ? 'w' : 'b'
 
-  // A game with no moves has nothing to review, so the banner would sit there
-  // claiming a search was starting that never will.
-  const reviewing = moves.length > 0 && (!analysis || analysisError)
+  // A game with no moves has nothing to review, so the ring would sit there
+  // spinning over a search that never will start. A failed review is finished
+  // too — the banner says so instead.
+  const reviewing = moves.length > 0 && !analysis && !analysisError
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
-      {reviewing && <AnalysisProgress progress={analysisProgress} error={analysisError} />}
+      <ReviewError error={analysisError} />
 
       <FileWarnings warnings={warnings} onDismiss={onDismissWarnings} />
 
@@ -195,6 +196,8 @@ export default function AnalysisPage({
             onEnabledChange={onEngineOnChange}
             settings={engineSettings}
             onSettingsChange={onEngineSettingsChange}
+            reviewActive={reviewing}
+            reviewProgress={analysisProgress}
             onTopScore={onTopScore}
             onFirstMoves={onEngineMoves}
           />

@@ -5,6 +5,7 @@ import type { AnalyzeUpdate, EngineLine } from '../lib/engine/uci'
 import { saveEngineSettings } from '../lib/settings'
 import type { EngineSettings } from '../lib/settings'
 import EngineSettingsPanel from './EngineSettings'
+import ReviewRing from './ReviewRing'
 
 interface EnginePanelProps {
   fen: string
@@ -12,6 +13,13 @@ interface EnginePanelProps {
   onEnabledChange: (enabled: boolean) => void
   settings: EngineSettings
   onSettingsChange: (next: EngineSettings) => void
+  /**
+   * The whole-game review, which is not this panel's search: its ring rides
+   * here because this row is already on screen and never changes height, so a
+   * review starting and finishing cannot move the board.
+   */
+  reviewActive?: boolean
+  reviewProgress?: { done: number; total: number } | null
   /**
    * Latest top-line score (white POV) and the depth that produced it; null
    * when idle. The depth lets the caller tell a deeper answer from a shallower
@@ -44,6 +52,8 @@ export default function EnginePanel({
   onEnabledChange,
   settings,
   onSettingsChange,
+  reviewActive = false,
+  reviewProgress = null,
   onTopScore,
   onFirstMoves,
 }: EnginePanelProps) {
@@ -195,7 +205,10 @@ export default function EnginePanel({
           </span>
         )}
 
-        <span className="min-w-0 flex-1 truncate text-xs text-ink-mute">{ENGINE_NAME}</span>
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="min-w-0 truncate text-xs text-ink-mute">{ENGINE_NAME}</span>
+          {reviewActive && <ReviewRing progress={reviewProgress} />}
+        </div>
 
         <button
           type="button"

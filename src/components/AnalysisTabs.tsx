@@ -117,7 +117,7 @@ function ScrollHint({ side, show }: { side: 'left' | 'right'; show: boolean }) {
   )
 }
 
-/** Short placeholder; the banner above the board carries the live progress. */
+/** Short placeholder; the ring in the engine pane carries the live progress. */
 function AnalysisPending({
   progress,
   error,

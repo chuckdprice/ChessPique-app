@@ -10,6 +10,7 @@ import type { MoveTree } from '../lib/moveTree'
 import type { Opening } from '../lib/openings'
 import AnalysisProgress from './AnalysisProgress'
 import AnalysisTabs from './AnalysisTabs'
+import BoardBoundary from './BoardBoundary'
 import BoardViewer, { BoardNav, PlayerPlateRow } from './BoardViewer'
 import type { PlayerPlate } from './BoardViewer'
 import EnginePanel from './EnginePanel'
@@ -168,15 +169,17 @@ export default function AnalysisPage({
         </div>
 
         <div className="area-board">
-          <BoardViewer
-            tree={tree}
-            currentId={currentId}
-            orientation={orientation}
-            analysis={analysis}
-            arrows={arrows}
-            onPieceMove={onPieceMove}
-            pieceSet={pieceSet}
-          />
+          <BoardBoundary resetKey={currentId}>
+            <BoardViewer
+              tree={tree}
+              currentId={currentId}
+              orientation={orientation}
+              analysis={analysis}
+              arrows={arrows}
+              onPieceMove={onPieceMove}
+              pieceSet={pieceSet}
+            />
+          </BoardBoundary>
         </div>
 
         {/* On lg this spans rows 1-3, so the engine pane's top lines up with the

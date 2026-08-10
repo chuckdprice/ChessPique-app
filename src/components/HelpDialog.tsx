@@ -173,6 +173,11 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               runs.
             </p>
             <p>
+              If the board itself ever stops drawing, a note takes its place and the rest of the
+              page carries on — the move list, the engine and the export are unaffected, and
+              stepping to another move draws it again.
+            </p>
+            <p>
               If anything in the file did not come through as written, a note above the board says
               so and names it — a variation with an unplayable move in it is dropped, and a move
               with no elapsed time reuses the clock before it. The game is still usable either

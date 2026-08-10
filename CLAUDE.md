@@ -45,6 +45,16 @@ app bug for several minutes. Use the `mobile` / `tablet` / `desktop` presets,
 and if a click does nothing, calibrate before debugging the app — attach a
 capturing `click` listener, click a known point, and compare.
 
+**The board can throw, and it is wrapped so that it does not take the page.**
+react-chessboard measures a square to animate a move and throws "Square width
+not found" when it has no layout to measure — which the browser pane does to it
+regularly once it stops painting. An uncaught error unmounts the whole React
+tree, so this used to blank the app mid-session and lose the game. `BoardBoundary`
+catches it and clears itself when `currentId` changes, so navigating recovers.
+If the app goes blank while you are testing, check the console for that message
+before suspecting whatever you just changed — it reproduces on an untouched
+checkout.
+
 **The chessboard needs pointer events.** react-chessboard v5 uses dnd-kit, so
 the harness's drag tool (mouse events) cannot move a piece. Drive it with a
 `pointerdown` → several `pointermove` → `pointerup` sequence.
@@ -93,7 +103,7 @@ the harness's drag tool (mouse events) cannot move a piece. Drive it with a
   `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>` line.
 - Commit and push only when Chuck asks. He asks explicitly, usually right after
   reviewing.
-- `npm run build && npm test` before every commit. 179 tests as of this writing;
+- `npm run build && npm test` before every commit. 180 tests as of this writing;
   they cover `src/lib` only — the UI is verified in the browser.
 - **Bump the version with `npm version`, never by editing `package.json`.** Only
   major and minor are read (`vite.config.ts` derives the build number from the
@@ -115,10 +125,18 @@ v1 release and the point v2 branched from. Pushes to `v2.0` get preview
 deployments, not production — merging to `main` is what makes v2 live, and Chuck
 means it to replace v1 rather than run alongside it.
 
-Done on the branch: the left-nav menu, a Settings page, the move tree and
-variation editing. Still open from the original list: starting a PGN from
-scratch — `emptyTree()` exists and works, there is simply no way to ask for one
-yet.
+Every feature on the original v2 list is done: the left-nav menu, a Settings
+page, Appearance moved onto the nav, the move tree with variation editing, and
+starting a game from nothing. What is left is Chuck trying it himself and the
+merge to `main`.
+
+Two things about the review that a session should not undo. It only covers the
+mainline — reviewing every variation would pin the CPU for minutes on a
+repertoire and start again on every edit — and its searches are cached by FEN
+for the life of the tab, so adding a move costs one search rather than a whole
+review. The engine's recommended line for a faulted move is played into the
+tree as a real variation, which is why nothing writes it into the PGN
+separately any more.
 
 The Lichess sign-in and study import work: Chuck confirmed the whole flow
 against his own account on 6 August 2026, after the pop-up handoff was changed

@@ -9,8 +9,6 @@ interface StepNavProps {
   onPageChange: (page: Step) => void
   /** Analysis is unreachable until a game has been converted. */
   gameLoaded: boolean
-  /** 0-100 while the engine review runs; null when idle or finished. */
-  analysisPercent: number | null
 }
 
 const STEPS: Array<{ id: Step; label: string }> = [
@@ -34,12 +32,7 @@ function clipFor(index: number, count: number): string {
   ].join(', ')
 }
 
-export default function StepNav({
-  page,
-  onPageChange,
-  gameLoaded,
-  analysisPercent,
-}: StepNavProps) {
+export default function StepNav({ page, onPageChange, gameLoaded }: StepNavProps) {
   return (
     <nav aria-label="Steps" className="flex select-none">
       {STEPS.map((step, i) => {
@@ -67,15 +60,6 @@ export default function StepNav({
           >
             <span className="mr-2 font-score text-xs opacity-70">{i + 1}</span>
             {step.label}
-            {step.id === 'analysis' && analysisPercent != null && (
-              <span
-                className={`ml-2 rounded-full px-1.5 py-0.5 font-score text-[10px] ${
-                  active ? 'bg-buff/25 text-buff' : 'bg-felt/15 text-ink-mute'
-                }`}
-              >
-                {analysisPercent}%
-              </span>
-            )}
           </button>
         )
       })}

@@ -771,11 +771,6 @@ export default function App() {
     return list
   }, [engineOn, engineMoves, game, currentId])
 
-  const analysisPercent =
-    analysisProgress && analysisProgress.total > 0
-      ? Math.round((analysisProgress.done / analysisProgress.total) * 100)
-      : null
-
   const playedLikeTooltip =
     `Estimated "played like" rating for this game.\n\n` +
     `Estimated from average win-% lost per move in undecided positions, calibrated against ` +
@@ -861,12 +856,7 @@ export default function App() {
       </header>
 
       <div className="app-steps mx-auto w-full max-w-[1600px] shrink-0 px-4 pt-2 sm:px-6">
-        <StepNav
-          page={page}
-          onPageChange={setPage}
-          gameLoaded={!!game}
-          analysisPercent={analysisPercent}
-        />
+        <StepNav page={page} onPageChange={setPage} gameLoaded={!!game} />
       </div>
 
       {/* --board-size lives in index.css: a short viewport needs a different

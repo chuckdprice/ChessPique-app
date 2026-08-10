@@ -105,6 +105,9 @@ the harness's drag tool (mouse events) cannot move a piece. Drive it with a
   reviewing.
 - `npm run build && npm test` before every commit. 180 tests as of this writing;
   they cover `src/lib` only — the UI is verified in the browser.
+- Commits during v2 were split by concern rather than by session, sometimes by
+  rebuilding intermediate file states by hand (`git add -p` is interactive and
+  unavailable here). Worth the trouble: each one builds and passes on its own.
 - **Bump the version with `npm version`, never by editing `package.json`.** Only
   major and minor are read (`vite.config.ts` derives the build number from the
   commit timestamp), but the lockfile carries the version too, and hand-editing
@@ -119,24 +122,27 @@ Deployed at <https://chessnoter.vercel.app> from `main` (auto-deploy on push).
 The version in the header is `major.minor` from `package.json` plus a build
 number derived from the commit's timestamp, so it changes on every commit.
 
-**v2.0 is in progress on the `v2.0` branch**, which is where the work is. `main`
-still holds v1 and still serves production; the tag `v1.6-final` marks the last
-v1 release and the point v2 branched from. Pushes to `v2.0` get preview
-deployments, not production — merging to `main` is what makes v2 live, and Chuck
-means it to replace v1 rather than run alongside it.
+**v2.0 shipped on 10 August 2026** and is what production serves; Chuck
+confirmed it against the live site. Work happens on `main` again — the `v2.0`
+branch was merged and deleted. Two tags bracket it: `v2.0.0` on the release
+merge, `v1.6-final` on the last v1 release, which is what a rollback goes back
+to (`git revert -m 1` the merge, or redeploy that tag from Vercel).
 
-Every feature on the original v2 list is done: the left-nav menu, a Settings
-page, Appearance moved onto the nav, the move tree with variation editing, and
-starting a game from nothing. What is left is Chuck trying it himself and the
-merge to `main`.
+What v2 changed, in one line: the game became a tree of moves rather than a
+list, so the app edits a game as well as converting and reviewing one. That is
+what makes it usable for an opening repertoire — and v1's parser discarded
+variations silently, so any repertoire opened in v1 lost them.
 
-Two things about the review that a session should not undo. It only covers the
-mainline — reviewing every variation would pin the CPU for minutes on a
-repertoire and start again on every edit — and its searches are cached by FEN
-for the life of the tab, so adding a move costs one search rather than a whole
-review. The engine's recommended line for a faulted move is played into the
-tree as a real variation, which is why nothing writes it into the PGN
-separately any more.
+Three things about the review that a session should not undo:
+
+- It covers the mainline only. Reviewing every branch of a repertoire would pin
+  the CPU for minutes and start again on every edit.
+- Its searches are cached by FEN for the life of the tab, so adding a move costs
+  one search rather than a whole review — 21.3s against 2.0s, measured on a
+  sixteen-move game.
+- The engine's recommended line for a faulted move is played into the tree as a
+  real variation. That is why nothing writes it into the PGN separately any
+  more, and why `moveVariation` and `formatVariation` are gone.
 
 The Lichess sign-in and study import work: Chuck confirmed the whole flow
 against his own account on 6 August 2026, after the pop-up handoff was changed

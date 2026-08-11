@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Chessboard, defaultArrowOptions } from 'react-chessboard'
 import type { Arrow, PieceRenderObject, SquareHandlerArgs } from 'react-chessboard'
 import { PIECE_CODES, pieceSrc } from '../lib/appearance'
-import { formatClockTime } from '../lib/convert'
+import { formatClockDisplay } from '../lib/convert'
 import { hasMoveMarker } from '../lib/engine/analysis'
 import type { GameAnalysis } from '../lib/engine/analysis'
 import { moveTargets } from '../lib/gameModel'
@@ -147,7 +147,7 @@ export function PlayerPlateRow({ plate, color }: { plate: PlayerPlate; color: 'w
             className="shrink-0 rounded bg-buff-soft px-2 py-0.5 font-score text-sm font-semibold tabular-nums"
             aria-label={`${color === 'w' ? 'White' : 'Black'} clock`}
           >
-            {formatClockTime(plate.clock)}
+            {formatClockDisplay(plate.clock)}
           </span>
         )}
       </span>

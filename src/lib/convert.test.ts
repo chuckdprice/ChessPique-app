@@ -5,6 +5,7 @@ import {
   buildPgn,
   ConvertError,
   convertPgn,
+  formatClockDisplay,
   formatClockTime,
   parseClockTime,
   parseTimecontrolHeader,
@@ -39,6 +40,24 @@ describe('formatClockTime', () => {
     expect(formatClockTime(4020)).toBe('1:07:00')
     expect(formatClockTime(0)).toBe('0:00:00')
     expect(formatClockTime(-5)).toBe('0:00:00')
+  })
+})
+
+describe('formatClockDisplay', () => {
+  it('drops the hour when there is none', () => {
+    expect(formatClockDisplay(595)).toBe('9:55')
+    expect(formatClockDisplay(45)).toBe('0:45')
+    expect(formatClockDisplay(600)).toBe('10:00')
+    expect(formatClockDisplay(0)).toBe('0:00')
+    expect(formatClockDisplay(-5)).toBe('0:00')
+  })
+  it('keeps it, zero-padding the minutes, from an hour up', () => {
+    expect(formatClockDisplay(4020)).toBe('1:07:00')
+    expect(formatClockDisplay(3600)).toBe('1:00:00')
+    expect(formatClockDisplay(3599)).toBe('59:59')
+  })
+  it('leaves the PGN form alone — [%clk] keeps its hour', () => {
+    expect(formatClockTime(595)).toBe('0:09:55')
   })
 })
 

@@ -94,12 +94,31 @@ export function parseClockTime(value: string, bare = false): number {
   return hours * 3600 + minutes * 60 + seconds
 }
 
+/** h:mm:ss, the form the PGN supplement gives for `[%clk]`. */
 export function formatClockTime(totalSeconds: number): string {
   const s = Math.max(0, Math.trunc(totalSeconds))
   const hours = Math.trunc(s / 3600)
   const minutes = Math.trunc((s % 3600) / 60)
   const secs = s % 60
   return `${hours}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+}
+
+/**
+ * The same clock for the screen: "9:55" under the hour, "1:07:00" over it.
+ *
+ * Separate from `formatClockTime` rather than a flag on it, because that one
+ * writes `[%clk]` into the converted PGN and has to keep the leading hour
+ * whatever a game's length — a reader is entitled to insist on h:mm:ss, and
+ * most games never reach an hour, so a flag defaulted either way would have
+ * put the wrong form in the file the first time someone forgot it.
+ */
+export function formatClockDisplay(totalSeconds: number): string {
+  const s = Math.max(0, Math.trunc(totalSeconds))
+  const hours = Math.trunc(s / 3600)
+  const minutes = Math.trunc((s % 3600) / 60)
+  const secs = s % 60
+  const mins = hours > 0 ? String(minutes).padStart(2, '0') : String(minutes)
+  return `${hours > 0 ? `${hours}:` : ''}${mins}:${String(secs).padStart(2, '0')}`
 }
 
 export function splitHeadersAndMovetext(text: string): {

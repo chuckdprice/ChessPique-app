@@ -8,7 +8,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { formatClockTime } from '../lib/convert'
+import { formatClockDisplay } from '../lib/convert'
 import type { ChartRow } from '../lib/gameModel'
 
 interface ClockChartProps {
@@ -105,7 +105,7 @@ function ChartTooltip({ active, payload, whiteName, blackName }: TooltipContentP
         <span className="font-score">{san}</span>
         <span className="text-ink-mute">
           {name} · spent {emt != null ? formatMinSec(emt) : '—'} · left{' '}
-          {clk != null ? formatClockTime(clk) : '—'}
+          {clk != null ? formatClockDisplay(clk) : '—'}
         </span>
       </div>
     )
@@ -225,7 +225,7 @@ export default function ClockChart({
               yAxisId="clock"
               domain={[0, maxClock]}
               ticks={clockTicks(maxClock)}
-              tickFormatter={formatClockTime}
+              tickFormatter={formatClockDisplay}
               tick={{ fontSize: 11, fill: 'var(--chart-tick)' }}
               tickLine={false}
               axisLine={false}

@@ -2,7 +2,7 @@ import { Fragment, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Chess } from 'chess.js'
 import { Engine, ENGINE_NAME, formatScore } from '../lib/engine/uci'
-import type { AnalyzeUpdate, EngineLine } from '../lib/engine/uci'
+import type { AnalyzeUpdate, EngineLine, Score } from '../lib/engine/uci'
 import { saveEngineSettings } from '../lib/settings'
 import type { EngineSettings } from '../lib/settings'
 import EngineSettingsPanel from './EngineSettings'
@@ -31,8 +31,18 @@ interface EnginePanelProps {
    * one for the same position.
    */
   onTopScore?: (score: import('../lib/engine/uci').Score | null, depth: number) => void
-  /** First UCI move of each line, best first — drives the board arrows. */
-  onFirstMoves?: (ucis: string[]) => void
+  /**
+   * Each line's first move and the score it is worth, best first — the board's
+   * arrows and the numbers printed at their heads.
+   */
+  onFirstMoves?: (lines: EngineArrow[]) => void
+}
+
+/** One candidate as the board draws it: a move, and what the engine makes of it. */
+export interface EngineArrow {
+  /** Empty for a line the engine has not given a move for yet. */
+  uci: string
+  score: Score | null
 }
 
 /**
@@ -165,7 +175,10 @@ export default function EnginePanel({
       cancelled = true
       engineRef.current?.stop()
     }
-  }, [enabled, fen, settings])
+    // The three the search itself reads, not the settings object: it now also
+    // carries how the board draws the answer, and a whole search was thrown
+    // away and restarted every time one of those was flipped.
+  }, [enabled, fen, settings.searchTimeSec, settings.multiPv, settings.hashMb])
 
   /**
    * The board's arrows, taken from the very lines being listed.
@@ -181,7 +194,9 @@ export default function EnginePanel({
    */
   useEffect(() => {
     if (!enabled) return
-    onFirstMovesRef.current?.((update?.lines ?? []).map((line) => line.pvUci[0] ?? ''))
+    onFirstMovesRef.current?.(
+      (update?.lines ?? []).map((line) => ({ uci: line.pvUci[0] ?? '', score: line.score })),
+    )
   }, [enabled, update])
 
   // Tear the worker down when the panel unmounts.

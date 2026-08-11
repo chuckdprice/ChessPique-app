@@ -18,6 +18,8 @@ export interface EngineSettings {
   multiPv: number
   /** Hash table size in MB. */
   hashMb: number
+  /** Print each candidate's score at the head of its arrow on the board. */
+  arrowEvals: boolean
 }
 
 export const DEFAULT_APPEARANCE: AppearanceSettings = {
@@ -25,7 +27,12 @@ export const DEFAULT_APPEARANCE: AppearanceSettings = {
   board: 'tournament',
   pieces: 'classic',
 }
-export const DEFAULT_ENGINE: EngineSettings = { searchTimeSec: 8, multiPv: 3, hashMb: 128 }
+export const DEFAULT_ENGINE: EngineSettings = {
+  searchTimeSec: 8,
+  multiPv: 3,
+  hashMb: 128,
+  arrowEvals: true,
+}
 
 const APPEARANCE_KEY = 'chessnoter.appearance'
 const ENGINE_KEY = 'chessnoter.engine'
@@ -69,6 +76,9 @@ export function loadEngineSettings(): EngineSettings {
   e.searchTimeSec = Math.min(30, Math.max(1, Math.round(e.searchTimeSec)))
   e.multiPv = Math.min(5, Math.max(1, Math.round(e.multiPv)))
   e.hashMb = Math.min(512, Math.max(16, Math.round(e.hashMb)))
+  // A setting saved before this one existed merges the default in as any other
+  // missing key would, but a file hand-edited to a string would not.
+  e.arrowEvals = e.arrowEvals !== false
   return e
 }
 

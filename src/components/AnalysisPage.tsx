@@ -11,8 +11,9 @@ import type { Opening } from '../lib/openings'
 import AnalysisTabs from './AnalysisTabs'
 import BoardBoundary from './BoardBoundary'
 import BoardViewer, { BoardNav, PlayerPlateRow } from './BoardViewer'
-import type { PlayerPlate } from './BoardViewer'
+import type { EvalLabel, PlayerPlate } from './BoardViewer'
 import EnginePanel from './EnginePanel'
+import type { EngineArrow } from './EnginePanel'
 import EvalBar from './EvalBar'
 import FileWarnings from './FileWarnings'
 import MoveTable from './MoveTable'
@@ -63,9 +64,11 @@ interface AnalysisPageProps {
   engineSettings: EngineSettings
   onEngineSettingsChange: (next: EngineSettings) => void
   onTopScore: (score: Score | null, depth: number) => void
-  onEngineMoves: (ucis: string[]) => void
+  onEngineMoves: (lines: EngineArrow[]) => void
   onCommentChange: (nodeId: string, comment: string) => void
   arrows: Arrow[]
+  /** Scores printed at the arrow heads; empty when the setting is off. */
+  evalLabels: EvalLabel[]
   /** Piece set id from the appearance settings. */
   pieceSet: string
 }
@@ -115,6 +118,7 @@ export default function AnalysisPage({
   onEngineMoves,
   onCommentChange,
   arrows,
+  evalLabels,
   pieceSet,
 }: AnalysisPageProps) {
   const [orientation, setOrientation] = useState<'white' | 'black'>('white')
@@ -179,6 +183,7 @@ export default function AnalysisPage({
               orientation={orientation}
               analysis={analysis}
               arrows={arrows}
+              evalLabels={evalLabels}
               onPieceMove={onPieceMove}
               pieceSet={pieceSet}
             />

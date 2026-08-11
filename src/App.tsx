@@ -8,6 +8,8 @@ import NavDrawer, { NavToggle } from './components/NavDrawer'
 import PgnFilePage from './components/PgnFilePage'
 import SettingsPage from './components/SettingsPage'
 import StepNav from './components/StepNav'
+import type { EvalLabel } from './components/BoardViewer'
+import type { EngineArrow } from './components/EnginePanel'
 import type { Page } from './lib/pages'
 import type { PgnExtras } from './components/PgnExtrasSwitches'
 import {
@@ -29,7 +31,7 @@ import {
   withDeeperEval,
 } from './lib/engine/analysis'
 import type { GameAnalysis, RefinedEval, ReviewedPosition } from './lib/engine/analysis'
-import { formatEvalTag } from './lib/engine/uci'
+import { formatEvalTag, formatScore } from './lib/engine/uci'
 import type { Score } from './lib/engine/uci'
 import { buildChartRows } from './lib/gameModel'
 import {
@@ -218,7 +220,7 @@ export default function App() {
   const [engineSettings, setEngineSettings] = useState<EngineSettings>(loadEngineSettings)
   const [engineOn, setEngineOn] = useState(false)
   const [liveScore, setLiveScore] = useState<Score | null>(null)
-  const [engineMoves, setEngineMoves] = useState<string[]>([])
+  const [engineMoves, setEngineMoves] = useState<EngineArrow[]>([])
   const [analysis, setAnalysis] = useState<GameAnalysis | null>(null)
   const [analysisProgress, setAnalysisProgress] = useState<{ done: number; total: number } | null>(
     null,
@@ -398,7 +400,7 @@ export default function App() {
     const reviewDepth = analysisRef.current?.evalDepths[ply] ?? REVIEW_DEPTH
     setDeeperEvals((prev) => withDeeperEval(prev, at, { score, depth }, reviewDepth))
   }, [])
-  const handleEngineMoves = useCallback((ucis: string[]) => setEngineMoves(ucis), [])
+  const handleEngineMoves = useCallback((lines: EngineArrow[]) => setEngineMoves(lines), [])
 
   /** Move the board to a node. Navigation never changes the game. */
   const handleNavigate = useCallback((nodeId: string) => setCurrentId(nodeId), [])
@@ -729,11 +731,16 @@ export default function App() {
       ? liveScore
       : (deeperEvals.get(currentId)?.score ?? analysis.evals[currentPly] ?? null)
 
+  // Read out of the settings object here so the memo below depends on the flag
+  // itself: the object is replaced by any engine setting changing, and the
+  // arrows have no business being rebuilt because the hash size moved.
+  const showArrowEvals = engineSettings.arrowEvals
+
   // Engine candidates fade best→worst, then the game's own next move is drawn
   // on top. The move already on the board gets no arrow — the highlighted
   // squares already show it, and it belongs to the other side.
-  const arrows: Arrow[] = useMemo(() => {
-    if (!engineOn || !game) return []
+  const { arrows, evalLabels } = useMemo<{ arrows: Arrow[]; evalLabels: EvalLabel[] }>(() => {
+    if (!engineOn || !game) return { arrows: [], evalLabels: [] }
     // The continuation of the line the board is on, which is by the same side
     // the engine is thinking for. It follows the board into a variation now,
     // where before there was no next move to draw at all.
@@ -749,22 +756,38 @@ export default function App() {
     // the duplicate is dropped and the orange next-move arrow wins.
     const seen = new Set<string>()
     if (nextKey) seen.add(nextKey)
+    // Arrows are keyed by the pair of squares, but a label sits on the head
+    // alone, and two candidates arriving on one square — two pieces that can
+    // both take it — would print one number on top of the other. The better
+    // line's is the one worth reading, so it is the one that gets there.
+    const labelled = new Set<string>()
 
     const list: Arrow[] = []
-    engineMoves.slice(0, ENGINE_ARROW_ALPHA.length).forEach((uci, i) => {
+    const labels: EvalLabel[] = []
+    engineMoves.slice(0, ENGINE_ARROW_ALPHA.length).forEach((line, i) => {
       // A line the engine has not given a move for yet holds its place, so the
       // arrows below it keep the rank — and the shade — of their own line.
-      if (!uci) return
-      const from = uci.slice(0, 2)
-      const to = uci.slice(2, 4)
+      if (!line.uci) return
+      const from = line.uci.slice(0, 2)
+      const to = line.uci.slice(2, 4)
       const key = `${from}${to}`
       if (seen.has(key)) return
       seen.add(key)
-      list.push({
-        startSquare: from,
-        endSquare: to,
-        color: `rgba(${ENGINE_ARROW_RGB}, ${ENGINE_ARROW_ALPHA[i]})`,
-      })
+      const color = `rgba(${ENGINE_ARROW_RGB}, ${ENGINE_ARROW_ALPHA[i]})`
+      list.push({ startSquare: from, endSquare: to, color })
+      // Labels are built here rather than beside the board so that a candidate
+      // dropped for drawing the same arrow twice cannot leave a number behind
+      // pointing at nothing. The badge takes the strong shade whatever its own
+      // rank: a faded number is a number you have to squint at.
+      if (showArrowEvals && line.score && !labelled.has(to)) {
+        labelled.add(to)
+        labels.push({
+          square: to,
+          text: formatScore(line.score),
+          best: i === 0,
+          color: `rgba(${ENGINE_ARROW_RGB}, 0.95)`,
+        })
+      }
     })
 
     if (nextMove) {
@@ -774,8 +797,8 @@ export default function App() {
         color: NEXT_MOVE_ARROW,
       })
     }
-    return list
-  }, [engineOn, engineMoves, game, currentId])
+    return { arrows: list, evalLabels: labels }
+  }, [engineOn, engineMoves, game, currentId, showArrowEvals])
 
   const playedLikeTooltip =
     `Estimated "played like" rating for this game.\n\n` +
@@ -947,6 +970,7 @@ export default function App() {
               onEngineMoves={handleEngineMoves}
               onCommentChange={handleCommentChange}
               arrows={arrows}
+              evalLabels={evalLabels}
               pieceSet={appearance.pieces}
             />
           </Suspense>

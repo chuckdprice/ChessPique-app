@@ -1,6 +1,6 @@
 import { DEFAULT_ENGINE } from '../lib/settings'
 import type { EngineSettings } from '../lib/settings'
-import { SliderRow } from './EngineSettings'
+import { SliderRow, SwitchRow } from './EngineSettings'
 
 interface SettingsPageProps {
   engine: EngineSettings
@@ -37,7 +37,8 @@ export default function SettingsPage({ engine, onEngineChange }: SettingsPagePro
   const atDefaults =
     engine.searchTimeSec === DEFAULT_ENGINE.searchTimeSec &&
     engine.multiPv === DEFAULT_ENGINE.multiPv &&
-    engine.hashMb === DEFAULT_ENGINE.hashMb
+    engine.hashMb === DEFAULT_ENGINE.hashMb &&
+    engine.arrowEvals === DEFAULT_ENGINE.arrowEvals
 
   return (
     <div className="mx-auto w-full max-w-2xl py-2">
@@ -97,6 +98,12 @@ export default function SettingsPage({ engine, onEngineChange }: SettingsPagePro
             value={1}
             disabled
             caption="Single-threaded in browser WASM."
+          />
+          <SwitchRow
+            label="Scores on arrows"
+            caption="Print each candidate move's evaluation at the head of its arrow on the board. The best move's is filled in."
+            checked={engine.arrowEvals}
+            onChange={(v) => onEngineChange({ ...engine, arrowEvals: v })}
           />
         </Section>
       </div>

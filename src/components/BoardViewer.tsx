@@ -24,6 +24,17 @@ export interface PlayerPlate {
   lead: string | null
 }
 
+/** A score printed at the head of an engine arrow. */
+export interface EvalLabel {
+  /** The move's destination — where its arrow points. */
+  square: string
+  text: string
+  /** The engine's first choice, which is filled in rather than outlined. */
+  best: boolean
+  /** The colour of the arrow this belongs to, so the two read as one thing. */
+  color: string
+}
+
 interface BoardViewerProps {
   tree: MoveTree
   /** The node the board is showing. */
@@ -31,6 +42,7 @@ interface BoardViewerProps {
   orientation: 'white' | 'black'
   analysis: GameAnalysis | null
   arrows: Arrow[]
+  evalLabels: EvalLabel[]
   /** Play a move, which writes it into the game. False snaps the piece back. */
   onPieceMove: (from: string, to: string) => boolean
   /** Piece set id from the appearance settings. */
@@ -81,13 +93,26 @@ const MOVE_DOT =
 const CAPTURE_RING =
   'radial-gradient(circle closest-side, transparent 0 76%, rgba(226, 74, 74, 0.8) 78% 97%, transparent 98%)'
 
-/** Top-right-corner position of a square as percentages, given orientation. */
-function squareCorner(square: string, orientation: 'white' | 'black') {
+/** Square's column and row on screen, 0-7 from the top-left, given orientation. */
+function squareGrid(square: string, orientation: 'white' | 'black') {
   const file = square.charCodeAt(0) - 97 // a=0
   const rank = parseInt(square[1], 10) // 1..8
-  const col = orientation === 'white' ? file : 7 - file
-  const row = orientation === 'white' ? 8 - rank : rank - 1
+  return {
+    col: orientation === 'white' ? file : 7 - file,
+    row: orientation === 'white' ? 8 - rank : rank - 1,
+  }
+}
+
+/** Top-right-corner position of a square as percentages, given orientation. */
+function squareCorner(square: string, orientation: 'white' | 'black') {
+  const { col, row } = squareGrid(square, orientation)
   return { left: (col + 1) * 12.5, top: row * 12.5 }
+}
+
+/** Centre of a square as percentages, given orientation. */
+function squareCenter(square: string, orientation: 'white' | 'black') {
+  const { col, row } = squareGrid(square, orientation)
+  return { left: (col + 0.5) * 12.5, top: (row + 0.5) * 12.5 }
 }
 
 /**
@@ -136,6 +161,7 @@ export default function BoardViewer({
   orientation,
   analysis,
   arrows,
+  evalLabels,
   onPieceMove,
   pieceSet,
 }: BoardViewerProps) {
@@ -221,6 +247,44 @@ export default function BoardViewer({
           boardStyle: { width: '100%', height: '100%' },
         }}
       />
+      {/* Over the arrow layer, which react-chessboard puts at z-index 20 in
+          this same stacking context: below it, the arrowhead a label belongs
+          to painted across the label and ate its first two characters. */}
+      {evalLabels.map((label) => {
+        const at = squareCenter(label.square, orientation)
+        return (
+          <div
+            key={label.square}
+            className="pointer-events-none absolute z-30 -translate-x-1/2 -translate-y-1/2"
+            style={{ left: `${at.left}%`, top: `${at.top}%` }}
+          >
+            <span
+              className="block rounded font-score font-semibold leading-none tabular-nums shadow-md"
+              style={{
+                // Sized off the board, not in fixed pixels: a badge wider than
+                // its square overlaps the one on the square beside it, and the
+                // board runs from 180px on a phone to 560px on a desktop.
+                fontSize: 'clamp(8px, calc(var(--board-size) / 34), 15px)',
+                padding: '0.2em 0.35em',
+                ...(label.best
+                  ? { background: label.color, color: '#fff' }
+                  : {
+                      // Outlined in its arrow's colour rather than filled with
+                      // it: two filled badges of the same blue read as two best
+                      // moves, and the ranking is the point.
+                      background: 'var(--card)',
+                      color: 'var(--ink)',
+                      boxShadow: `0 0 0 1.5px ${label.color}`,
+                    }),
+              }}
+            >
+              {label.text}
+              {label.best && <span className="align-super text-[0.7em]">★</span>}
+            </span>
+          </div>
+        )
+      })}
+
       {moveAnalysis && badgePos && (
         <div
           className="pointer-events-none absolute z-10"

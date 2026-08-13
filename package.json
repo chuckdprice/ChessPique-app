@@ -8,12 +8,13 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "postinstall": "node scripts/copy-stockfish.mjs"
+    "postinstall": "node scripts/copy-stockfish.mjs && node scripts/copy-onnxruntime.mjs"
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "chess.js": "^1.4.0",
+    "onnxruntime-web": "^1.27.0",
     "react": "^19.1.0",
     "react-chessboard": "^5.2.0",
     "react-dom": "^19.1.0",

@@ -1,11 +1,18 @@
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Chess } from 'chess.js'
 import { Engine, ENGINE_NAME, formatScore } from '../lib/engine/uci'
-import type { AnalyzeUpdate, EngineLine, Score } from '../lib/engine/uci'
+import type { AnalyzeUpdate, Score } from '../lib/engine/uci'
 import { saveEngineSettings } from '../lib/settings'
 import type { EngineSettings } from '../lib/settings'
+import { MaiaSession } from '../lib/maia/session'
+import type { MaiaStatus } from '../lib/maia/session'
+import { predictMoves, nearestRating } from '../lib/maia/model'
+import type { MaiaMove } from '../lib/maia/decode'
+import { firstMoves, movesToSearch, verdictsForMoves } from '../lib/maia/verdicts'
+import type { Classification } from '../lib/engine/analysis'
 import EngineSettingsPanel from './EngineSettings'
+import MaiaColumn from './MaiaColumn'
 import MiniBoard from './MiniBoard'
 import ReviewRing from './ReviewRing'
 
@@ -36,6 +43,14 @@ interface EnginePanelProps {
    * arrows and the numbers printed at their heads.
    */
   onFirstMoves?: (lines: EngineArrow[]) => void
+  /**
+   * The review's "played like" estimate for whoever is on move, which is what
+   * Maia's rating follows until the reader picks one. Null before the review
+   * has run, or for a position with no estimate behind it.
+   */
+  playedLike?: number | null
+  /** Maia's single most likely human move, for the board's one arrow. */
+  onMaiaMove?: (move: MaiaMove | null) => void
 }
 
 /** One candidate as the board draws it: a move, and what the engine makes of it. */
@@ -72,22 +87,28 @@ function numberedLine(fen: string, sans: string[]): string {
 }
 
 /**
- * The position after playing `sans` up to and including `upTo`, or null if the
- * line does not play out — a PV arriving mid-search can be one move stale for
- * the position it is listed under.
+ * The position after playing `sans` up to and including `upTo`, with the move
+ * that reached it — or null if the line does not play out, which a PV arriving
+ * mid-search can fail to do when it is one move stale for the position it is
+ * listed under.
  */
-function fenAfter(fen: string, sans: string[], upTo: number): string | null {
+function positionAfter(
+  fen: string,
+  sans: string[],
+  upTo: number,
+): { fen: string; from: string; to: string } | null {
   try {
     const game = new Chess(fen)
-    for (let i = 0; i <= upTo; i++) game.move(sans[i])
-    return game.fen()
+    let last
+    for (let i = 0; i <= upTo; i++) last = game.move(sans[i])
+    return last ? { fen: game.fen(), from: last.from, to: last.to } : null
   } catch {
     return null
   }
 }
 
 /** Board edge and card padding of the hover preview, in pixels. */
-const PREVIEW_BOARD = 168
+const PREVIEW_BOARD = 200
 const PREVIEW_PAD = 6
 const PREVIEW_BOX = PREVIEW_BOARD + PREVIEW_PAD * 2
 
@@ -103,8 +124,14 @@ export default function EnginePanel({
   orientation,
   onTopScore,
   onFirstMoves,
+  playedLike = null,
+  onMaiaMove,
 }: EnginePanelProps) {
   const engineRef = useRef<Engine | null>(null)
+  const gearRef = useRef<HTMLButtonElement>(null)
+  // Every hover preview is drawn against this one move, so the board does not
+  // move as you read along a line.
+  const firstTokenRef = useRef<HTMLSpanElement>(null)
   const [update, setUpdate] = useState<AnalyzeUpdate | null>(null)
   // Whether a search is still running, so the depth badge can say whether the
   // number under it is going to keep climbing.
@@ -113,12 +140,38 @@ export default function EnginePanel({
   // The hovered move's position, already placed: a fixed-position card cannot
   // be laid out relative to the move, so where it goes is worked out once, on
   // entering the move, from the rect the mouse is over.
-  const [preview, setPreview] = useState<{ fen: string; left: number; top: number } | null>(null)
+  const [preview, setPreview] = useState<{
+    fen: string
+    move: { from: string; to: string }
+    left: number
+    top: number
+  } | null>(null)
   const lastFlush = useRef(0)
   const onTopScoreRef = useRef(onTopScore)
   onTopScoreRef.current = onTopScore
   const onFirstMovesRef = useRef(onFirstMoves)
   onFirstMovesRef.current = onFirstMoves
+  const onMaiaMoveRef = useRef(onMaiaMove)
+  onMaiaMoveRef.current = onMaiaMove
+
+  const maiaRef = useRef<MaiaSession | null>(null)
+  const [maiaMoves, setMaiaMoves] = useState<MaiaMove[] | null>(null)
+  const [maiaStatus, setMaiaStatus] = useState<MaiaStatus>('idle')
+  const [maiaProgress, setMaiaProgress] = useState(0)
+  const [maiaError, setMaiaError] = useState<string | null>(null)
+  const [verdicts, setVerdicts] = useState<Map<string, Classification>>(new Map())
+  // Whether the constrained search that colours Maia's moves is still running.
+  const [colouring, setColouring] = useState(false)
+  // Maia is deterministic — same position, same rating, same answer — so
+  // stepping back through a game costs nothing after the first visit. The
+  // engine's scores are not cached with it: those move with the search
+  // settings, and a stale one would be a wrong colour rather than a slow one.
+  const maiaCache = useRef(new Map<string, MaiaMove[]>())
+
+  const maiaAuto = settings.maiaRating == null
+  // 1500 is where the estimate lands for a middling game, and it is only what
+  // gets shown before a review has produced anything better.
+  const maiaRating = settings.maiaRating ?? nearestRating(playedLike ?? 1500)
 
   // Live analysis loop: restart on position, toggle, or settings change.
   useEffect(() => {
@@ -199,11 +252,135 @@ export default function EnginePanel({
     )
   }, [enabled, update])
 
-  // Tear the worker down when the panel unmounts.
+  /**
+   * Ask Maia what a human would play here.
+   *
+   * One forward pass, no search — it settles long before Stockfish does, which
+   * is why the column fills in first and the colours arrive after.
+   */
+  useEffect(() => {
+    if (!enabled || !settings.maia) {
+      setMaiaMoves(null)
+      setVerdicts(new Map())
+      setColouring(false)
+      onMaiaMoveRef.current?.(null)
+      return
+    }
+    const key = `${fen}|${maiaRating}`
+    const cached = maiaCache.current.get(key)
+    if (cached) {
+      setMaiaMoves(cached)
+      setVerdicts(new Map())
+      setColouring(false)
+      return
+    }
+
+    let cancelled = false
+    setMaiaMoves(null)
+    setVerdicts(new Map())
+    setColouring(false)
+    // Built on first use, not on mount: constructing it starts the download,
+    // and the panel is on for most of a session with Maia off.
+    const session = (maiaRef.current ??= new MaiaSession({
+      onStatus: setMaiaStatus,
+      onProgress: (loaded, total) => setMaiaProgress(total > 0 ? loaded / total : 0),
+    }))
+    predictMoves(session, fen, maiaRating)
+      .then(({ moves }) => {
+        if (cancelled) return
+        maiaCache.current.set(key, moves)
+        setMaiaError(null)
+        setMaiaMoves(moves)
+      })
+      .catch((error: Error) => {
+        // Maia failing is not the app failing: the engine panel carries on
+        // exactly as it does with Maia switched off.
+        if (!cancelled) setMaiaError(error.message)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [enabled, settings.maia, fen, maiaRating])
+
+  useEffect(() => {
+    onMaiaMoveRef.current?.(maiaMoves?.[0] ?? null)
+  }, [maiaMoves])
+
+  /**
+   * Score the Maia moves the panel's own search did not cover.
+   *
+   * This is the one place the feature costs real engine time. It waits for the
+   * main search to settle, then runs a second one restricted to the moves it
+   * missed — plus the engine's best move, so the baseline comes out of the same
+   * search as the moves being measured against it.
+   */
+  useEffect(() => {
+    if (!enabled || !settings.maia || searching || !update || !maiaMoves) return
+    const wanted = maiaMoves.slice(0, settings.multiPv).map((move) => move.uci)
+    const primary = firstMoves(update.lines)
+    const whiteToMove = fen.split(' ')[1] !== 'b'
+    // Colour whatever the panel already knows before spending a search on the rest.
+    setVerdicts(verdictsForMoves(wanted, primary, [], whiteToMove))
+
+    const need = movesToSearch(wanted, primary)
+    const engine = engineRef.current
+    if (need.length === 0 || !engine) {
+      setColouring(false)
+      return
+    }
+
+    let cancelled = false
+    // This search takes as long as the panel's own, and until it lands most of
+    // Maia's moves sit in plain ink looking as though that were their verdict.
+    // The ring is the difference between "unremarkable" and "not worked out
+    // yet" — there is no total to count towards, so it spins.
+    setColouring(true)
+    engine
+      .analyze({
+        fen,
+        movetimeMs: settings.searchTimeSec * 1000,
+        multiPv: need.length,
+        searchMoves: need,
+      })
+      .then((result) => {
+        if (cancelled) return
+        setVerdicts(verdictsForMoves(wanted, primary, firstMoves(result.lines), whiteToMove))
+        setColouring(false)
+      })
+      .catch(() => {
+        /* the position moved on; the next search will colour it */
+        if (!cancelled) setColouring(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [enabled, settings.maia, settings.multiPv, settings.searchTimeSec, searching, update, maiaMoves, fen])
+
+  /** Maia's moves as the panel prints them: SAN, probability, and a verdict. */
+  const maiaRows = useMemo(() => {
+    if (!maiaMoves) return []
+    return maiaMoves.slice(0, settings.multiPv).map((move) => {
+      let san = move.uci
+      try {
+        san = new Chess(fen).move({
+          from: move.uci.slice(0, 2),
+          to: move.uci.slice(2, 4),
+          promotion: move.uci.length > 4 ? move.uci[4] : undefined,
+        }).san
+      } catch {
+        /* keep the UCI: a move that will not play is still worth showing */
+      }
+      return { uci: move.uci, san, prob: move.prob, classification: verdicts.get(move.uci) }
+    })
+  }, [maiaMoves, verdicts, fen, settings.multiPv])
+
+  // Tear the workers down when the panel unmounts.
   useEffect(
     () => () => {
       engineRef.current?.destroy()
       engineRef.current = null
+      maiaRef.current?.destroy()
+      maiaRef.current = null
     },
     [],
   )
@@ -213,111 +390,87 @@ export default function EnginePanel({
   // the move it was on is unmounted from under the pointer.
   useEffect(() => setPreview(null), [enabled, fen])
 
-  const topLine: EngineLine | undefined = update?.lines[0]
+  const gameOver = useMemo(() => new Chess(fen).isGameOver(), [fen])
 
-  /** Open the preview above the hovered move, or below it when the top is full. */
+  /**
+   * Open the preview: fixed across, and just under the line being read.
+   *
+   * Two separate lessons. Following the mouse *horizontally* meant the board
+   * slid along as you read a variation, so its left edge is pinned to the first
+   * move of the first line and never moves. But pinning the top there too put
+   * the board over the lines below it — you could not see the line you were
+   * reading — so the top follows the hovered row and clears it.
+   */
   const showPreview = (el: HTMLElement, sans: string[], upTo: number) => {
-    const at = fenAfter(fen, sans, upTo)
-    if (!at) return
-    const rect = el.getBoundingClientRect()
+    const at = positionAfter(fen, sans, upTo)
+    const anchor = firstTokenRef.current
+    if (!at || !anchor) return
+    const row = (el.closest('li') ?? el).getBoundingClientRect()
     // A viewport of no width is not a narrow one: a browser pane that has
     // stopped painting reports zero, and clamping to that would pin every
     // preview to the left edge. With nothing to clamp against, the move's own
     // edge is the honest answer.
     const vw = document.documentElement.clientWidth
     const vh = document.documentElement.clientHeight
-    const above = rect.top - PREVIEW_BOX - 8
-    const below = rect.bottom + 8
-    const top = above >= 8 ? above : below
+    const left = anchor.getBoundingClientRect().left
+    // Below the row it belongs to, and above it only when there is no room
+    // below — which still leaves that row readable.
+    const below = row.bottom + 6
+    const top = vh > 0 && below + PREVIEW_BOX + 8 > vh ? row.top - PREVIEW_BOX - 6 : below
     setPreview({
-      fen: at,
-      left: vw > 0 ? Math.max(8, Math.min(rect.left, vw - PREVIEW_BOX - 8)) : rect.left,
+      fen: at.fen,
+      move: { from: at.from, to: at.to },
+      left: vw > 0 ? Math.max(8, Math.min(left, vw - PREVIEW_BOX - 8)) : left,
       top: vh > 0 ? Math.max(8, Math.min(top, vh - PREVIEW_BOX - 8)) : top,
     })
   }
 
   return (
     <section
-      aria-label="Engine analysis"
+      aria-label="Move evaluations"
       className="relative rounded-xl border border-rule bg-card shadow-sm"
     >
-      {/* Nothing in this strip is taller than the text now, so it is padded
-          like a row of text rather than like a header. */}
+      {/* The disclosure is the switch: open is the engine running, closed is
+          the engine stopped. One control rather than a twisty beside a toggle
+          that could disagree with it — and with both engines off, a closed pane
+          costs nothing but its own title. */}
       <div className="flex items-center gap-3 px-4 py-1.5">
         <button
           type="button"
-          role="switch"
-          aria-checked={enabled}
-          aria-label="Toggle engine analysis"
+          aria-expanded={enabled}
           onClick={() => onEnabledChange(!enabled)}
-          // The track is only 16px tall now, so the tap target is grown past it
-          // by a pseudo-element rather than by padding, which would show.
-          className={`relative h-4 w-7 shrink-0 rounded-full transition-colors before:absolute before:-inset-2 before:content-[''] ${
-            enabled ? 'bg-felt' : 'bg-rule'
-          }`}
-        >
-          <span
-            className={`absolute top-0.5 size-3 rounded-full bg-card shadow transition-[left] ${
-              enabled ? 'left-[14px]' : 'left-0.5'
-            }`}
-          />
-        </button>
-
-        {/* Same size as the scores in the lines below: this is the first of
-            them, not a headline over them. */}
-        <span className="font-score text-xs font-semibold tabular-nums">
-          {enabled && topLine ? formatScore(topLine.score) : '—'}
-        </span>
-
-        {/* Search depth gets its own non-shrinking badge so it is never clipped.
-            It turns green when the search has stopped, so a number that is not
-            moving reads as finished rather than as a stalled engine. */}
-        {enabled && (
-          <span
-            title={
-              searching
-                ? 'Search depth reached so far — still thinking'
-                : 'Search depth reached; the engine has stopped'
-            }
-            className={`shrink-0 rounded px-1.5 py-0.5 font-score text-xs font-semibold tabular-nums ${
-              !searching && update ? 'bg-class-best text-white' : 'bg-buff-soft'
-            }`}
-          >
-            d{update?.depth ?? '—'}
-          </span>
-        )}
-
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="min-w-0 truncate text-xs text-ink-mute">{ENGINE_NAME}</span>
-          {reviewActive && <ReviewRing progress={reviewProgress} />}
-        </div>
-
-        <button
-          type="button"
-          onClick={() => setSettingsOpen((o) => !o)}
-          aria-expanded={settingsOpen}
-          aria-label="Engine settings"
-          title="Engine settings"
-          className="rounded-md p-1 text-ink-mute transition-colors hover:bg-buff-soft hover:text-ink"
+          // Never the thing that gives way: a title shortened to "Move Ev…" to
+          // make room for a dash reads as a bug. The spacer after it takes the
+          // slack instead.
+          className="flex shrink-0 items-center gap-1.5 text-left"
         >
           <svg
             aria-hidden="true"
             viewBox="0 0 24 24"
-            className="size-4"
+            className={`size-3.5 shrink-0 text-ink-mute transition-transform ${
+              enabled ? 'rotate-90' : ''
+            }`}
             fill="none"
             stroke="currentColor"
-            strokeWidth="1.8"
+            strokeWidth="2.5"
             strokeLinecap="round"
             strokeLinejoin="round"
           >
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.01a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55h.01a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.01a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1Z" />
+            <path d="m9 6 6 6-6 6" />
           </svg>
+          <span className="whitespace-nowrap text-xs font-semibold">Move Evals</span>
         </button>
+
+        <div className="min-w-0 flex-1" />
+
+        {/* The review is not this panel's search; its ring rides here because
+            this row is on screen whether the pane is open or shut. */}
+        {reviewActive && <ReviewRing progress={reviewProgress} />}
       </div>
 
       {settingsOpen && (
         <EngineSettingsPanel
+          anchor={gearRef}
           value={settings}
           onChange={(next) => {
             onSettingsChange(next)
@@ -328,44 +481,142 @@ export default function EnginePanel({
       )}
 
       {enabled && (
-        <ul className="border-t border-rule px-4 py-1" onPointerLeave={() => setPreview(null)}>
-          {(update?.lines ?? []).map((line) => (
-            <li
-              key={line.multipv}
-              className="flex items-baseline gap-2 py-0.5 font-score text-xs"
-              title={`depth ${line.depth}: ${numberedLine(fen, line.pvSan)}`}
-            >
-              <span className="w-10 shrink-0 font-semibold tabular-nums">
-                {formatScore(line.score)}
-              </span>
-              <span className="truncate text-ink-mute">
-                {pvTokens(fen, line.pvSan).map((token, i) => (
-                  // The separating space is outside the move so that the hover
-                  // highlight is the width of the move and not a space wider.
-                  <Fragment key={i}>
-                    {i > 0 && ' '}
-                    <span
-                      className="cursor-help rounded-sm hover:bg-buff-soft hover:text-ink"
-                      // Pointer rather than mouse events, so that a tap does
-                      // not open a board a phone has no way to close: a touch
-                      // fires mouseenter too, and nothing fires the leave.
-                      onPointerEnter={(e) => {
-                        if (e.pointerType === 'mouse') showPreview(e.currentTarget, line.pvSan, i)
-                      }}
-                    >
-                      {token}
-                    </span>
-                  </Fragment>
-                ))}
-              </span>
-            </li>
-          ))}
-          {!update && (
-            <li className="py-1 text-xs text-ink-mute">
-              {new Chess(fen).isGameOver() ? 'Game over' : 'Thinking…'}
-            </li>
+        // Side by side only when this panel is wide enough for both, which is
+        // its own width and not the viewport's: the side column is narrow on a
+        // mid-size window even though `sm:` is long since true, and the fixed
+        // Maia column starved the engine's lines to nothing there.
+        <div className="@container/evals flex flex-col gap-2 border-t border-rule px-4 py-1">
+          <div className="flex flex-col gap-2 @[22rem]/evals:flex-row @[22rem]/evals:gap-3">
+          {settings.maia && (
+            <MaiaColumn
+              rows={maiaRows}
+              rowCount={settings.multiPv}
+              busy={colouring}
+              rating={maiaRating}
+              auto={maiaAuto}
+              onRatingChange={(rating) => {
+                const next = { ...settings, maiaRating: rating }
+                onSettingsChange(next)
+                saveEngineSettings(next)
+              }}
+              status={maiaStatus}
+              progress={maiaProgress}
+              error={maiaError}
+            />
           )}
-        </ul>
+
+          <div className="min-w-0 flex-1">
+            {/* Level with Maia's heading, and the same height whether or not
+                Maia is showing, so the two lists start on one line. */}
+            <div className="flex h-6 items-center gap-2">
+              <span className="shrink-0 whitespace-nowrap text-xs font-bold">
+                {ENGINE_NAME}: Engine Moves
+              </span>
+
+              {/* Depth belongs to the title, not to the gear: it says how far
+                  this list has been searched. It turns green when the search
+                  has stopped, so a number that is not moving reads as finished
+                  rather than as a stalled engine. */}
+              <span
+                title={
+                  searching
+                    ? 'Search depth reached so far — still thinking'
+                    : 'Search depth reached; the engine has stopped'
+                }
+                className={`shrink-0 rounded px-1.5 py-0.5 font-score text-[0.6875rem] font-semibold tabular-nums ${
+                  !searching && update ? 'bg-class-best text-white' : 'bg-buff-soft'
+                }`}
+              >
+                d{update?.depth ?? '—'}
+              </span>
+
+              <div className="min-w-0 flex-1" />
+
+              <button
+                ref={gearRef}
+                type="button"
+                onClick={() => setSettingsOpen((o) => !o)}
+                aria-expanded={settingsOpen}
+                aria-label="Engine settings"
+                title="Engine settings"
+                className="shrink-0 rounded-md p-0.5 text-ink-mute transition-colors hover:bg-buff-soft hover:text-ink"
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  className="size-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.01a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55h.01a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.01a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1Z" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Always as many rows as the engine is set to show, filled or not.
+                A new position empties the list until the first result lands, and
+                letting the list shrink to a single "Thinking…" and spring back
+                bounced this pane — and everything under it — on every move. */}
+            <ul onPointerLeave={() => setPreview(null)}>
+              {Array.from({ length: settings.multiPv }, (_, slot) => {
+                const line = update?.lines[slot]
+                if (!line) {
+                  return (
+                    <li
+                      key={`pending-${slot}`}
+                      className="flex items-baseline gap-2 py-0.5 font-score text-xs text-ink-mute"
+                    >
+                      {slot === 0 ? (gameOver ? 'Game over' : 'Thinking…') : ' '}
+                    </li>
+                  )
+                }
+                return (
+                  <li
+                    key={`line-${slot}`}
+                    className="flex items-baseline gap-2 py-0.5 font-score text-xs"
+                    title={`depth ${line.depth}: ${numberedLine(fen, line.pvSan)}`}
+                  >
+                    <span className="w-10 shrink-0 font-semibold tabular-nums">
+                      {formatScore(line.score)}
+                    </span>
+                    <span className="truncate text-ink-mute">
+                      {pvTokens(fen, line.pvSan).map((token, i) => (
+                        // The separating space is outside the move so that the
+                        // hover highlight is the width of the move and not a
+                        // space wider.
+                        <Fragment key={i}>
+                          {i > 0 && ' '}
+                          <span
+                            // The first move of the first line is what pins the
+                            // preview's left edge, so it is the one element the
+                            // preview needs to find.
+                            ref={slot === 0 && i === 0 ? firstTokenRef : undefined}
+                            className="cursor-help rounded-sm hover:bg-buff-soft hover:text-ink"
+                            // Pointer rather than mouse events, so that a tap
+                            // does not open a board a phone has no way to close:
+                            // a touch fires mouseenter too, and nothing fires
+                            // the leave.
+                            onPointerEnter={(e) => {
+                              if (e.pointerType === 'mouse')
+                                showPreview(e.currentTarget, line.pvSan, i)
+                            }}
+                          >
+                            {token}
+                          </span>
+                        </Fragment>
+                      ))}
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
+          </div>
+        </div>
       )}
 
       {/* Through the body, so no ancestor's overflow can clip it: the pane is
@@ -380,6 +631,7 @@ export default function EnginePanel({
           >
             <MiniBoard
               fen={preview.fen}
+              move={preview.move}
               orientation={orientation}
               pieceSet={pieceSet}
               size={PREVIEW_BOARD}

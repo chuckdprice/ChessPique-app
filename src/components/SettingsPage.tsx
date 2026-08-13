@@ -1,6 +1,6 @@
 import { DEFAULT_ENGINE } from '../lib/settings'
 import type { EngineSettings } from '../lib/settings'
-import { SliderRow, SwitchRow } from './EngineSettings'
+import { SliderRow, SwitchRow, MAIA_CAPTION } from './EngineSettings'
 
 interface SettingsPageProps {
   engine: EngineSettings
@@ -38,7 +38,9 @@ export default function SettingsPage({ engine, onEngineChange }: SettingsPagePro
     engine.searchTimeSec === DEFAULT_ENGINE.searchTimeSec &&
     engine.multiPv === DEFAULT_ENGINE.multiPv &&
     engine.hashMb === DEFAULT_ENGINE.hashMb &&
-    engine.arrowEvals === DEFAULT_ENGINE.arrowEvals
+    engine.arrowEvals === DEFAULT_ENGINE.arrowEvals &&
+    engine.maia === DEFAULT_ENGINE.maia &&
+    engine.maiaRating === DEFAULT_ENGINE.maiaRating
 
   return (
     <div className="mx-auto w-full max-w-2xl py-2">
@@ -104,6 +106,12 @@ export default function SettingsPage({ engine, onEngineChange }: SettingsPagePro
             caption="Print each candidate move's evaluation at the head of its arrow on the board. The best move's is filled in."
             checked={engine.arrowEvals}
             onChange={(v) => onEngineChange({ ...engine, arrowEvals: v })}
+          />
+          <SwitchRow
+            label="Human moves (Maia 3)"
+            caption={MAIA_CAPTION}
+            checked={engine.maia}
+            onChange={(v) => onEngineChange({ ...engine, maia: v })}
           />
         </Section>
       </div>

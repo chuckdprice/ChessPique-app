@@ -1,6 +1,7 @@
 /** Persisted user settings: appearance (theme, board, pieces) and engine options. */
 
 import { BOARDS, PIECE_SETS, THEMES, boardById, themeById } from './appearance'
+import { nearestRating } from './maia/model'
 
 export interface AppearanceSettings {
   /** Theme id from THEMES — a whole palette, not just an accent. */
@@ -20,6 +21,21 @@ export interface EngineSettings {
   hashMb: number
   /** Print each candidate's score at the head of its arrow on the board. */
   arrowEvals: boolean
+  /**
+   * Show Maia-3's human-move predictions beside the engine's. Off by default:
+   * turning it on is what fetches the 43 MB model.
+   */
+  maia: boolean
+  /**
+   * The rating Maia conditions on, or null to follow the review's "played like"
+   * estimate for whoever is on move.
+   *
+   * Null is the default rather than a number because the estimate is the more
+   * useful starting point and it changes as you step through the game — but the
+   * moment the reader picks a rating themselves, that is the question they are
+   * asking and it stops moving under them.
+   */
+  maiaRating: number | null
 }
 
 export const DEFAULT_APPEARANCE: AppearanceSettings = {
@@ -32,6 +48,8 @@ export const DEFAULT_ENGINE: EngineSettings = {
   multiPv: 3,
   hashMb: 128,
   arrowEvals: true,
+  maia: false,
+  maiaRating: null,
 }
 
 const APPEARANCE_KEY = 'chessnoter.appearance'
@@ -79,6 +97,11 @@ export function loadEngineSettings(): EngineSettings {
   // A setting saved before this one existed merges the default in as any other
   // missing key would, but a file hand-edited to a string would not.
   e.arrowEvals = e.arrowEvals !== false
+  e.maia = e.maia === true
+  e.maiaRating =
+    typeof e.maiaRating === 'number' && Number.isFinite(e.maiaRating)
+      ? nearestRating(e.maiaRating)
+      : null
   return e
 }
 

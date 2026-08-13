@@ -4,9 +4,9 @@
  *
  * A theme is a whole palette rather than an accent. Each one names a base —
  * the light or dark var block in index.css, which carries the chart, status
- * and classification colours — and then overrides the ten variables that give
- * the app its character. Every theme sets all ten, so switching between them
- * never leaves a stale value behind.
+ * and classification colours — and then overrides the eleven variables that
+ * give the app its character. Every theme sets all eleven, so switching between
+ * them never leaves a stale value behind.
  */
 
 export type ThemeVar =
@@ -20,6 +20,15 @@ export type ThemeVar =
   | '--accent'
   | '--accent-hover'
   | '--accent-bright'
+  /**
+   * Maia's colour, on its arrow and in its column heading.
+   *
+   * It has to read as neither engine nor game: the engine's candidates are
+   * blue, the move actually played next is orange, and the classification
+   * scale runs green to red. That leaves violet, which every theme uses except
+   * Neon — whose own accent is violet, so there it steps sideways to magenta.
+   */
+  | '--maia'
 
 export interface Theme {
   id: string
@@ -45,6 +54,7 @@ export const THEMES: Theme[] = [
       '--accent': '#1e5943',
       '--accent-hover': '#153f30',
       '--accent-bright': '#2c7a5c',
+      '--maia': '#7c3aed',
     },
   },
   {
@@ -62,6 +72,7 @@ export const THEMES: Theme[] = [
       '--accent': '#2563c4',
       '--accent-hover': '#2f74e0',
       '--accent-bright': '#5a94e8',
+      '--maia': '#b48cff',
     },
   },
   {
@@ -79,6 +90,7 @@ export const THEMES: Theme[] = [
       '--accent': '#7d5327',
       '--accent-hover': '#603d18',
       '--accent-bright': '#a5713a',
+      '--maia': '#7b3fbf',
     },
   },
   {
@@ -96,6 +108,7 @@ export const THEMES: Theme[] = [
       '--accent': '#2f6fd0',
       '--accent-hover': '#3b81e8',
       '--accent-bright': '#65a3f0',
+      '--maia': '#b98cf5',
     },
   },
   {
@@ -113,6 +126,7 @@ export const THEMES: Theme[] = [
       '--accent': '#963232',
       '--accent-hover': '#7a2525',
       '--accent-bright': '#bf5050',
+      '--maia': '#6d3fc4',
     },
   },
   {
@@ -130,6 +144,7 @@ export const THEMES: Theme[] = [
       '--accent': '#35704d',
       '--accent-hover': '#40875d',
       '--accent-bright': '#5aa877',
+      '--maia': '#b28cf0',
     },
   },
   {
@@ -147,6 +162,7 @@ export const THEMES: Theme[] = [
       '--accent': '#33332f',
       '--accent-hover': '#1f1f1c',
       '--accent-bright': '#5c5c56',
+      '--maia': '#6d3fc4',
     },
   },
   {
@@ -164,6 +180,7 @@ export const THEMES: Theme[] = [
       '--accent': '#b8480f',
       '--accent-hover': '#93370a',
       '--accent-bright': '#dd6a24',
+      '--maia': '#7a3fd0',
     },
   },
   {
@@ -181,6 +198,8 @@ export const THEMES: Theme[] = [
       '--accent': '#6d3ac8',
       '--accent-hover': '#7f4ade',
       '--accent-bright': '#a684f2',
+      // Violet is this theme's own accent, so Maia steps sideways to magenta.
+      '--maia': '#f472b6',
     },
   },
   {
@@ -198,6 +217,7 @@ export const THEMES: Theme[] = [
       '--accent': '#0f6a88',
       '--accent-hover': '#0a5169',
       '--accent-bright': '#1f8fb3',
+      '--maia': '#7c3aed',
     },
   },
 ]

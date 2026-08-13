@@ -4,6 +4,8 @@ import { replayGame } from '../gameModel'
 import {
   buildGameAnalysis,
   classify,
+  classifyCandidate,
+  winPctLostBy,
   CLASSIFICATION_SYMBOL,
   CLASSIFICATIONS,
   DECIDED_CP,
@@ -64,6 +66,32 @@ describe('classify', () => {
     expect(classify(8, false)).toBe('inaccuracy')
     expect(classify(15, false)).toBe('mistake')
     expect(classify(30, false)).toBe('blunder')
+  })
+})
+
+describe('classifyCandidate', () => {
+  const best = { cp: 50 }
+
+  it('measures the loss from the side to move', () => {
+    // The same pair of white-POV scores is a loss for one side and not the other.
+    expect(winPctLostBy(best, { cp: -300 }, true)).toBeGreaterThan(20)
+    expect(winPctLostBy(best, { cp: -300 }, false)).toBe(0)
+    expect(winPctLostBy(best, { cp: 400 }, false)).toBeGreaterThan(20)
+  })
+
+  it('gives a move the verdict it would have earned in the move list', () => {
+    expect(classifyCandidate(best, { cp: 50 }, true, true)).toBe('best')
+    expect(classifyCandidate(best, { cp: 40 }, true, false)).toBe('excellent')
+    expect(classifyCandidate(best, { cp: -400 }, true, false)).toBe('blunder')
+    // A mate the mover walks into is the worst it gets, whoever is moving.
+    expect(classifyCandidate(best, { mate: -1 }, true, false)).toBe('blunder')
+    expect(classifyCandidate({ cp: -50 }, { mate: 1 }, false, false)).toBe('blunder')
+  })
+
+  it('never reports a gain as a loss', () => {
+    // A candidate can out-score the "best" move mid-search, when the two came
+    // from different depths of the same search.
+    expect(winPctLostBy(best, { cp: 900 }, true)).toBe(0)
   })
 })
 

@@ -198,6 +198,30 @@ export function moveAccuracy(winPctLoss: number): number {
   return Math.max(0, Math.min(100, raw))
 }
 
+/**
+ * How much win-% a candidate move gives up against the best move available in
+ * the same position, from the mover's side. Both scores are white-POV, and both
+ * must come from the same search — see `AnalyzeOptions.searchMoves`.
+ */
+export function winPctLostBy(best: Score, candidate: Score, whiteToMove: boolean): number {
+  const delta = whiteToMove ? winPct(best) - winPct(candidate) : winPct(candidate) - winPct(best)
+  return Math.max(0, delta)
+}
+
+/**
+ * The verdict on a move nobody played — what it would have been scored as, had
+ * it been played. This is how a Maia move gets the same colour it would have
+ * earned in the move list, rather than a second scale meaning something else.
+ */
+export function classifyCandidate(
+  best: Score,
+  candidate: Score,
+  whiteToMove: boolean,
+  isBest: boolean,
+): Classification {
+  return classify(winPctLostBy(best, candidate, whiteToMove), isBest)
+}
+
 export function classify(winPctLoss: number, playedBest: boolean): Classification {
   if (playedBest) return 'best'
   if (winPctLoss <= EXCELLENT_MAX) return 'excellent'

@@ -8,7 +8,7 @@ import { Chess } from 'chess.js'
  */
 
 export const ENGINE_WORKER_PATH = '/stockfish/stockfish-18-lite-single.js'
-export const ENGINE_NAME = 'SF 18'
+export const ENGINE_NAME = 'SF18'
 
 /** Centipawns (cp) or moves-to-mate (mate); exactly one is set. White POV. */
 export interface Score {
@@ -41,6 +41,17 @@ export interface AnalyzeOptions {
   /** Optional target depth — the search stops at whichever limit hits first. */
   depth?: number
   multiPv?: number
+  /**
+   * Restrict the search to these root moves.
+   *
+   * Used to score moves the engine would not otherwise look at — a popular
+   * human move it does not rank is exactly the case worth showing. Whoever
+   * asks should include the engine's own best move in the list, so the
+   * baseline it is compared against comes out of this same search: scores from
+   * two searches can be at two depths, and comparing across them is how a
+   * variation once borrowed the mainline's verdict.
+   */
+  searchMoves?: string[]
   onUpdate?: (update: AnalyzeUpdate) => void
 }
 
@@ -139,6 +150,7 @@ export class Engine {
     movetimeMs,
     depth: targetDepth,
     multiPv,
+    searchMoves,
     onUpdate,
   }: AnalyzeOptions): Promise<AnalyzeResult> {
     if (!this.worker) return Promise.reject(new Error('Engine not initialized'))
@@ -172,6 +184,8 @@ export class Engine {
       // Both limits may be given; Stockfish stops at whichever comes first.
       const limits = [`movetime ${Math.max(50, Math.round(movetimeMs))}`]
       if (targetDepth) limits.unshift(`depth ${targetDepth}`)
+      // `searchmoves` takes every token after it, so UCI requires it last.
+      if (searchMoves?.length) limits.push(`searchmoves ${searchMoves.join(' ')}`)
       this.send(`go ${limits.join(' ')}`)
     })
   }

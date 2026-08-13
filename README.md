@@ -155,6 +155,46 @@ Searched positions are remembered for as long as the tab is open, keyed by posit
 by game, so a review only pays for what is genuinely new. Adding a move to the end of a
 sixteen-move game took 21s before and 2s after.
 
+## Human moves (Maia 3)
+
+Stockfish answers *what is best*. **Maia-3** answers *what is tempting* — the move a human of
+a given rating would actually play. The interesting case is when the two disagree: a move that a
+third of 600-rated players would choose can be the one that throws the game away, and that
+collision is what this overlay puts on screen.
+
+Off by default. Switching it on in engine settings downloads a 46 MB model once and keeps it in
+IndexedDB; nothing is uploaded, and if the download or the model fails the app behaves exactly
+as it does with Stockfish alone. Both engines run only while the **Move Evals** pane is twisted
+open — opening it starts them, closing it stops them. Open, the pane gains:
+
+- **A column of the likeliest human moves**, with probabilities, to the left of the engine's
+  lines. The two lists are independent rankings: Maia's is sorted by how likely a human is to
+  play the move, Stockfish's by how good the move is. Row 3 of one has nothing to do with row 3
+  of the other.
+- **A colour per Maia move**, from that move's *own* Stockfish score, using the same win-%-loss
+  thresholds and the same `--class-*` colours as the move list. Green is the engine's own choice;
+  blue, orange and red are Inaccuracy, Mistake and Blunder. *Good* and *Excellent* stay in plain
+  ink, exactly as they go unmarked in the move list.
+- **One violet arrow** on the board, on Maia's single likeliest move — never a set, and never
+  shaded by probability, so it never reads as another engine line. It and the played-move arrow
+  are drawn thinner than the engine's and over the top of them, so a move all three agree on
+  still shows all three rather than whichever was drawn last.
+- **A rating**, chosen from the column's own heading (`Maia 1500: Human Moves`), from 600 to 2600
+  in hundreds. It defaults to the "played like" estimate for whoever is on move, so it follows
+  the level actually being played and changes with the side to move; picking a rating pins it.
+  Comparing what a 1200 would play here against an 1800 is the most instructive thing it does.
+
+Most of Maia's moves are not in the engine's top lines — that is the point — so they cannot be
+coloured from the MultiPV output alone. Whatever the panel's search missed gets a second,
+`searchmoves`-restricted search that also includes the engine's best move, so the baseline a move
+is measured against always comes out of the same search at the same depth. This is the one place
+the feature adds real engine load rather than riding along on work already being done, and it
+takes as long as the panel's own search — the gold ring beside the heading is showing while it
+runs, so a move still in plain ink reads as "not worked out yet" rather than "unremarkable".
+
+Maia is a pure policy network: one forward pass gives a probability over the legal moves, and
+there is no search behind it. Adding one would make it a worse predictor of human play.
+
 ### How the "played like" rating is calibrated — and its limits
 
 The estimate comes from **average win-percentage lost per move, counting only positions that
@@ -301,6 +341,20 @@ project, and only sets under a permissive or attribution license are included:
 | Firi | James Faure | CC BY 4.0 |
 | Totoy | Kosal Sen | CC BY 4.0 |
 | Papercut | Nikolay Anzarov | CC BY 4.0 |
+
+### Engine and model credits
+
+| Component | Author | License |
+| --- | --- | --- |
+| Stockfish 18 (lite, single-threaded) | The Stockfish developers | GPLv3 |
+| [Maia-3](https://github.com/CSSLab/maia3) (`maia3_simplified.onnx`) | UofT Computational Social Science Lab | **AGPL-3.0** |
+| [onnxruntime-web](https://github.com/microsoft/onnxruntime) | Microsoft | MIT |
+
+Maia-3 is the one dependency here under a network-copyleft license, and it is served
+from this app's own origin rather than a third party — see
+[`public/maia3/NOTICE.md`](public/maia3/NOTICE.md) for the attribution, the source
+links and the ICLR 2026 citation. The corresponding source for this application is
+this repository, which is public.
 
 ## How clocks are computed
 

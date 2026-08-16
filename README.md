@@ -188,9 +188,16 @@ Most of Maia's moves are not in the engine's top lines — that is the point —
 coloured from the MultiPV output alone. Whatever the panel's search missed gets a second,
 `searchmoves`-restricted search that also includes the engine's best move, so the baseline a move
 is measured against always comes out of the same search at the same depth. This is the one place
-the feature adds real engine load rather than riding along on work already being done, and it
-takes as long as the panel's own search — the gold ring beside the heading is showing while it
-runs, so a move still in plain ink reads as "not worked out yet" rather than "unremarkable".
+the feature adds real engine load rather than riding along on work already being done. It gets a
+fraction of the panel's search time, because it is scoring two or three named moves rather than
+looking for the best one, and its depth only has to be consistent with itself. The gold ring
+beside the heading shows while it runs, so a move still in plain ink reads as "not worked out
+yet" rather than "unremarkable".
+
+Maia itself does not wait for any of this. Its answer is one forward pass in its own worker —
+about 65 ms, on screen at the same time as Stockfish's first line. Only the colours wait, and
+they have to: the colour on a Maia move *is* a Stockfish verdict, and one taken from an
+unsettled search would be wrong and then change under you.
 
 Maia is a pure policy network: one forward pass gives a probability over the legal moves, and
 there is no search behind it. Adding one would make it a worse predictor of human play.

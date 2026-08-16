@@ -111,6 +111,17 @@ the harness's drag tool (mouse events) cannot move a piece. Drive it with a
   recoloured — and the answers mirrored back inside `encodePosition`, which returns UCIs in the
   caller's coordinates so nothing downstream has to remember. This is upstream's contract, read
   off `CSSLab/maia-platform-frontend` (`src/lib/engine/tensor.ts`), not something to re-derive.
+- **Maia is not what you are waiting for.** Measured: its moves are on screen 121-211ms after
+  arriving at a position, against Stockfish's first line at 184ms, and the forward pass itself is
+  ~65ms. The wait is the colouring search, and `colourSearchMs` deliberately gives it only a
+  fraction of the panel's movetime — it scores two or three named moves against a baseline from
+  its own search, so its depth never has to match anything. Shortening it from 8s to 3.2s left
+  the smoke test below unchanged, verdict for verdict.
+- **Searches are serialized on one worker, so leaving a position must `abandon`, not `stop`.**
+  `stop` only cuts short the search actually running; one still queued behind it would run its
+  full movetime for a position no longer on the board. Stepping quickly through a game put
+  several of those in front of the move being looked at. Measured after: navigating away from a
+  running colouring search puts the new position's lines on screen in 106ms.
 - **A Maia move is only ever compared against the best move from the same search.** Its colour
   needs a Stockfish score, and most of its moves are outside MultiPV, so a second
   `searchmoves` search covers the rest *and re-scores the engine's best move*. Comparing a

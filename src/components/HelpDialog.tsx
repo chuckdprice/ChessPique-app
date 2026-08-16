@@ -80,7 +80,9 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               ChessNoteR writes each move's elapsed time as <code>{'{[%emt 0:01:23]}'}</code>, which
               most chess sites ignore. This app rebuilds those into the running clock comments{' '}
               <code>{'{[%clk 1:07:00]}'}</code> that Lichess and Chess.com understand, tidies the{' '}
-              <Ui>TimeControl</Ui> tag, and then reviews the game with Stockfish.
+              <Ui>TimeControl</Ui> tag, and then reviews the game with Stockfish — and, if you
+              ask it to, shows what a human of a given rating would have played beside what was
+              best.
             </p>
             <p>
               A PGN that already has <code>%clk</code> times works too, as does a plain move list
@@ -191,18 +193,46 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               one pawn, with the lead in pawns beside them.
             </p>
             <p>
-              Turn on <Ui>SF 18</Ui> for a live engine on the current position: its best lines are
-              drawn as blue arrows, shaded from best to worst, with the move actually played in
-              orange. The gear beside it sets search time, number of lines, and memory — the same
-              three as <Ui>Settings</Ui> on the menu, which is where they live; the gear is
-              simply nearer to hand while you are looking at a position.
+              Twist open <Ui>Move Evals</Ui> for a live engine on the current position; twisting
+              it shut stops it again. <Ui>SF18: Engine Moves</Ui> lists its best lines, drawn on
+              the board as blue arrows shaded from best to worst, with the move actually played in
+              orange. The gear sets search time, number of lines, and memory — the same controls
+              as <Ui>Settings</Ui> on the menu, which is where they live; the gear is simply
+              nearer to hand while you are looking at a position.
             </p>
             <p>
               Leaving the engine running on a move lets it search deeper than the whole-game
               review did, and when it does, that move's number in the list is replaced with the
               better one. Hovering a move or its number tells you the depth behind the figure.
-              The depth badge beside the score turns green when the search has stopped, so a
-              number that has settled is not mistaken for one that is stuck.
+              The depth badge beside the title turns green when the search has stopped, so a
+              number that has settled is not mistaken for one that is stuck. Hovering any move in
+              a line shows the position it leads to on a small board, with that move's squares
+              marked.
+            </p>
+            <p>
+              Beside the engine's lines, <Ui>Human Moves</Ui> is a second opinion from a different
+              kind of engine. Stockfish answers what is <em>best</em>; Maia-3 answers what is{' '}
+              <em>tempting</em> — the move a player of a given rating would most likely play, with
+              how often they would play it. The two lists are ranked by different things and have
+              nothing to do with each other row by row: one is sorted by how likely a move is, the
+              other by how good it is.
+            </p>
+            <p>
+              Each of Maia's moves is coloured by what Stockfish makes of it, on the same scale as
+              the move list — green for the engine's own choice, blue, orange and red for an
+              inaccuracy, mistake and blunder, and plain ink for the merely fine. That is the
+              point of showing them together: a move half the players at your level would find can
+              be the one that loses the game. Maia's likeliest move is also drawn on the board, as
+              a single violet arrow.
+            </p>
+            <p>
+              The heading is the control — click <Ui>Maia 1500: Human Moves</Ui> to ask a
+              different rating, anywhere from 600 to 2600. It starts at whatever the review
+              reckons the player to move has been playing at, so it follows the game, and asking
+              what a 1200 would play here against an 1800 is one of the more instructive things it
+              does. Turn it on under the gear; the first time costs a one-off model download,
+              after which it is kept in the browser. Nothing is ever uploaded, and if it fails or
+              you are offline the panel is simply Stockfish alone.
             </p>
             <p>
               You can also move the pieces yourself: drag one, or click it and then click where
@@ -304,6 +334,12 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
             </p>
             <p>
               One game is a weak signal. Treat the number as a rough indicator, not a measurement.
+            </p>
+            <p>
+              It is also where <Ui>Human Moves</Ui> starts from, which is the other reason it is
+              deliberately coarse: it is a sensible place to begin asking the question, not an
+              answer in itself. Change the rating on its heading whenever you want a different
+              one.
             </p>
           </Section>
 

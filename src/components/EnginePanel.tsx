@@ -226,7 +226,10 @@ export default function EnginePanel({
 
     return () => {
       cancelled = true
-      engineRef.current?.stop()
+      // Abandon rather than stop: leaving a position also has to throw away the
+      // colouring search queued behind this one, which is for a position that
+      // is no longer on the board.
+      engineRef.current?.abandon()
     }
     // The three the search itself reads, not the settings object: it now also
     // carries how the board draws the answer, and a whole search was thrown

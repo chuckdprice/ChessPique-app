@@ -27,6 +27,27 @@ export function firstMoves(lines: { pvUci: string[]; score: Score }[]): ScoredMo
 }
 
 /**
+ * How long the colouring search gets, as a fraction of the panel's own.
+ *
+ * It is not doing the same job. The panel's search is looking for the best
+ * move; this one is scoring two or three named moves against a baseline drawn
+ * from *the same search*, so it only has to be internally consistent to be
+ * right — its depth never has to match the panel's, because nothing ever
+ * compares across the two. Giving it the full movetime doubled the wait for a
+ * colour and bought precision the classification bands cannot spend: they are
+ * 2, 5, 10 and 20 percentage points of win probability wide, and the last few
+ * ply of a search on three forced candidates rarely move a move across one.
+ */
+export const COLOUR_SEARCH_FRACTION = 0.4
+/** Below this the search is too short to be worth the round trip. */
+const COLOUR_SEARCH_MIN_MS = 500
+
+export function colourSearchMs(searchTimeSec: number): number {
+  const share = Math.round(searchTimeSec * 1000 * COLOUR_SEARCH_FRACTION)
+  return Math.max(COLOUR_SEARCH_MIN_MS, share)
+}
+
+/**
  * Which of `wanted` still need scoring, given what the panel's search already
  * covered. The engine's own best move is always included: it is the baseline
  * the others are measured against, and it has to come out of the same search

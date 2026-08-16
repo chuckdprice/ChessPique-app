@@ -9,7 +9,7 @@ import { MaiaSession } from '../lib/maia/session'
 import type { MaiaStatus } from '../lib/maia/session'
 import { predictMoves, nearestRating } from '../lib/maia/model'
 import type { MaiaMove } from '../lib/maia/decode'
-import { firstMoves, movesToSearch, verdictsForMoves } from '../lib/maia/verdicts'
+import { colourSearchMs, firstMoves, movesToSearch, verdictsForMoves } from '../lib/maia/verdicts'
 import type { Classification } from '../lib/engine/analysis'
 import EngineSettingsPanel from './EngineSettings'
 import MaiaColumn from './MaiaColumn'
@@ -341,7 +341,7 @@ export default function EnginePanel({
     engine
       .analyze({
         fen,
-        movetimeMs: settings.searchTimeSec * 1000,
+        movetimeMs: colourSearchMs(settings.searchTimeSec),
         multiPv: need.length,
         searchMoves: need,
       })

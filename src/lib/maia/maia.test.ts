@@ -6,7 +6,13 @@ import { encodePosition, mirrorFen, mirrorMove, TOKEN_LENGTH } from './encode'
 import { decodePolicy, decodeValue } from './decode'
 import { predictMoves, nearestRating, MAIA_RATINGS } from './model'
 import type { ModelRunner } from './model'
-import { firstMoves, movesToSearch, verdictsForMoves, isColoured } from './verdicts'
+import {
+  firstMoves,
+  movesToSearch,
+  verdictsForMoves,
+  isColoured,
+  colourSearchMs,
+} from './verdicts'
 
 const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 const AFTER_E4 = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1'
@@ -221,6 +227,13 @@ describe('verdicts', () => {
   it('leaves a move unjudged until something has scored it', () => {
     expect(verdictsForMoves(wanted, primary, [], true).has('h7h6')).toBe(false)
     expect(verdictsForMoves(wanted, [], [], true).size).toBe(0)
+  })
+
+  it('gives the colouring search a fraction of the panel’s time', () => {
+    expect(colourSearchMs(10)).toBe(4000)
+    expect(colourSearchMs(8)).toBe(3200)
+    // Never so short that the round trip costs more than the search.
+    expect(colourSearchMs(1)).toBe(500)
   })
 
   it('colours the same verdicts the move list marks', () => {

@@ -28,12 +28,13 @@ describe('appearance presets', () => {
     '--accent',
     '--accent-hover',
     '--accent-bright',
+    '--maia',
   ]
 
   // Every theme has to set every variable: they go on as inline properties and
   // are never cleared, so one a theme forgot would be inherited from whichever
   // theme was showing before it.
-  it.each(THEMES)('$name sets all ten variables to colours', (theme) => {
+  it.each(THEMES)('$name sets all eleven variables to colours', (theme) => {
     for (const name of VARS) {
       expect(theme.vars[name], `${theme.id} ${name}`).toMatch(/^#[0-9a-f]{6}$/)
     }

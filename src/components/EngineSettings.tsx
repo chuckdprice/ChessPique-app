@@ -1,10 +1,30 @@
+import { useLayoutEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
+import type { RefObject } from 'react'
 import type { EngineSettings } from '../lib/settings'
+import { MODEL_BYTES } from '../lib/maia/session'
+
+/**
+ * The download is worth being plain about rather than burying. The app's
+ * promise is that a game never leaves the browser, and that still holds: this
+ * sends nothing out, it pulls a file in — from this site, not a third party —
+ * and keeps it so it happens once.
+ */
+export const MAIA_CAPTION =
+  `What a player of a given rating would probably play, beside what is best. ` +
+  `Downloads a ${Math.round(MODEL_BYTES / 1e6)} MB model from this site the first ` +
+  `time, then keeps it. Your games are never uploaded.`
 
 interface EngineSettingsPanelProps {
   value: EngineSettings
   onChange: (next: EngineSettings) => void
   onClose: () => void
+  /** The gear this hangs off, which is what it is positioned against. */
+  anchor: RefObject<HTMLElement | null>
 }
+
+const PANEL_WIDTH = 288
+const PANEL_GAP = 8
 
 /** Exported so the Settings page offers the same controls as this popover. */
 export function SliderRow({
@@ -91,9 +111,42 @@ export default function EngineSettingsPanel({
   value,
   onChange,
   onClose,
+  anchor,
 }: EngineSettingsPanelProps) {
-  return (
-    <div className="absolute right-0 top-full z-20 mt-2 w-72 rounded-xl border border-rule bg-card p-4 shadow-lg">
+  /**
+   * Placed against the gear and drawn through the body.
+   *
+   * As an absolutely-positioned child it was clipped by the side column, which
+   * is overflow-hidden from sm up: the last rows simply could not be reached,
+   * and adding a sixth made that obvious. Same escape the hover preview takes.
+   */
+  const [place, setPlace] = useState<{ left: number; top: number; maxHeight?: number }>()
+  useLayoutEffect(() => {
+    const rect = anchor.current?.getBoundingClientRect()
+    if (!rect) return
+    // A viewport of no width is a pane that has stopped painting, not a narrow
+    // one; with nothing to clamp against, the gear's own edge is the honest
+    // answer. The same guard as showPreview, for the same reason.
+    const vw = document.documentElement.clientWidth
+    const vh = document.documentElement.clientHeight
+    const top = rect.bottom + PANEL_GAP
+    setPlace({
+      left:
+        vw > 0
+          ? Math.max(PANEL_GAP, Math.min(rect.right - PANEL_WIDTH, vw - PANEL_WIDTH - PANEL_GAP))
+          : rect.right - PANEL_WIDTH,
+      top,
+      maxHeight: vh > 0 ? Math.max(160, vh - top - PANEL_GAP) : undefined,
+    })
+  }, [anchor])
+
+  if (!place) return null
+
+  return createPortal(
+    <div
+      style={{ left: place.left, top: place.top, width: PANEL_WIDTH, maxHeight: place.maxHeight }}
+      className="fixed z-50 overflow-y-auto rounded-xl border border-rule bg-card p-4 shadow-lg"
+    >
       <div className="flex items-center justify-between">
         <h3 className="font-display text-base font-semibold">Engine Settings</h3>
         <button
@@ -149,7 +202,14 @@ export default function EngineSettingsPanel({
           checked={value.arrowEvals}
           onChange={(v) => onChange({ ...value, arrowEvals: v })}
         />
+        <SwitchRow
+          label="Human moves (Maia 3)"
+          caption={MAIA_CAPTION}
+          checked={value.maia}
+          onChange={(v) => onChange({ ...value, maia: v })}
+        />
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

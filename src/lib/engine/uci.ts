@@ -8,7 +8,7 @@ import { Chess } from 'chess.js'
  */
 
 export const ENGINE_WORKER_PATH = '/stockfish/stockfish-18-lite-single.js'
-export const ENGINE_NAME = 'SF 18'
+export const ENGINE_NAME = 'SF18'
 
 /** Centipawns (cp) or moves-to-mate (mate); exactly one is set. White POV. */
 export interface Score {
@@ -41,6 +41,17 @@ export interface AnalyzeOptions {
   /** Optional target depth — the search stops at whichever limit hits first. */
   depth?: number
   multiPv?: number
+  /**
+   * Restrict the search to these root moves.
+   *
+   * Used to score moves the engine would not otherwise look at — a popular
+   * human move it does not rank is exactly the case worth showing. Whoever
+   * asks should include the engine's own best move in the list, so the
+   * baseline it is compared against comes out of this same search: scores from
+   * two searches can be at two depths, and comparing across them is how a
+   * variation once borrowed the mainline's verdict.
+   */
+  searchMoves?: string[]
   onUpdate?: (update: AnalyzeUpdate) => void
 }
 
@@ -62,12 +73,22 @@ function uciToSanLine(fen: string, pvUci: string[], maxPlies = 12): string[] {
   return sans
 }
 
+/** What an abandoned search resolves to: nothing found, nothing searched. */
+const NOTHING: AnalyzeResult = { bestMoveUci: null, depth: 0, lines: [] }
+
 export class Engine {
   private worker: Worker | null = null
   private lineHandlers = new Set<(line: string) => void>()
   private queue: Promise<unknown> = Promise.resolve()
   private searching = false
   private initialized = false
+  /**
+   * Bumped by `abandon`. A search remembers the generation it was queued in and
+   * skips itself if that has moved on, which is the only way to get rid of one
+   * that has not started yet — `stop` can only cut short the search actually
+   * running.
+   */
+  private generation = 0
 
   constructor(private workerPath: string = ENGINE_WORKER_PATH) {}
 
@@ -128,7 +149,14 @@ export class Engine {
    * through its bestmove).
    */
   analyze(options: AnalyzeOptions): Promise<AnalyzeResult> {
-    const run = this.queue.then(() => this.runSearch(options))
+    const generation = this.generation
+    const run = this.queue.then(() =>
+      // Queued behind a search that has since been abandoned, which means the
+      // position it was for is no longer on the board. Resolving with nothing
+      // rather than rejecting keeps every caller's shape the same; they all
+      // already ignore a result they did not ask for.
+      generation === this.generation ? this.runSearch(options) : NOTHING,
+    )
     // Keep the queue alive even if a search fails.
     this.queue = run.catch(() => {})
     return run
@@ -139,6 +167,7 @@ export class Engine {
     movetimeMs,
     depth: targetDepth,
     multiPv,
+    searchMoves,
     onUpdate,
   }: AnalyzeOptions): Promise<AnalyzeResult> {
     if (!this.worker) return Promise.reject(new Error('Engine not initialized'))
@@ -172,6 +201,8 @@ export class Engine {
       // Both limits may be given; Stockfish stops at whichever comes first.
       const limits = [`movetime ${Math.max(50, Math.round(movetimeMs))}`]
       if (targetDepth) limits.unshift(`depth ${targetDepth}`)
+      // `searchmoves` takes every token after it, so UCI requires it last.
+      if (searchMoves?.length) limits.push(`searchmoves ${searchMoves.join(' ')}`)
       this.send(`go ${limits.join(' ')}`)
     })
   }
@@ -179,6 +210,21 @@ export class Engine {
   /** Cut the current search short; its promise resolves via bestmove. */
   stop(): void {
     if (this.searching) this.send('stop')
+  }
+
+  /**
+   * Give up on everything in flight: stop the running search and skip the ones
+   * still queued behind it.
+   *
+   * `stop` alone is not enough. Searches are serialized on one worker, so a
+   * search queued for a position you have already left still had to run to its
+   * movetime before the new position's could start — stepping quickly through
+   * a game could put several of those in front of the move you were actually
+   * looking at.
+   */
+  abandon(): void {
+    this.generation += 1
+    this.stop()
   }
 
   destroy(): void {

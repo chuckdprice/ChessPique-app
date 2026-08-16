@@ -11,9 +11,10 @@ import type { Opening } from '../lib/openings'
 import AnalysisTabs from './AnalysisTabs'
 import BoardBoundary from './BoardBoundary'
 import BoardViewer, { BoardNav, PlayerPlateRow } from './BoardViewer'
-import type { EvalLabel, PlayerPlate } from './BoardViewer'
+import type { EvalLabel, OverlayArrow, PlayerPlate } from './BoardViewer'
 import EnginePanel from './EnginePanel'
 import type { EngineArrow } from './EnginePanel'
+import type { MaiaMove } from '../lib/maia/decode'
 import EvalBar from './EvalBar'
 import FileWarnings from './FileWarnings'
 import MoveTable from './MoveTable'
@@ -65,8 +66,12 @@ interface AnalysisPageProps {
   onEngineSettingsChange: (next: EngineSettings) => void
   onTopScore: (score: Score | null, depth: number) => void
   onEngineMoves: (lines: EngineArrow[]) => void
+  /** Maia's likeliest human move, for the board's single violet arrow. */
+  onMaiaMove: (move: MaiaMove | null) => void
   onCommentChange: (nodeId: string, comment: string) => void
   arrows: Arrow[]
+  /** Maia's move and the played move, drawn thinner and over the engine's. */
+  overlayArrows: OverlayArrow[]
   /** Scores printed at the arrow heads; empty when the setting is off. */
   evalLabels: EvalLabel[]
   /** Piece set id from the appearance settings. */
@@ -116,8 +121,10 @@ export default function AnalysisPage({
   onEngineSettingsChange,
   onTopScore,
   onEngineMoves,
+  onMaiaMove,
   onCommentChange,
   arrows,
+  overlayArrows,
   evalLabels,
   pieceSet,
 }: AnalysisPageProps) {
@@ -134,6 +141,11 @@ export default function AnalysisPage({
   // Each player's row shows what they are up, so it carries the *opponent's*
   // missing pieces, and the lead badge goes to whoever holds it.
   const captured = capturedMaterial(shownFen)
+  // What Maia's rating follows by default: how the player who has to move here
+  // has actually been playing. It changes with the side to move, which is the
+  // point — the two players in a game are rarely the same strength.
+  const playedLike =
+    analysis && (shownFen.split(' ')[1] === 'b' ? analysis.black : analysis.white).playedLike
   const lead = Math.abs(captured.diff)
   const whitePlate: PlayerPlate = {
     name: whiteName,
@@ -183,6 +195,7 @@ export default function AnalysisPage({
               orientation={orientation}
               analysis={analysis}
               arrows={arrows}
+              overlayArrows={overlayArrows}
               evalLabels={evalLabels}
               onPieceMove={onPieceMove}
               pieceSet={pieceSet}
@@ -209,6 +222,8 @@ export default function AnalysisPage({
             orientation={orientation}
             onTopScore={onTopScore}
             onFirstMoves={onEngineMoves}
+            onMaiaMove={onMaiaMove}
+            playedLike={playedLike}
           />
           <MoveTable
             tree={tree}

@@ -101,6 +101,59 @@ the harness's drag tool (mouse events) cannot move a piece. Drive it with a
   and a unit test guards this — and in the browser pane you check a theme by
   reading `document.documentElement.style`, never `getComputedStyle`.
 
+## Maia-3
+
+- **The 4352-move policy space is derived, not vendored.** `src/lib/maia/moves.ts` computes the
+  index; `src/lib/__fixtures__/all_moves_maia3.json` is Maia's own table, and the test checks
+  every one of the 4352 entries both ways. If a later model renumbers the space that test is
+  what tells you, so don't delete the fixture to save 60 kB.
+- **The model only ever sees White to move.** A Black-to-move position is mirrored — flipped and
+  recoloured — and the answers mirrored back inside `encodePosition`, which returns UCIs in the
+  caller's coordinates so nothing downstream has to remember. This is upstream's contract, read
+  off `CSSLab/maia-platform-frontend` (`src/lib/engine/tensor.ts`), not something to re-derive.
+- **Maia is not what you are waiting for.** Measured: its moves are on screen 121-211ms after
+  arriving at a position, against Stockfish's first line at 184ms, and the forward pass itself is
+  ~65ms. The wait is the colouring search, and `colourSearchMs` deliberately gives it only a
+  fraction of the panel's movetime — it scores two or three named moves against a baseline from
+  its own search, so its depth never has to match anything. Shortening it from 8s to 3.2s left
+  the smoke test below unchanged, verdict for verdict.
+- **Searches are serialized on one worker, so leaving a position must `abandon`, not `stop`.**
+  `stop` only cuts short the search actually running; one still queued behind it would run its
+  full movetime for a position no longer on the board. Stepping quickly through a game put
+  several of those in front of the move being looked at. Measured after: navigating away from a
+  running colouring search puts the new position's lines on screen in 106ms.
+- **A Maia move is only ever compared against the best move from the same search.** Its colour
+  needs a Stockfish score, and most of its moves are outside MultiPV, so a second
+  `searchmoves` search covers the rest *and re-scores the engine's best move*. Comparing a
+  constrained score against the panel's would be the mainline/variation depth mix-up again, in a
+  new place.
+- **Maia's arrow and the played-move arrow are not react-chessboard's.** That component takes one
+  stroke width for every arrow and keys them by their pair of squares, so two arrows along the
+  same squares are one arrow with a duplicate React key — and those two are the ones most likely
+  to land on an engine candidate. `BoardViewer` draws them itself in an SVG at z-25, between the
+  library's arrows and the eval labels, thinner, and steps the width down again for a second
+  arrow on the same path so both colours stay visible.
+- **Both lists always render `multiPv` rows, filled or not.** A new position empties them until
+  the first result lands, and letting them collapse to a single "Thinking…" and spring back
+  bounced the pane and everything under it on every move — it read as the pane closing and
+  reopening. The waiting message lives in the first reserved row rather than above the list, so
+  it costs no height of its own. Measured after the fix: constant 123px across six first-visit
+  moves, sampled every 30ms.
+- **The hover preview is fixed across and follows the row down.** Two separate bugs, one in each
+  axis: anchored to the hovered move it slid sideways as you read a variation, and pinned
+  entirely to the first line it covered the lines below. Its left comes from `firstTokenRef`, its
+  top from the hovered `<li>`.
+- **The two columns are laid out by container query, not by `sm:`.** The side column is narrow on
+  a mid-size window long after `sm:` is true, and a fixed-width Maia column starved the engine's
+  lines to nothing there. `@container/evals` on the wrapper and `@[22rem]/evals:` on the two
+  children is what keeps them side by side only when they fit. Note that `basis-*` on a stacked
+  flex column is a *height* — that one opened a 9rem hole under the Maia rows.
+- The weights are **AGPL-3.0** — the only copyleft-with-network-clause thing here. Attribution
+  and the ICLR 2026 citation live in `public/maia3/NOTICE.md`; keep them with the file.
+- Verified live on 11 August 2026 against the sample Sicilian in this repo: at the position after
+  21…d6, Maia at 600 plays exd6 33.8% (a Mistake) over the engine's b4 23.6%, and at 1500 those
+  invert to b4 37.4% / exd6 9.3%. That is the feature working, and a useful smoke test.
+
 ## Conventions
 
 - No semicolons, single quotes, 2-space indent, ~96 columns.

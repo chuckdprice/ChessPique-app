@@ -8,8 +8,9 @@ import NavDrawer, { NavToggle } from './components/NavDrawer'
 import PgnFilePage from './components/PgnFilePage'
 import SettingsPage from './components/SettingsPage'
 import StepNav from './components/StepNav'
-import type { EvalLabel } from './components/BoardViewer'
+import type { EvalLabel, OverlayArrow } from './components/BoardViewer'
 import type { EngineArrow } from './components/EnginePanel'
+import type { MaiaMove } from './lib/maia/decode'
 import type { Page } from './lib/pages'
 import type { PgnExtras } from './components/PgnExtrasSwitches'
 import {
@@ -95,6 +96,9 @@ function findHeader(headers: Array<{ name: string; value: string }>, name: strin
 const ENGINE_ARROW_ALPHA = [0.95, 0.7, 0.52, 0.4, 0.3]
 const ENGINE_ARROW_RGB = '38, 122, 255'
 const NEXT_MOVE_ARROW = 'rgba(244, 130, 32, 0.95)'
+// The one arrow colour that is a theme variable rather than a literal: the
+// engine's shade-by-rank needs a numeric alpha, and Maia's does not.
+const MAIA_ARROW = 'var(--maia)'
 
 /** Credited in every converted PGN, so a shared file says where it came from. */
 const ANNOTATOR_URL = 'https://chessnoter.vercel.app/'
@@ -221,6 +225,7 @@ export default function App() {
   const [engineOn, setEngineOn] = useState(false)
   const [liveScore, setLiveScore] = useState<Score | null>(null)
   const [engineMoves, setEngineMoves] = useState<EngineArrow[]>([])
+  const [maiaMove, setMaiaMove] = useState<MaiaMove | null>(null)
   const [analysis, setAnalysis] = useState<GameAnalysis | null>(null)
   const [analysisProgress, setAnalysisProgress] = useState<{ done: number; total: number } | null>(
     null,
@@ -401,6 +406,7 @@ export default function App() {
     setDeeperEvals((prev) => withDeeperEval(prev, at, { score, depth }, reviewDepth))
   }, [])
   const handleEngineMoves = useCallback((lines: EngineArrow[]) => setEngineMoves(lines), [])
+  const handleMaiaMove = useCallback((move: MaiaMove | null) => setMaiaMove(move), [])
 
   /** Move the board to a node. Navigation never changes the game. */
   const handleNavigate = useCallback((nodeId: string) => setCurrentId(nodeId), [])
@@ -736,11 +742,22 @@ export default function App() {
   // arrows have no business being rebuilt because the hash size moved.
   const showArrowEvals = engineSettings.arrowEvals
 
-  // Engine candidates fade best→worst, then the game's own next move is drawn
-  // on top. The move already on the board gets no arrow — the highlighted
-  // squares already show it, and it belongs to the other side.
-  const { arrows, evalLabels } = useMemo<{ arrows: Arrow[]; evalLabels: EvalLabel[] }>(() => {
-    if (!engineOn || !game) return { arrows: [], evalLabels: [] }
+  /**
+   * Three kinds of arrow, in two layers.
+   *
+   * The engine's candidates fade best→worst and go to react-chessboard. Maia's
+   * move and the game's own next move go to the board's own thin overlay on
+   * top, because those two are the ones that most often land on an engine
+   * candidate — and when they agree that is worth seeing, not a reason to drop
+   * one of them. The move already on the board gets no arrow at all: the
+   * highlighted squares show it, and it belongs to the other side.
+   */
+  const { arrows, overlayArrows, evalLabels } = useMemo<{
+    arrows: Arrow[]
+    overlayArrows: OverlayArrow[]
+    evalLabels: EvalLabel[]
+  }>(() => {
+    if (!engineOn || !game) return { arrows: [], overlayArrows: [], evalLabels: [] }
     // The continuation of the line the board is on, which is by the same side
     // the engine is thinking for. It follows the board into a variation now,
     // where before there was no next move to draw at all.
@@ -748,14 +765,11 @@ export default function App() {
     const nextNode = next ? game.tree.nodes.get(next) : null
     const nextMove =
       nextNode?.from && nextNode.to ? ([nextNode.from, nextNode.to] as const) : null
-    const nextKey = nextMove ? `${nextMove[0]}${nextMove[1]}` : null
 
-    // The board keys arrows by from-to, so every square pair may appear once.
-    // Mid-search the engine can list the same first move under two multipv
-    // slots, and the played move often *is* the engine's pick — in both cases
-    // the duplicate is dropped and the orange next-move arrow wins.
+    // Only the engine's own candidates need de-duplicating now: mid-search it
+    // can list the same first move under two multipv slots, and the board still
+    // keys its arrows by the pair of squares. The overlay has no such limit.
     const seen = new Set<string>()
-    if (nextKey) seen.add(nextKey)
     // Arrows are keyed by the pair of squares, but a label sits on the head
     // alone, and two candidates arriving on one square — two pieces that can
     // both take it — would print one number on top of the other. The better
@@ -790,15 +804,32 @@ export default function App() {
       }
     })
 
-    if (nextMove) {
-      list.push({
-        startSquare: nextMove[0],
-        endSquare: nextMove[1],
-        color: NEXT_MOVE_ARROW,
-      })
+    // Maia's single arrow. One, never a set: this is a claim about what a
+    // human would play, not another ranking of what is good, and shading it by
+    // probability would make it read as one more engine line.
+    const overlay: OverlayArrow[] = []
+    if (maiaMove) {
+      const from = maiaMove.uci.slice(0, 2)
+      const to = maiaMove.uci.slice(2, 4)
+      overlay.push({ from, to, color: MAIA_ARROW })
+      if (showArrowEvals && !labelled.has(to)) {
+        labelled.add(to)
+        // Outlined rather than filled: a filled badge is how the engine's own
+        // best move is marked, and this is not that.
+        labels.push({
+          square: to,
+          text: `${Math.round(maiaMove.prob * 100)}%`,
+          best: false,
+          color: MAIA_ARROW,
+        })
+      }
     }
-    return { arrows: list, evalLabels: labels }
-  }, [engineOn, engineMoves, game, currentId, showArrowEvals])
+
+    if (nextMove) {
+      overlay.push({ from: nextMove[0], to: nextMove[1], color: NEXT_MOVE_ARROW })
+    }
+    return { arrows: list, overlayArrows: overlay, evalLabels: labels }
+  }, [engineOn, engineMoves, maiaMove, game, currentId, showArrowEvals])
 
   const playedLikeTooltip =
     `Estimated "played like" rating for this game.\n\n` +
@@ -968,8 +999,10 @@ export default function App() {
               onEngineSettingsChange={setEngineSettings}
               onTopScore={handleTopScore}
               onEngineMoves={handleEngineMoves}
+              onMaiaMove={handleMaiaMove}
               onCommentChange={handleCommentChange}
               arrows={arrows}
+              overlayArrows={overlayArrows}
               evalLabels={evalLabels}
               pieceSet={appearance.pieces}
             />

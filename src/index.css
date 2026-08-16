@@ -52,6 +52,7 @@
   --accent: #1e5943;
   --accent-hover: #153f30;
   --accent-bright: #2c7a5c;
+  --maia: #7c3aed;
   --board-light: #efe8d6;
   --board-dark: #4e7d63;
 }
@@ -116,6 +117,8 @@
   --color-class-inaccuracy: var(--class-inaccuracy);
   --color-class-mistake: var(--class-mistake);
   --color-class-blunder: var(--class-blunder);
+
+  --color-maia: var(--maia);
 }
 
 html {

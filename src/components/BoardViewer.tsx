@@ -24,6 +24,21 @@ export interface PlayerPlate {
   lead: string | null
 }
 
+/**
+ * An arrow this component draws itself, over react-chessboard's own.
+ *
+ * The library takes one width for every arrow and keys them by their pair of
+ * squares, so two arrows along the same squares are one arrow with a duplicate
+ * React key. Maia's move and the move actually played are exactly the arrows
+ * most likely to land on an engine candidate — and the agreement is worth
+ * seeing — so they are drawn here instead: thinner, and on top.
+ */
+export interface OverlayArrow {
+  from: string
+  to: string
+  color: string
+}
+
 /** A score printed at the head of an engine arrow. */
 export interface EvalLabel {
   /** The move's destination — where its arrow points. */
@@ -42,6 +57,8 @@ interface BoardViewerProps {
   orientation: 'white' | 'black'
   analysis: GameAnalysis | null
   arrows: Arrow[]
+  /** Drawn over `arrows`, thinner — see OverlayArrow. */
+  overlayArrows: OverlayArrow[]
   evalLabels: EvalLabel[]
   /** Play a move, which writes it into the game. False snaps the piece back. */
   onPieceMove: (from: string, to: string) => boolean
@@ -72,8 +89,13 @@ function pieceRenderers(setId: string): PieceRenderObject | undefined {
   )
 }
 
-/** The square of the last move played, and of a piece picked up to move. */
-const HIGHLIGHT = 'rgba(237, 189, 71, 0.5)'
+/**
+ * The square of the last move played, and of a piece picked up to move.
+ *
+ * Exported because the hover preview marks its move with the same wash: a
+ * second gold that was nearly this one would read as a different kind of mark.
+ */
+export const HIGHLIGHT = 'rgba(237, 189, 71, 0.5)'
 /**
  * Where a selected piece may go: a dot on an empty square, a ring around a
  * piece it can take. Gradients rather than elements, so they cost nothing but
@@ -113,6 +135,46 @@ function squareCorner(square: string, orientation: 'white' | 'black') {
 function squareCenter(square: string, orientation: 'white' | 'black') {
   const { col, row } = squareGrid(square, orientation)
   return { left: (col + 0.5) * 12.5, top: (row + 0.5) * 12.5 }
+}
+
+/**
+ * The overlay arrows are drawn in a 100x100 viewBox, so a square is 12.5 units
+ * and the numbers below are react-chessboard's own defaults expressed in it:
+ * the length reduction that stops an arrow short of the target's centre, and
+ * the stroke it would have used. Matching them is the point — these arrows have
+ * to read as the same kind of mark, only slimmer.
+ */
+const SQUARE = 12.5
+const ARROW_SHORTEN = SQUARE / 8
+const ENGINE_ARROW_STROKE = SQUARE / 5
+const OVERLAY_ARROW_STROKE = ENGINE_ARROW_STROKE * 0.55
+
+/** An arrow's path, L-shaped for a knight's move exactly as the library draws it. */
+function arrowPath(from: string, to: string, orientation: 'white' | 'black'): string {
+  const a = squareCenter(from, orientation)
+  const b = squareCenter(to, orientation)
+  const dx = b.left - a.left
+  const dy = b.top - a.top
+  const r = Math.hypot(dx, dy)
+  if (r === 0) return ''
+
+  if (Math.abs(Math.hypot(1, 2) * SQUARE - r) < 0.001) {
+    const verticalFirst = Math.abs(dx) < Math.abs(dy)
+    const corner = verticalFirst ? { x: a.left, y: b.top } : { x: b.left, y: a.top }
+    const legX = b.left - corner.x
+    const legY = b.top - corner.y
+    const end = {
+      x: corner.x + (legX * (SQUARE - ARROW_SHORTEN)) / SQUARE,
+      y: corner.y + (legY * (SQUARE - ARROW_SHORTEN)) / SQUARE,
+    }
+    return `M${a.left},${a.top} L${corner.x},${corner.y} L${end.x},${end.y}`
+  }
+
+  const end = {
+    x: a.left + (dx * (r - ARROW_SHORTEN)) / r,
+    y: a.top + (dy * (r - ARROW_SHORTEN)) / r,
+  }
+  return `M${a.left},${a.top} L${end.x},${end.y}`
 }
 
 /**
@@ -161,6 +223,7 @@ export default function BoardViewer({
   orientation,
   analysis,
   arrows,
+  overlayArrows,
   evalLabels,
   onPieceMove,
   pieceSet,
@@ -247,6 +310,57 @@ export default function BoardViewer({
           boardStyle: { width: '100%', height: '100%' },
         }}
       />
+      {/* Between the library's arrows (z-20) and the labels (z-30), so a Maia
+          or played-move arrow lies over an engine candidate sharing its
+          squares rather than being dropped for it. */}
+      {overlayArrows.length > 0 && (
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 100 100"
+          className="pointer-events-none absolute inset-0 z-[25] size-full"
+        >
+          {(() => {
+            // Maia's move and the move actually played are often the same one,
+            // and then the second arrow would sit exactly on the first and hide
+            // it. Each arrow that repeats a path is drawn narrower than the one
+            // before, so it reads as a stripe down the middle of it and both
+            // colours stay on screen.
+            const drawnPaths = new Map<string, number>()
+            return overlayArrows.map((arrow, i) => {
+              const d = arrowPath(arrow.from, arrow.to, orientation)
+              const repeat = drawnPaths.get(d) ?? 0
+              drawnPaths.set(d, repeat + 1)
+              // Unique per arrow, not per pair of squares: two arrows along the
+              // same squares are exactly the case this overlay exists for.
+              const id = `overlay-${i}-${arrow.from}-${arrow.to}`
+              return (
+                <g key={id}>
+                  {/* Marker units are stroke widths, so the head thins with the
+                      shaft and the two stay in proportion. */}
+                  <marker
+                    id={id}
+                    markerWidth="2"
+                    markerHeight="2.5"
+                    refX="1.25"
+                    refY="1.25"
+                    orient="auto"
+                  >
+                    <polygon points="0.3 0, 2 1.25, 0.3 2.5" fill={arrow.color} />
+                  </marker>
+                  <path
+                    d={d}
+                    fill="none"
+                    stroke={arrow.color}
+                    strokeWidth={OVERLAY_ARROW_STROKE * (1 - repeat * 0.45)}
+                    markerEnd={`url(#${id})`}
+                  />
+                </g>
+              )
+            })
+          })()}
+        </svg>
+      )}
+
       {/* Over the arrow layer, which react-chessboard puts at z-index 20 in
           this same stacking context: below it, the arrowhead a label belongs
           to painted across the label and ate its first two characters. */}

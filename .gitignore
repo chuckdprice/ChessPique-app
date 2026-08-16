@@ -1,6 +1,10 @@
 node_modules
 dist
 public/stockfish
+# The ONNX runtime, copied out of node_modules by postinstall like Stockfish.
+# The Maia weights next door are NOT ignored: they are self-hosted rather than
+# installed, and 46 MB in the history is the price of serving them ourselves.
+public/ort
 *.local
 .DS_Store
 .vercel

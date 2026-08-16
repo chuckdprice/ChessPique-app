@@ -32,6 +32,7 @@ measurement, not folklore:
 | `window.open` — becomes a same-tab navigation | reason about it; test the parts |
 | `navigator.clipboard.readText` — "Document is not focused" | stub `writeText` and assert its argument |
 | `computer` key presses — arrows never reach the page | dispatch a `KeyboardEvent` on `window` |
+| `computer` hover — React's `onPointerEnter` never fires from it | dispatch `pointerover` then `pointerenter` (`pointerType: 'mouse'`, `bubbles: true`) on the element |
 | Viewport size — `innerWidth`/`innerHeight` and `clientWidth`/`clientHeight` all read **0** while the pane is backgrounded | take the size from an element's rect, or treat 0 as "unknown" |
 
 `getBoundingClientRect` and DOM attribute reads *are* reliable. So are
@@ -165,7 +166,7 @@ the harness's drag tool (mouse events) cannot move a piece. Drive it with a
   `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>` line.
 - Commit and push only when Chuck asks. He asks explicitly, usually right after
   reviewing.
-- `npm run build && npm test` before every commit. 180 tests as of this writing;
+- `npm run build && npm test` before every commit. 211 tests as of this writing;
   they cover `src/lib` only — the UI is verified in the browser.
 - Commits during v2 were split by concern rather than by session, sometimes by
   rebuilding intermediate file states by hand (`git add -p` is interactive and
@@ -184,11 +185,25 @@ Deployed at <https://chessnoter.vercel.app> from `main` (auto-deploy on push).
 The version in the header is `major.minor` from `package.json` plus a build
 number derived from the commit's timestamp, so it changes on every commit.
 
-**v2.0 shipped on 10 August 2026** and is what production serves; Chuck
-confirmed it against the live site. Work happens on `main` again — the `v2.0`
-branch was merged and deleted. Two tags bracket it: `v2.0.0` on the release
-merge, `v1.6-final` on the last v1 release, which is what a rollback goes back
-to (`git revert -m 1` the merge, or redeploy that tag from Vercel).
+**v2.1 shipped on 16 August 2026** and is what production serves. Work happens
+on `main` again — the `v2.1` branch was merged and deleted. Two tags bracket it:
+`v2.1.0` on the release merge, `v2.0-final` on the last v2.0 release, which is
+what a rollback goes back to (`git revert -m 1` the merge, or redeploy that tag
+from Vercel). `v2.0.0` and `v1.6-final` bracket the release before it, the same
+way.
+
+What v2.1 changed, in one line: Maia-3 runs beside Stockfish, so the panel shows
+what a human of a given rating would probably play next to what is actually
+best. The Maia-3 section above is the part worth reading before touching it.
+
+**Not yet confirmed against the live site.** Every check on the model was made
+against localhost, where a 46 MB fetch is instant and cannot fail. What has
+never run for real is the first-enable download over a network, the progress
+ring at a speed where it is visible for more than a frame, and the IndexedDB
+cache surviving a reload. If a bug report arrives about Maia not loading, start
+there rather than in the inference code — and note the blast radius is small,
+because the feature is off until asked for and every failure path falls back to
+Stockfish alone. (Contrast v2.0, which Chuck did confirm against production.)
 
 What v2 changed, in one line: the game became a tree of moves rather than a
 list, so the app edits a game as well as converting and reviewing one. That is

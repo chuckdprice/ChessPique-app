@@ -196,14 +196,15 @@ What v2.1 changed, in one line: Maia-3 runs beside Stockfish, so the panel shows
 what a human of a given rating would probably play next to what is actually
 best. The Maia-3 section above is the part worth reading before touching it.
 
-**Not yet confirmed against the live site.** Every check on the model was made
-against localhost, where a 46 MB fetch is instant and cannot fail. What has
-never run for real is the first-enable download over a network, the progress
-ring at a speed where it is visible for more than a frame, and the IndexedDB
-cache surviving a reload. If a bug report arrives about Maia not loading, start
-there rather than in the inference code — and note the blast radius is small,
-because the feature is off until asked for and every failure path falls back to
-Stockfish alone. (Contrast v2.0, which Chuck did confirm against production.)
+**The model download works in production.** Chuck confirmed it against the live
+site on 16 August 2026: the 46 MB first-enable fetch, the progress ring visibly
+counting up rather than flashing past in a frame, and the IndexedDB cache
+holding it across a reload so the second visit does not download again. That was
+the one part of v2.1 no local test could reach — every other check was made
+against localhost, where the fetch is instant and cannot fail — so treat that
+path as working, and suspect a regression rather than a never-worked bug if it
+breaks. The blast radius was always small in any case: the feature is off until
+asked for, and every failure path falls back to Stockfish alone.
 
 What v2 changed, in one line: the game became a tree of moves rather than a
 list, so the app edits a game as well as converting and reviewing one. That is

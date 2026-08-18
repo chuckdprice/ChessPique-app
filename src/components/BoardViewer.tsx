@@ -5,7 +5,7 @@ import { PIECE_CODES, pieceSrc } from '../lib/appearance'
 import { formatClockDisplay } from '../lib/convert'
 import { hasMoveMarker } from '../lib/engine/analysis'
 import type { GameAnalysis } from '../lib/engine/analysis'
-import { moveTargets } from '../lib/gameModel'
+import { checkedKingSquare, moveTargets } from '../lib/gameModel'
 import type { CapturedKind } from '../lib/gameModel'
 import { isMainline, lineEndId, nextId, previousId } from '../lib/moveTree'
 import type { MoveTree } from '../lib/moveTree'
@@ -114,6 +114,21 @@ const MOVE_DOT =
   'radial-gradient(circle closest-side, rgba(0, 0, 0, 0.42) 0 26%, rgba(255, 255, 255, 0.18) 27% 31%, transparent 32%)'
 const CAPTURE_RING =
   'radial-gradient(circle closest-side, transparent 0 76%, rgba(226, 74, 74, 0.8) 78% 97%, transparent 98%)'
+/**
+ * The king that is in check, lit from underneath.
+ *
+ * Exported for the same reason as HIGHLIGHT: the hover preview marks a check
+ * with it too, and two nearly-identical reds would read as two different marks.
+ *
+ * A wash over the whole square would read as one more highlighted square —
+ * the app already spends a flat fill on the last move and on a selected piece
+ * — so this is a glow with a soft edge instead, brightest under the king and
+ * gone before the square's own edge. `closest-side` for the same reason as the
+ * two above: without it a gradient's 100% is the distance to the corner, and
+ * the falloff would reach the neighbouring squares.
+ */
+export const CHECK_GLOW =
+  'radial-gradient(circle closest-side, rgba(226, 74, 74, 0.92) 0 24%, rgba(226, 74, 74, 0.55) 52%, rgba(226, 74, 74, 0) 88%)'
 
 /** Square's column and row on screen, 0-7 from the top-left, given orientation. */
 function squareGrid(square: string, orientation: 'white' | 'black') {
@@ -264,13 +279,17 @@ export default function BoardViewer({
   const badgePos = badgeSquare ? squareCorner(badgeSquare, orientation) : null
 
   const squareStyles: Record<string, React.CSSProperties> = {}
+  const checkedKing = checkedKingSquare(fen)
+  if (checkedKing) {
+    squareStyles[checkedKing] = { backgroundImage: CHECK_GLOW }
+  }
   if (highlight) {
     for (const square of highlight) {
-      squareStyles[square] = { backgroundColor: HIGHLIGHT }
+      squareStyles[square] = { ...squareStyles[square], backgroundColor: HIGHLIGHT }
     }
   }
   if (selected) {
-    squareStyles[selected] = { backgroundColor: HIGHLIGHT }
+    squareStyles[selected] = { ...squareStyles[selected], backgroundColor: HIGHLIGHT }
     for (const target of targets) {
       // The gradient sits behind the piece, so a capture ring encircles it
       // rather than covering it. Merged with any highlight already here: the

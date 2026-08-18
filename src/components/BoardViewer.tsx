@@ -122,13 +122,17 @@ const CAPTURE_RING =
  *
  * A wash over the whole square would read as one more highlighted square —
  * the app already spends a flat fill on the last move and on a selected piece
- * — so this is a glow with a soft edge instead, brightest under the king and
- * gone before the square's own edge. `closest-side` for the same reason as the
- * two above: without it a gradient's 100% is the distance to the corner, and
- * the falloff would reach the neighbouring squares.
+ * — so this is a glow with a soft edge instead. It fills most of the square and
+ * leaves the corners, which is what keeps it a glow rather than a fill.
+ *
+ * `closest-corner`, so 100% is the distance to the corner rather than to the
+ * side. With `closest-side` the strong part of the gradient reached only the
+ * middle of each edge, which under a piece drawn nearly square read as a small
+ * dot behind a large king. Nothing escapes the square either way: this is a
+ * background-image on the square itself, so it is clipped to it.
  */
 export const CHECK_GLOW =
-  'radial-gradient(circle closest-side, rgba(226, 74, 74, 0.92) 0 24%, rgba(226, 74, 74, 0.55) 52%, rgba(226, 74, 74, 0) 88%)'
+  'radial-gradient(circle closest-corner, rgba(226, 74, 74, 0.95) 0 42%, rgba(226, 74, 74, 0.78) 68%, rgba(226, 74, 74, 0) 100%)'
 
 /** Square's column and row on screen, 0-7 from the top-left, given orientation. */
 function squareGrid(square: string, orientation: 'white' | 'black') {

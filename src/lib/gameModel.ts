@@ -37,6 +37,119 @@ export function replayGame(moves: Move[]): ReplayedGame {
 }
 
 /** Somewhere the piece on a chosen square may go, for the board's markers. */
+/**
+ * The square of the king that is in check, or null when nobody is.
+ *
+ * Only the side to move can be in check in a legal position, so there is never
+ * more than one answer. A position chess.js will not parse gets null: a board
+ * that cannot say whether there is a check should not claim there is one.
+ */
+export function checkedKingSquare(fen: string): string | null {
+  let chess
+  try {
+    chess = new Chess(fen)
+  } catch {
+    return null
+  }
+  if (!chess.isCheck()) return null
+  const inCheck = chess.turn()
+  for (const rank of chess.board()) {
+    for (const piece of rank) {
+      if (piece && piece.type === 'k' && piece.color === inCheck) return piece.square
+    }
+  }
+  return null
+}
+
+const FILES = 'abcdefgh'
+
+/** A piece on a board, with an identity that outlives the square it stands on. */
+export interface PlacedPiece {
+  /** Stable across positions, which is what lets a drawing of it move. */
+  id: number
+  /** FEN letter: uppercase for white, lowercase for black. */
+  letter: string
+  square: string
+}
+
+/** Every piece in a position, by the square it stands on, rank 8 first. */
+export function piecesOf(fen: string): Array<{ letter: string; square: string }> {
+  const out: Array<{ letter: string; square: string }> = []
+  let index = 0
+  for (const row of fen.split(' ')[0].split('/')) {
+    for (const ch of row) {
+      const empty = parseInt(ch, 10)
+      if (Number.isNaN(empty)) {
+        out.push({ letter: ch, square: FILES[index % 8] + String(8 - (index >> 3)) })
+        index += 1
+      } else {
+        index += empty
+      }
+    }
+  }
+  return out
+}
+
+function squareDistance(a: string, b: string): number {
+  const file = FILES.indexOf(a[0]) - FILES.indexOf(b[0])
+  const rank = Number(a[1]) - Number(b[1])
+  return Math.hypot(file, rank)
+}
+
+/**
+ * Carry piece identities from one position to the next, so that a drawing of
+ * the board can move the pieces that moved instead of rebuilding all of them.
+ *
+ * Anything standing still keeps its id outright. What is left is matched by
+ * piece letter — preferring whatever set off from the square the move names,
+ * then whatever is nearest — which covers the cases a single from/to does not
+ * describe: the rook in a castle, and the pawn taken en passant, which leaves
+ * a square the move never mentions.
+ *
+ * A piece with no match is new and gets a fresh id, which is the honest answer
+ * for a promotion: a pawn that becomes a queen is not the same piece moving.
+ */
+export function carryPieceIdentities(
+  previous: PlacedPiece[],
+  fen: string,
+  move?: { from: string; to: string } | null,
+): PlacedPiece[] {
+  const placement = piecesOf(fen)
+  const spare = new Set(previous)
+  const carried: Array<PlacedPiece | null> = placement.map(() => null)
+
+  placement.forEach((piece, i) => {
+    for (const old of spare) {
+      if (old.square === piece.square && old.letter === piece.letter) {
+        carried[i] = old
+        spare.delete(old)
+        return
+      }
+    }
+  })
+
+  placement.forEach((piece, i) => {
+    if (carried[i]) return
+    let best: PlacedPiece | null = null
+    let bestCost = Infinity
+    for (const old of spare) {
+      if (old.letter !== piece.letter) continue
+      const cost = old.square === move?.from ? -1 : squareDistance(old.square, piece.square)
+      if (cost < bestCost) {
+        best = old
+        bestCost = cost
+      }
+    }
+    if (best) {
+      carried[i] = { ...best, square: piece.square }
+      spare.delete(best)
+    }
+  })
+
+  let nextId = previous.reduce((max, piece) => Math.max(max, piece.id), 0) + 1
+  return placement.map((piece, i) => carried[i] ?? { id: nextId++, ...piece })
+}
+
 export interface MoveTarget {
   to: string
   /** True when landing there takes a piece. */

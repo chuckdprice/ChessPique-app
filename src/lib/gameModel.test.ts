@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import type { Move } from './convert'
-import { capturedMaterial, moveTargets, replayGame } from './gameModel'
+import {
+  capturedMaterial,
+  carryPieceIdentities,
+  checkedKingSquare,
+  moveTargets,
+  piecesOf,
+  replayGame,
+} from './gameModel'
 
 function movesFrom(sans: string[]): Move[] {
   return sans.map((san, i) => ({
@@ -111,5 +118,103 @@ describe('moveTargets', () => {
   it('survives a square or a position it cannot read', () => {
     expect(moveTargets(fenAfter([]), 'z9')).toEqual([])
     expect(moveTargets('not a fen', 'e2')).toEqual([])
+  })
+})
+
+describe('checkedKingSquare', () => {
+  it('finds the king of the side that is in check', () => {
+    // Scholar's mate: black's king on e8 is mated by the queen on f7.
+    expect(
+      checkedKingSquare('r1bqkb1r/pppp1Qpp/2n2n2/4p3/2B1P3/8/PPPP1PPP/RNB1K1NR b KQkq - 0 4'),
+    ).toBe('e8')
+    // A check that is not mate is still a check.
+    expect(checkedKingSquare('4k3/8/8/8/8/8/8/R3K3 b - - 0 1')).toBe(null)
+    expect(checkedKingSquare('4k3/8/8/8/8/8/8/4R1K1 b - - 0 1')).toBe('e8')
+  })
+
+  it('says nothing when no one is in check', () => {
+    expect(checkedKingSquare(fenAfter([]))).toBe(null)
+    // Stalemate is not check, which is the whole difference between the two.
+    expect(checkedKingSquare('7k/5Q2/6K1/8/8/8/8/8 b - - 0 1')).toBe(null)
+  })
+
+  it('survives a position it cannot read', () => {
+    expect(checkedKingSquare('not a fen')).toBe(null)
+  })
+})
+
+describe('carryPieceIdentities', () => {
+  /** Ids by square, for asserting who kept theirs and who is new. */
+  function idsBySquare(pieces: ReturnType<typeof carryPieceIdentities>) {
+    return Object.fromEntries(pieces.map((p) => [p.square, p.id]))
+  }
+
+  const startingPieces = () => carryPieceIdentities([], fenAfter([]))
+
+  it('numbers every piece in a position', () => {
+    expect(piecesOf(fenAfter([])).length).toBe(32)
+    expect(new Set(startingPieces().map((p) => p.id)).size).toBe(32)
+  })
+
+  it('keeps the id of a piece that moved, so it can be drawn moving', () => {
+    const before = startingPieces()
+    const pawn = idsBySquare(before)['e2']
+    const after = carryPieceIdentities(before, fenAfter(['e4']), { from: 'e2', to: 'e4' })
+    expect(idsBySquare(after)['e4']).toBe(pawn)
+    expect(after).toHaveLength(32)
+  })
+
+  it('drops the piece that was taken and keeps the taker', () => {
+    const before = carryPieceIdentities([], fenAfter(['e4', 'd5']))
+    const pawn = idsBySquare(before)['e4']
+    const after = carryPieceIdentities(before, fenAfter(['e4', 'd5', 'exd5']), {
+      from: 'e4',
+      to: 'd5',
+    })
+    expect(after).toHaveLength(31)
+    expect(idsBySquare(after)['d5']).toBe(pawn)
+  })
+
+  // The move names the king's two squares and says nothing about the rook, so
+  // a rook that keeps its id is the whole point of the second matching pass.
+  it('moves the rook as well as the king when castling', () => {
+    const sans = ['e4', 'e5', 'Nf3', 'Nc6', 'Bc4', 'Bc5']
+    const before = carryPieceIdentities([], fenAfter(sans))
+    const ids = idsBySquare(before)
+    const after = carryPieceIdentities(before, fenAfter([...sans, 'O-O']), { from: 'e1', to: 'g1' })
+    expect(idsBySquare(after)['g1']).toBe(ids['e1'])
+    expect(idsBySquare(after)['f1']).toBe(ids['h1'])
+  })
+
+  // The captured pawn is on neither of the squares the move names.
+  it('removes the pawn taken en passant', () => {
+    const sans = ['e4', 'a6', 'e5', 'd5']
+    const before = carryPieceIdentities([], fenAfter(sans))
+    const ids = idsBySquare(before)
+    const after = carryPieceIdentities(before, fenAfter([...sans, 'exd6']), {
+      from: 'e5',
+      to: 'd6',
+    })
+    expect(after).toHaveLength(31)
+    expect(idsBySquare(after)['d6']).toBe(ids['e5'])
+    expect(idsBySquare(after)['d5']).toBeUndefined()
+  })
+
+  it('gives a promoted pawn a new identity rather than sliding a queen in', () => {
+    const before = carryPieceIdentities([], '4k3/P7/8/8/8/8/8/4K3 w - - 0 1')
+    const pawn = idsBySquare(before)['a7']
+    const after = carryPieceIdentities(before, 'Q3k3/8/8/8/8/8/8/4K3 b - - 0 1', {
+      from: 'a7',
+      to: 'a8',
+    })
+    expect(idsBySquare(after)['a8']).not.toBe(pawn)
+  })
+
+  it('starts from nothing when the position is unrelated', () => {
+    const before = startingPieces()
+    const after = carryPieceIdentities(before, '4k3/8/8/8/8/8/8/4K3 w - - 0 1')
+    expect(after).toHaveLength(2)
+    // Both kings stand where they started, so both keep their ids.
+    expect(idsBySquare(after)['e1']).toBe(idsBySquare(before)['e1'])
   })
 })

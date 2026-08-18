@@ -14,6 +14,13 @@ checking it:
 - A pop-up handoff was "verified" against a callback URL written by hand with a
   marker in it. Lichess *replaces* the redirect URI's query, so the real URL
   never had that marker and the feature failed twice in the field.
+- Jerky preview animation was "diagnosed" as React reordering sixteen DOM nodes
+  on a capture, by comparing each node's index among its siblings before and
+  after. Removing one node shifts every later index by one without anything
+  having moved: measured with a `MutationObserver` instead, a capture removes
+  one node and moves none. The theory was wrong and would have produced the
+  wrong fix — count real mutations, never positions in a list that changed
+  length.
 
 When a third-party contract matters, read the other side's source or spec.
 `lila` is open source and settled several questions outright — see
@@ -150,6 +157,13 @@ the harness's drag tool (mouse events) cannot move a piece. Drive it with a
   axis: anchored to the hovered move it slid sideways as you read a variation, and pinned
   entirely to the first line it covered the lines below. Its left comes from `firstTokenRef`, its
   top from the hovered `<li>`.
+- **`MiniBoard` draws its pieces in id order, and lifts the one that is moving.** They are
+  absolutely positioned, so for them the DOM order *is* the paint order: drawn in board order a
+  piece changed place in the stack as it moved and could slide beneath a neighbour it had just
+  been in front of, worst on a capture. `carryPieceIdentities` supplies the stable id; the piece
+  on `move.to` gets a z-index for as long as it is travelling. Chuck confirmed on 16 August 2026
+  that the slide and captures look right, so treat this as working and suspect a regression
+  rather than a never-worked bug.
 - **The two columns are laid out by container query, not by `sm:`.** The side column is narrow on
   a mid-size window long after `sm:` is true, and a fixed-width Maia column starved the engine's
   lines to nothing there. `@container/evals` on the wrapper and `@[22rem]/evals:` on the two

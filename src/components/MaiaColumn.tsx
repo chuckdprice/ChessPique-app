@@ -32,8 +32,20 @@ const COLOUR: Record<Classification, string> = {
   blunder: 'text-class-blunder',
 }
 
-/** What the first row says while it has no move to show. */
-function waitingMessage(status: MaiaStatus, progress: number, error: string | null): string {
+/**
+ * What the first row says while it has no move to show.
+ *
+ * "Game over" comes first because it is the one state that is finished rather
+ * than pending: a decided position has no legal moves to predict, and saying
+ * "Thinking…" under a checkmate describes a wait that is never going to end.
+ */
+function waitingMessage(
+  status: MaiaStatus,
+  progress: number,
+  error: string | null,
+  gameOver: boolean,
+): string {
+  if (gameOver) return 'Game over'
   if (status === 'downloading') return `Downloading… ${Math.round(progress * 100)}%`
   if (status === 'error') return error ?? 'Maia unavailable'
   return 'Thinking…'
@@ -49,6 +61,8 @@ interface MaiaColumnProps {
    * move it did not already cover, and that takes as long as the panel's own.
    */
   busy: boolean
+  /** A decided position: there is nothing to predict and nothing to wait for. */
+  gameOver: boolean
   rating: number
   /** True when the rating is following the review's estimate rather than a pick. */
   auto: boolean
@@ -63,6 +77,7 @@ export default function MaiaColumn({
   rows,
   rowCount,
   busy,
+  gameOver,
   rating,
   auto,
   onRatingChange,
@@ -143,7 +158,7 @@ export default function MaiaColumn({
           if (!row) {
             return (
               <li key={`pending-${slot}`} className="flex items-baseline py-0.5 text-ink-mute">
-                {slot === 0 ? waitingMessage(status, progress, error) : ' '}
+                {slot === 0 ? waitingMessage(status, progress, error, gameOver) : ' '}
               </li>
             )
           }

@@ -118,6 +118,11 @@ the harness's drag tool (mouse events) cannot move a piece. Drive it with a
   fraction of the panel's movetime — it scores two or three named moves against a baseline from
   its own search, so its depth never has to match anything. Shortening it from 8s to 3.2s left
   the smoke test below unchanged, verdict for verdict.
+- **A finished game needs the guard in two places.** Both the inference effect and the colouring
+  effect test `gameOver`, and neither is redundant: on the render that arrives at a mate, `update`
+  and `maiaMoves` still hold the position you came from — the nulls land a render later — so the
+  colouring effect would start a search anyway and leave its ring spinning over "Thinking…" with
+  nothing left to turn it off. That is the bug Chuck reported; removing either test brings it back.
 - **Searches are serialized on one worker, so leaving a position must `abandon`, not `stop`.**
   `stop` only cuts short the search actually running; one still queued behind it would run its
   full movetime for a position no longer on the board. Stepping quickly through a game put

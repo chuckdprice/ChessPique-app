@@ -172,6 +172,9 @@ export default function EnginePanel({
   // 1500 is where the estimate lands for a middling game, and it is only what
   // gets shown before a review has produced anything better.
   const maiaRating = settings.maiaRating ?? nearestRating(playedLike ?? 1500)
+  // Checked once and read by both engines: neither has anything to say about
+  // a position that is already decided.
+  const gameOver = useMemo(() => new Chess(fen).isGameOver(), [fen])
 
   // Live analysis loop: restart on position, toggle, or settings change.
   useEffect(() => {
@@ -183,7 +186,6 @@ export default function EnginePanel({
       return
     }
     let cancelled = false
-    const gameOver = new Chess(fen).isGameOver()
     if (gameOver) {
       setUpdate(null)
       setSearching(false)
@@ -234,7 +236,7 @@ export default function EnginePanel({
     // The three the search itself reads, not the settings object: it now also
     // carries how the board draws the answer, and a whole search was thrown
     // away and restarted every time one of those was flipped.
-  }, [enabled, fen, settings.searchTimeSec, settings.multiPv, settings.hashMb])
+  }, [enabled, gameOver, fen, settings.searchTimeSec, settings.multiPv, settings.hashMb])
 
   /**
    * The board's arrows, taken from the very lines being listed.
@@ -262,7 +264,12 @@ export default function EnginePanel({
    * is why the column fills in first and the colours arrive after.
    */
   useEffect(() => {
-    if (!enabled || !settings.maia) {
+    // A finished game is not a position anyone is about to move in. Maia would
+    // answer it happily — the model is asked for a distribution over the legal
+    // moves and there are none — leaving an empty list that reads as still
+    // thinking, spinning under a "Thinking…" that never resolves. The engine
+    // beside it has always stopped here and said so.
+    if (!enabled || !settings.maia || gameOver) {
       setMaiaMoves(null)
       setVerdicts(new Map())
       setColouring(false)
@@ -303,7 +310,7 @@ export default function EnginePanel({
     return () => {
       cancelled = true
     }
-  }, [enabled, settings.maia, fen, maiaRating])
+  }, [enabled, settings.maia, gameOver, fen, maiaRating])
 
   useEffect(() => {
     onMaiaMoveRef.current?.(maiaMoves?.[0] ?? null)
@@ -318,7 +325,12 @@ export default function EnginePanel({
    * search as the moves being measured against it.
    */
   useEffect(() => {
-    if (!enabled || !settings.maia || searching || !update || !maiaMoves) return
+    // gameOver has to be tested here as well as in the effect above. On the
+    // render that arrives at a mate, `update` and `maiaMoves` still hold the
+    // position you came from — the nulls only land on the next one — so
+    // without this the colouring search starts anyway, and nothing afterwards
+    // clears the ring it turned on.
+    if (!enabled || !settings.maia || gameOver || searching || !update || !maiaMoves) return
     const wanted = maiaMoves.slice(0, settings.multiPv).map((move) => move.uci)
     const primary = firstMoves(update.lines)
     const whiteToMove = fen.split(' ')[1] !== 'b'
@@ -357,7 +369,7 @@ export default function EnginePanel({
     return () => {
       cancelled = true
     }
-  }, [enabled, settings.maia, settings.multiPv, settings.searchTimeSec, searching, update, maiaMoves, fen])
+  }, [enabled, settings.maia, gameOver, settings.multiPv, settings.searchTimeSec, searching, update, maiaMoves, fen])
 
   /** Maia's moves as the panel prints them: SAN, probability, and a verdict. */
   const maiaRows = useMemo(() => {
@@ -393,7 +405,6 @@ export default function EnginePanel({
   // the move it was on is unmounted from under the pointer.
   useEffect(() => setPreview(null), [enabled, fen])
 
-  const gameOver = useMemo(() => new Chess(fen).isGameOver(), [fen])
 
   /**
    * Open the preview: fixed across, and just under the line being read.
@@ -495,6 +506,7 @@ export default function EnginePanel({
               rows={maiaRows}
               rowCount={settings.multiPv}
               busy={colouring}
+              gameOver={gameOver}
               rating={maiaRating}
               auto={maiaAuto}
               onRatingChange={(rating) => {

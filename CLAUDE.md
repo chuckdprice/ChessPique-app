@@ -32,6 +32,7 @@ measurement, not folklore:
 | `window.open` — becomes a same-tab navigation | reason about it; test the parts |
 | `navigator.clipboard.readText` — "Document is not focused" | stub `writeText` and assert its argument |
 | `computer` key presses — arrows never reach the page | dispatch a `KeyboardEvent` on `window` |
+| `requestAnimationFrame` — never fires while the pane is hidden, so a rAF sampling loop hangs | sample with `setTimeout`, or measure the mechanism rather than the frames |
 | `computer` hover — React's `onPointerEnter` never fires from it | dispatch `pointerover` then `pointerenter` (`pointerType: 'mouse'`, `bubbles: true`) on the element |
 | Viewport size — `innerWidth`/`innerHeight` and `clientWidth`/`clientHeight` all read **0** while the pane is backgrounded | take the size from an element's rect, or treat 0 as "unknown" |
 

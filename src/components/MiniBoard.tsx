@@ -107,7 +107,14 @@ export default function MiniBoard({
         })}
       </div>
 
-      {pieces.map((piece) => {
+      {/* Drawn in a stable order rather than in board order, because for
+          absolutely-positioned siblings the DOM order *is* the paint order. By
+          square, a piece changes its place among its siblings as it moves, so
+          it can pass beneath a neighbour it was in front of a moment earlier —
+          which reads as a stutter rather than as a slide. An id that never
+          changes keeps the stack still, and the piece that is actually moving
+          is lifted above the rest for as long as it takes to arrive. */}
+      {[...pieces].sort((a, b) => a.id - b.id).map((piece) => {
         const { col, row } = place(piece.square, orientation)
         const code = codeOf(piece.letter)
         const Piece = pieceSet === 'classic' ? defaultPieces[code] : null
@@ -118,6 +125,10 @@ export default function MiniBoard({
             style={{
               width: '12.5%',
               height: '12.5%',
+              // Over everything it crosses on the way. Only the piece that
+              // moved needs it, and only while it is moving — which is exactly
+              // as long as it is the move's destination.
+              zIndex: piece.square === move?.to ? 1 : undefined,
               // Percentages here are of the piece's own box, which is exactly
               // one square — so a whole number of squares moves it a whole
               // number of squares, whatever the board's pixel size.

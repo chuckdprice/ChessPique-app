@@ -59,8 +59,8 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               How to use this app
             </h2>
             <p className="mt-0.5 text-xs text-ink-mute">
-              Convert a ChessNoteR PGN, review it with Stockfish, and build or edit a game by
-              hand.
+              Review a game with Stockfish, prepare an opening against a real opponent, edit a
+              repertoire by hand — and convert a ChessNoteR PGN's clocks on the way in.
             </p>
           </div>
           <button
@@ -77,24 +77,43 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
           <Section title="What it does">
             <p>
-              ChessNoteR writes each move's elapsed time as <code>{'{[%emt 0:01:23]}'}</code>, which
-              most chess sites ignore. This app rebuilds those into the running clock comments{' '}
-              <code>{'{[%clk 1:07:00]}'}</code> that Lichess and Chess.com understand, tidies the{' '}
-              <Ui>TimeControl</Ui> tag, and then reviews the game with Stockfish — and, if you
-              ask it to, shows what a human of a given rating would have played beside what was
-              best.
+              <strong>Chessnotes</strong> is somewhere to keep, read and prepare chess games in
+              the browser. Nothing you load is uploaded anywhere: the engines, the conversion
+              and the editing all run on this machine.
             </p>
             <p>
-              A PGN that already has <code>%clk</code> times works too, as does a plain move list
-              with no clocks at all — you just won't get the timing charts.
+              It began as a converter, and still is one.{' '}
+              <a
+                href="https://chessnoter.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-2"
+              >
+                ChessNoteR
+              </a>{' '}
+              writes each move's elapsed time as <code>{'{[%emt 0:01:23]}'}</code>, which most
+              chess sites ignore. Chessnotes rebuilds those into the running clock comments{' '}
+              <code>{'{[%clk 1:07:00]}'}</code> that Lichess and Chess.com understand, and tidies
+              the <Ui>TimeControl</Ui> tag. A PGN that already has <code>%clk</code> times works
+              too, as does a plain move list with no clocks at all — you just won't get the
+              timing charts.
             </p>
             <p>
-              From version 2 it is an editor as well. A game is held as a tree of moves rather
-              than a list, so a position can have more than one continuation: play a move onto
-              the board and it joins the game, keep several answers to the same position, write a
-              note against any of them, and decide which is the main line. That is what makes it
-              usable for an opening repertoire and not only for a game you played — and a game
-              need not come from a file at all, since <Ui>New game</Ui> starts an empty board.
+              Then it reviews the game with Stockfish, and — if you ask it to — shows what a
+              human of a given rating would probably have played beside what was best.
+            </p>
+            <p>
+              It is an editor as well. A game is held as a tree of moves rather than a list, so a
+              position can have more than one continuation: play a move onto the board and it
+              joins the game, keep several answers to the same position, write a note against any
+              of them, and decide which is the main line. That is what makes it usable for an
+              opening repertoire and not only for a game you played — and a game need not come
+              from a file at all, since <Ui>New game</Ui> starts an empty board.
+            </p>
+            <p>
+              And it reads the Lichess opening databases from the position on the board, one
+              player's games included, which is how you prepare for an opponent you are about to
+              face.
             </p>
           </Section>
 
@@ -187,7 +206,8 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
             </p>
             <p>
               Step through the game with the buttons under the board, by clicking a move in the
-              list, or with the keyboard. The bar beside the board shows who stands better, and
+              list, or with the keyboard. The button at the left of that row turns the board
+              round; the one at the right is the board's own menu. The bar beside the board shows who stands better, and
               each player's own row shows the material they are up, just left of their clock — an
               even trade cancels out, so four pawns apiece show nothing and five against four show
               one pawn, with the lead in pawns beside them.
@@ -195,10 +215,16 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
             <p>
               Twist open <Ui>Move Evals</Ui> for a live engine on the current position; twisting
               it shut stops it again. <Ui>SF18: Engine Moves</Ui> lists its best lines, drawn on
-              the board as blue arrows shaded from best to worst, with the move actually played in
-              orange. The gear sets search time, number of lines, and memory — the same controls
-              as <Ui>Settings</Ui> on the menu, which is where they live; the gear is simply
-              nearer to hand while you are looking at a position.
+              the board as blue arrows shaded from best to worst, with the move actually played
+              in orange — and with its evaluation at the arrow's head too, which is worth most
+              exactly when the move played was not one the engine listed. The gear beside that
+              heading is Stockfish's own settings: search time, number of lines and memory.
+            </p>
+            <p>
+              What gets <em>drawn</em> is the other menu — the one at the right-hand end of the
+              row of buttons under the board. It carries the arrow numbers and whether the human
+              moves run at all. Both menus close when you click anywhere else, and{' '}
+              <Ui>Settings</Ui> on the main menu offers the same two groups in one page.
             </p>
             <p>
               Leaving the engine running on a move lets it search deeper than the whole-game
@@ -222,8 +248,15 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               the move list — green for the engine's own choice, blue, orange and red for an
               inaccuracy, mistake and blunder, and plain ink for the merely fine. That is the
               point of showing them together: a move half the players at your level would find can
-              be the one that loses the game. Maia's likeliest move is also drawn on the board, as
-              a single violet arrow.
+              be the one that loses the game. Each also carries the engine's score for it, taken
+              from the search that graded it.
+            </p>
+            <p>
+              Maia's moves are drawn on the board as violet arrows, faded from likeliest to
+              least. Because Maia scores every legal move, the probability can be shown at the
+              head of <em>any</em> arrow — the engine's candidates and the move actually played
+              included — so a square can carry both a score and a percentage, stacked. That is
+              its own switch in the board menu.
             </p>
             <p>
               The heading is the control — click <Ui>Maia 1500: Human Moves</Ui> to ask a
@@ -278,12 +311,42 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
 
           <Section title="The analysis tabs">
             <p>
-              The row of icons under the board names each tab on hover.
+              Two panels sit side by side under the board, each with its own row of icon tabs
+              that name themselves on hover — so two views are open at once. The left holds the
+              charts and the opening explorer, the right the summaries. Read the evaluation chart
+              against the move counts, or keep it open beside the comment box while you write the
+              game up. On a narrow window the two stack.
             </p>
             <p>
               <Ui>Evaluation</Ui> — how the advantage swung, with a dot on each notable move.
               Click the chart to jump to that point in the game. The opening played is named in
               the top-left corner, matched by position so a transposition still counts.
+            </p>
+            <p>
+              <Ui>Move Times</Ui> — lines for time remaining, bars for time spent per move. This
+              chart jumps the board too: the left half of a move is White's, the right half
+              Black's. The move you are on is marked with a dashed line and a dot on each
+              player's curve, and the figures are reported in a fixed row above the plot — time
+              left on the left, time spent on the right — which follows your pointer across the
+              chart instead of covering it with a tooltip.
+            </p>
+            <p>
+              <Ui>Opening Explorer</Ui> — what has actually been played from this position, from
+              the Lichess databases. <Ui>Masters</Ui> is over-the-board games between titled
+              players, <Ui>Lichess</Ui> is rated online games, and <Ui>Player</Ui> is one
+              person's games, which is how you prepare against an opponent: choose them by
+              username, swap between their games as White and as Black, and see their repertoire
+              and how it has scored. Each row gives the move, how often it is played and the
+              white/draw/black split; pointing at one lays a grey shadow of it on the board, and
+              clicking it plays the move into your game. The gear at the right of the panel's tab
+              strip filters each database the way Lichess does — time control, rating band, rated
+              or casual, and a date range.
+            </p>
+            <p>
+              This one tab needs a Lichess sign-in: Lichess now requires one for its explorer, so
+              the panel offers the same sign-in the study export uses. Only the position on the
+              board is ever sent, and Chessnotes keeps to one request at a time so as not to lean
+              on their server.
             </p>
             <p>
               <Ui>Phase Accuracy</Ui> — each player's accuracy in the opening, middlegame, and
@@ -292,11 +355,6 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
             <p>
               <Ui>Move Classification</Ui> — how many moves of each quality both players made, with
               their rating and an estimated "played like" rating.
-            </p>
-            <p>
-              <Ui>Move Times</Ui> — lines for time remaining, bars for time spent per move. This
-              chart jumps the board too: the left half of a move is White's, the right half
-              Black's.
             </p>
             <p>
               <Ui>Comments</Ui> — a note on the move the board is showing, including a move

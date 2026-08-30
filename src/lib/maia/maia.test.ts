@@ -218,10 +218,22 @@ describe('verdicts', () => {
     ]
     const verdicts = verdictsForMoves(wanted, primary, constrained, true)
     // e4 is the engine's own choice, and it was scored by the panel's search.
-    expect(verdicts.get('e2e4')).toBe('best')
+    expect(verdicts.get('e2e4')?.classification).toBe('best')
     // 80 -> 70 is a small loss, not the large one it would be against cp 30.
-    expect(verdicts.get('h7h6')).toBe('excellent')
-    expect(verdicts.get('g8h6')).toBe('blunder')
+    expect(verdicts.get('h7h6')?.classification).toBe('excellent')
+    expect(verdicts.get('g8h6')?.classification).toBe('blunder')
+  })
+
+  it('reports the score the classification was drawn from', () => {
+    const constrained = [
+      { uci: 'e2e4', score: { cp: 80 } },
+      { uci: 'h7h6', score: { cp: 70 } },
+    ]
+    const verdicts = verdictsForMoves(wanted, primary, constrained, true)
+    // e4 came out of the panel's search, so the column shows that number and
+    // not the constrained search's 80 for the same move.
+    expect(verdicts.get('e2e4')?.score).toEqual({ cp: 30 })
+    expect(verdicts.get('h7h6')?.score).toEqual({ cp: 70 })
   })
 
   it('leaves a move unjudged until something has scored it', () => {

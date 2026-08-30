@@ -10,7 +10,8 @@ import type { MaiaStatus } from '../lib/maia/session'
 import { predictMoves, nearestRating } from '../lib/maia/model'
 import type { MaiaMove } from '../lib/maia/decode'
 import { colourSearchMs, firstMoves, movesToSearch, verdictsForMoves } from '../lib/maia/verdicts'
-import type { Classification } from '../lib/engine/analysis'
+import type { Verdict } from '../lib/maia/verdicts'
+import BusyRing from './BusyRing'
 import EngineSettingsPanel from './EngineSettings'
 import MaiaColumn from './MaiaColumn'
 import MiniBoard from './MiniBoard'
@@ -49,8 +50,13 @@ interface EnginePanelProps {
    * has run, or for a position with no estimate behind it.
    */
   playedLike?: number | null
-  /** Maia's single most likely human move, for the board's one arrow. */
-  onMaiaMove?: (move: MaiaMove | null) => void
+  /**
+   * Maia's moves for this position, likeliest first — every legal move, not
+   * just the ones the column lists. The board draws arrows for the top few and
+   * looks the rest up by UCI, so that an engine candidate or the played move
+   * can carry the probability of a human choosing it.
+   */
+  onMaiaMoves?: (moves: MaiaMove[] | null) => void
 }
 
 /** One candidate as the board draws it: a move, and what the engine makes of it. */
@@ -125,7 +131,7 @@ export default function EnginePanel({
   onTopScore,
   onFirstMoves,
   playedLike = null,
-  onMaiaMove,
+  onMaiaMoves,
 }: EnginePanelProps) {
   const engineRef = useRef<Engine | null>(null)
   const gearRef = useRef<HTMLButtonElement>(null)
@@ -151,15 +157,15 @@ export default function EnginePanel({
   onTopScoreRef.current = onTopScore
   const onFirstMovesRef = useRef(onFirstMoves)
   onFirstMovesRef.current = onFirstMoves
-  const onMaiaMoveRef = useRef(onMaiaMove)
-  onMaiaMoveRef.current = onMaiaMove
+  const onMaiaMovesRef = useRef(onMaiaMoves)
+  onMaiaMovesRef.current = onMaiaMoves
 
   const maiaRef = useRef<MaiaSession | null>(null)
   const [maiaMoves, setMaiaMoves] = useState<MaiaMove[] | null>(null)
   const [maiaStatus, setMaiaStatus] = useState<MaiaStatus>('idle')
   const [maiaProgress, setMaiaProgress] = useState(0)
   const [maiaError, setMaiaError] = useState<string | null>(null)
-  const [verdicts, setVerdicts] = useState<Map<string, Classification>>(new Map())
+  const [verdicts, setVerdicts] = useState<Map<string, Verdict>>(new Map())
   // Whether the constrained search that colours Maia's moves is still running.
   const [colouring, setColouring] = useState(false)
   // Maia is deterministic — same position, same rating, same answer — so
@@ -273,7 +279,7 @@ export default function EnginePanel({
       setMaiaMoves(null)
       setVerdicts(new Map())
       setColouring(false)
-      onMaiaMoveRef.current?.(null)
+      onMaiaMovesRef.current?.(null)
       return
     }
     const key = `${fen}|${maiaRating}`
@@ -313,7 +319,7 @@ export default function EnginePanel({
   }, [enabled, settings.maia, gameOver, fen, maiaRating])
 
   useEffect(() => {
-    onMaiaMoveRef.current?.(maiaMoves?.[0] ?? null)
+    onMaiaMovesRef.current?.(maiaMoves)
   }, [maiaMoves])
 
   /**
@@ -371,7 +377,7 @@ export default function EnginePanel({
     }
   }, [enabled, settings.maia, gameOver, settings.multiPv, settings.searchTimeSec, searching, update, maiaMoves, fen])
 
-  /** Maia's moves as the panel prints them: SAN, probability, and a verdict. */
+  /** Maia's moves as the panel prints them: SAN, eval, probability, verdict. */
   const maiaRows = useMemo(() => {
     if (!maiaMoves) return []
     return maiaMoves.slice(0, settings.multiPv).map((move) => {
@@ -385,7 +391,14 @@ export default function EnginePanel({
       } catch {
         /* keep the UCI: a move that will not play is still worth showing */
       }
-      return { uci: move.uci, san, prob: move.prob, classification: verdicts.get(move.uci) }
+      const verdict = verdicts.get(move.uci)
+      return {
+        uci: move.uci,
+        san,
+        prob: move.prob,
+        classification: verdict?.classification,
+        score: verdict?.score,
+      }
     })
   }, [maiaMoves, verdicts, fen, settings.multiPv])
 
@@ -544,6 +557,19 @@ export default function EnginePanel({
               >
                 d{update?.depth ?? '—'}
               </span>
+
+              {/* The same gold ring Maia's heading carries, for the same
+                  reason: the depth badge going green is a quiet signal, and
+                  which of the two engines is still working is worth seeing at
+                  a glance. Nothing to count towards here either — a movetime
+                  search has no total in plies — so it spins. */}
+              {searching && (
+                <BusyRing
+                  pct={null}
+                  title="Searching this position"
+                  ariaLabel="Engine searching"
+                />
+              )}
 
               <div className="min-w-0 flex-1" />
 

@@ -3,13 +3,14 @@ import type { Arrow } from 'react-chessboard'
 import type { ConvertResult, Move } from '../lib/convert'
 import type { GameAnalysis, RefinedEval } from '../lib/engine/analysis'
 import type { Score } from '../lib/engine/uci'
-import type { EngineSettings } from '../lib/settings'
+import type { EngineSettings, ExplorerSettings } from '../lib/settings'
 import type { ChartRow } from '../lib/gameModel'
 import { capturedMaterial, clockAtPly } from '../lib/gameModel'
 import type { MoveTree } from '../lib/moveTree'
 import type { Opening } from '../lib/openings'
 import AnalysisTabs from './AnalysisTabs'
 import BoardBoundary from './BoardBoundary'
+import BoardMenu from './BoardMenu'
 import BoardViewer, { BoardNav, PlayerPlateRow } from './BoardViewer'
 import type { EvalLabel, OverlayArrow, PlayerPlate } from './BoardViewer'
 import EnginePanel from './EnginePanel'
@@ -38,6 +39,8 @@ interface AnalysisPageProps {
   /** Named opening for the evaluation chart's caption; null while it loads. */
   opening: Opening | null
   onPieceMove: (from: string, to: string) => boolean
+  /** Play a move by SAN — what the opening explorer's rows are. */
+  onPlaySan: (san: string) => boolean
   onPromote: (nodeId: string, toMainline: boolean) => void
   onDemote: (nodeId: string) => void
   onDelete: (nodeId: string) => void
@@ -64,10 +67,12 @@ interface AnalysisPageProps {
   onEngineOnChange: (on: boolean) => void
   engineSettings: EngineSettings
   onEngineSettingsChange: (next: EngineSettings) => void
+  explorerSettings: ExplorerSettings
+  onExplorerSettingsChange: (next: ExplorerSettings) => void
   onTopScore: (score: Score | null, depth: number) => void
   onEngineMoves: (lines: EngineArrow[]) => void
-  /** Maia's likeliest human move, for the board's single violet arrow. */
-  onMaiaMove: (move: MaiaMove | null) => void
+  /** Maia's moves for this position, likeliest first, for the violet arrows. */
+  onMaiaMoves: (moves: MaiaMove[] | null) => void
   onCommentChange: (nodeId: string, comment: string) => void
   arrows: Arrow[]
   /** Maia's move and the played move, drawn thinner and over the engine's. */
@@ -96,6 +101,7 @@ export default function AnalysisPage({
   deeperEvals,
   opening,
   onPieceMove,
+  onPlaySan,
   onPromote,
   onDemote,
   onDelete,
@@ -119,9 +125,11 @@ export default function AnalysisPage({
   onEngineOnChange,
   engineSettings,
   onEngineSettingsChange,
+  explorerSettings,
+  onExplorerSettingsChange,
   onTopScore,
   onEngineMoves,
-  onMaiaMove,
+  onMaiaMoves,
   onCommentChange,
   arrows,
   overlayArrows,
@@ -129,6 +137,9 @@ export default function AnalysisPage({
   pieceSet,
 }: AnalysisPageProps) {
   const [orientation, setOrientation] = useState<'white' | 'black'>('white')
+  // Lives here rather than in App because this is where the two ends meet: the
+  // explorer that reports the hover and the board that draws it are siblings.
+  const [hintMove, setHintMove] = useState<{ from: string; to: string } | null>(null)
   const current = tree.nodes.get(currentId) ?? tree.nodes.get(tree.root)!
   // One position drives the board, the engine and the captured strip, wherever
   // in the tree it sits.
@@ -196,6 +207,7 @@ export default function AnalysisPage({
               analysis={analysis}
               arrows={arrows}
               overlayArrows={overlayArrows}
+              hintArrow={hintMove}
               evalLabels={evalLabels}
               onPieceMove={onPieceMove}
               pieceSet={pieceSet}
@@ -222,7 +234,7 @@ export default function AnalysisPage({
             orientation={orientation}
             onTopScore={onTopScore}
             onFirstMoves={onEngineMoves}
-            onMaiaMove={onMaiaMove}
+            onMaiaMoves={onMaiaMoves}
             playedLike={playedLike}
           />
           <MoveTable
@@ -253,12 +265,24 @@ export default function AnalysisPage({
             onStepForward={onStepForward}
             onRotate={() => setOrientation((o) => (o === 'white' ? 'black' : 'white'))}
             orientation={orientation}
+            menu={(className) => (
+              <BoardMenu
+                value={engineSettings}
+                onChange={onEngineSettingsChange}
+                className={className}
+              />
+            )}
           />
         </div>
 
         {/* Charts, spanning the full width so the edges line up */}
         <div className="area-tabs min-h-0">
           <AnalysisTabs
+            fen={shownFen}
+            onPlayMove={onPlaySan}
+            onHoverMove={setHintMove}
+            explorerSettings={explorerSettings}
+            onExplorerSettingsChange={onExplorerSettingsChange}
             analysis={analysis}
             progress={analysisProgress}
             analysisError={analysisError}

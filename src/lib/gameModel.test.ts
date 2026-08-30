@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import type { Move } from './convert'
 import {
+  CLOCK_PLOT_INSET,
   capturedMaterial,
   carryPieceIdentities,
   checkedKingSquare,
   moveTargets,
   piecesOf,
+  plyForClockClick,
   replayGame,
 } from './gameModel'
+import type { ChartRow } from './gameModel'
 
 function movesFrom(sans: string[]): Move[] {
   return sans.map((san, i) => ({
@@ -216,5 +219,45 @@ describe('carryPieceIdentities', () => {
     expect(after).toHaveLength(2)
     // Both kings stand where they started, so both keep their ids.
     expect(idsBySquare(after)['e1']).toBe(idsBySquare(before)['e1'])
+  })
+})
+
+describe('which move a click on the clock chart picked', () => {
+  const rows: ChartRow[] = [1, 2, 3, 4].map((moveNumber) => ({
+    moveNumber,
+    whiteSan: 'x',
+    blackSan: 'y',
+    whiteClk: null,
+    blackClk: null,
+    whiteSpent: null,
+    blackSpent: null,
+    whitePly: moveNumber * 2 - 1,
+    blackPly: moveNumber * 2,
+  }))
+
+  /** A plot 400px wide inside a container starting at x = 20. */
+  const plot = { left: 20, right: 20 + CLOCK_PLOT_INSET.left + 400 + CLOCK_PLOT_INSET.right }
+  const xFor = (fraction: number) => plot.left + CLOCK_PLOT_INSET.left + fraction * 400
+
+  it('reads White from the left of a band and Black from the right', () => {
+    // Move 1 owns the first quarter of a four-move plot, and its two plies
+    // split that band down the middle — White's bar left, Black's right.
+    expect(plyForClockClick(rows, plot, xFor(0.0625))).toBe(1)
+    expect(plyForClockClick(rows, plot, xFor(0.1875))).toBe(2)
+    expect(plyForClockClick(rows, plot, xFor(0.8125))).toBe(7)
+    expect(plyForClockClick(rows, plot, xFor(0.9375))).toBe(8)
+  })
+
+  it('ignores a click outside the plot', () => {
+    expect(plyForClockClick(rows, plot, plot.left)).toBeNull()
+    expect(plyForClockClick(rows, plot, plot.right)).toBeNull()
+  })
+
+  it('falls back to the side the row does have', () => {
+    // A game ending on White's move leaves the last band with no Black ply,
+    // and a click on that half should still go somewhere sensible.
+    const last: ChartRow[] = [{ ...rows[0], blackSan: null, blackPly: null }]
+    const onePlot = { left: 0, right: CLOCK_PLOT_INSET.left + 100 + CLOCK_PLOT_INSET.right }
+    expect(plyForClockClick(last, onePlot, CLOCK_PLOT_INSET.left + 80)).toBe(1)
   })
 })

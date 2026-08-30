@@ -1,8 +1,7 @@
-import { useLayoutEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
 import type { RefObject } from 'react'
 import type { EngineSettings } from '../lib/settings'
 import { MODEL_BYTES } from '../lib/maia/session'
+import SettingsPopover from './SettingsPopover'
 
 /**
  * The download is worth being plain about rather than burying. The app's
@@ -22,9 +21,6 @@ interface EngineSettingsPanelProps {
   /** The gear this hangs off, which is what it is positioned against. */
   anchor: RefObject<HTMLElement | null>
 }
-
-const PANEL_WIDTH = 288
-const PANEL_GAP = 8
 
 /** Exported so the Settings page offers the same controls as this popover. */
 export function SliderRow({
@@ -107,109 +103,59 @@ export function SwitchRow({
   )
 }
 
+/**
+ * The gear on the engine panel: how Stockfish searches, and nothing else.
+ *
+ * What is drawn on the board — the arrow numbers, and whether Maia runs at all
+ * — moved to the board's own menu, beside the board those things appear on.
+ * This panel sits on a heading that carries the engine's name, and everything
+ * under it should be about that engine.
+ */
 export default function EngineSettingsPanel({
   value,
   onChange,
   onClose,
   anchor,
 }: EngineSettingsPanelProps) {
-  /**
-   * Placed against the gear and drawn through the body.
-   *
-   * As an absolutely-positioned child it was clipped by the side column, which
-   * is overflow-hidden from sm up: the last rows simply could not be reached,
-   * and adding a sixth made that obvious. Same escape the hover preview takes.
-   */
-  const [place, setPlace] = useState<{ left: number; top: number; maxHeight?: number }>()
-  useLayoutEffect(() => {
-    const rect = anchor.current?.getBoundingClientRect()
-    if (!rect) return
-    // A viewport of no width is a pane that has stopped painting, not a narrow
-    // one; with nothing to clamp against, the gear's own edge is the honest
-    // answer. The same guard as showPreview, for the same reason.
-    const vw = document.documentElement.clientWidth
-    const vh = document.documentElement.clientHeight
-    const top = rect.bottom + PANEL_GAP
-    setPlace({
-      left:
-        vw > 0
-          ? Math.max(PANEL_GAP, Math.min(rect.right - PANEL_WIDTH, vw - PANEL_WIDTH - PANEL_GAP))
-          : rect.right - PANEL_WIDTH,
-      top,
-      maxHeight: vh > 0 ? Math.max(160, vh - top - PANEL_GAP) : undefined,
-    })
-  }, [anchor])
-
-  if (!place) return null
-
-  return createPortal(
-    <div
-      style={{ left: place.left, top: place.top, width: PANEL_WIDTH, maxHeight: place.maxHeight }}
-      className="fixed z-50 overflow-y-auto rounded-xl border border-rule bg-card p-4 shadow-lg"
-    >
-      <div className="flex items-center justify-between">
-        <h3 className="font-display text-base font-semibold">Engine Settings</h3>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close engine settings"
-          className="rounded-md px-2 py-0.5 text-ink-mute hover:bg-buff-soft hover:text-ink"
-        >
-          ×
-        </button>
-      </div>
-      <div className="mt-3 space-y-4">
-        <SliderRow
-          label="Search time"
-          display={`${value.searchTimeSec}s`}
-          min={1}
-          max={30}
-          step={1}
-          value={value.searchTimeSec}
-          onChange={(v) => onChange({ ...value, searchTimeSec: v })}
-        />
-        <SliderRow
-          label="Multiple lines"
-          display={`${value.multiPv} / 5`}
-          min={1}
-          max={5}
-          step={1}
-          value={value.multiPv}
-          onChange={(v) => onChange({ ...value, multiPv: v })}
-        />
-        <SliderRow
-          label="Threads"
-          display={`1 / ${typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 1 : 1}`}
-          min={1}
-          max={1}
-          step={1}
-          value={1}
-          disabled
-          caption="Single-threaded in browser WASM"
-        />
-        <SliderRow
-          label="Memory"
-          display={`${value.hashMb}MB`}
-          min={16}
-          max={512}
-          step={16}
-          value={value.hashMb}
-          onChange={(v) => onChange({ ...value, hashMb: v })}
-        />
-        <SwitchRow
-          label="Scores on arrows"
-          caption="Print each candidate's evaluation at the head of its arrow."
-          checked={value.arrowEvals}
-          onChange={(v) => onChange({ ...value, arrowEvals: v })}
-        />
-        <SwitchRow
-          label="Human moves (Maia 3)"
-          caption={MAIA_CAPTION}
-          checked={value.maia}
-          onChange={(v) => onChange({ ...value, maia: v })}
-        />
-      </div>
-    </div>,
-    document.body,
+  return (
+    <SettingsPopover anchor={anchor} title="Engine Settings" onClose={onClose}>
+      <SliderRow
+        label="Search time"
+        display={`${value.searchTimeSec}s`}
+        min={1}
+        max={30}
+        step={1}
+        value={value.searchTimeSec}
+        onChange={(v) => onChange({ ...value, searchTimeSec: v })}
+      />
+      <SliderRow
+        label="Multiple lines"
+        display={`${value.multiPv} / 5`}
+        min={1}
+        max={5}
+        step={1}
+        value={value.multiPv}
+        onChange={(v) => onChange({ ...value, multiPv: v })}
+      />
+      <SliderRow
+        label="Threads"
+        display={`1 / ${typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 1 : 1}`}
+        min={1}
+        max={1}
+        step={1}
+        value={1}
+        disabled
+        caption="Single-threaded in browser WASM"
+      />
+      <SliderRow
+        label="Memory"
+        display={`${value.hashMb}MB`}
+        min={16}
+        max={512}
+        step={16}
+        value={value.hashMb}
+        onChange={(v) => onChange({ ...value, hashMb: v })}
+      />
+    </SettingsPopover>
   )
 }

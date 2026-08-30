@@ -41,6 +41,7 @@ measurement, not folklore:
 | `computer` key presses — arrows never reach the page | dispatch a `KeyboardEvent` on `window` |
 | `requestAnimationFrame` — never fires while the pane is hidden, so a rAF sampling loop hangs | sample with `setTimeout`, or measure the mechanism rather than the frames |
 | `computer` hover — React's `onPointerEnter` never fires from it | dispatch `pointerover` then `pointerenter` (`pointerType: 'mouse'`, `bubbles: true`) on the element |
+| `computer` hover *leaving* an element — the pointer teleports, so no `mouseout` and no `onMouseLeave` | dispatch `mouseout` with a `relatedTarget` outside; `onMouseMove` itself does fire from two hovers in a row |
 | Viewport size — `innerWidth`/`innerHeight` and `clientWidth`/`clientHeight` all read **0** while the pane is backgrounded | take the size from an element's rect, or treat 0 as "unknown" |
 
 `getBoundingClientRect` and DOM attribute reads *are* reliable. So are
@@ -150,6 +151,13 @@ the harness's drag tool (mouse events) cannot move a piece. Drive it with a
   `searchmoves` search covers the rest *and re-scores the engine's best move*. Comparing a
   constrained score against the panel's would be the mainline/variation depth mix-up again, in a
   new place.
+- **Every arrow on the board can carry a Maia percentage, because Maia scores every
+  legal move.** `decodePolicy` returns the whole legal-move distribution, so `EnginePanel`
+  hands the full list up and `App` draws arrows for the first `multiPv` of them and looks the
+  rest up by UCI for the engine's candidates and the played move. Arrows were deliberately
+  one violet arrow at first — Chuck asked for the set, and they fade by rank through the
+  overlay's `opacity` rather than an alpha in the colour, because `--maia` is a theme variable
+  and a var cannot carry one.
 - **Maia's arrow and the played-move arrow are not react-chessboard's.** That component takes one
   stroke width for every arrow and keys them by their pair of squares, so two arrows along the
   same squares are one arrow with a duplicate React key — and those two are the ones most likely
@@ -162,6 +170,57 @@ the harness's drag tool (mouse events) cannot move a piece. Drive it with a
   reopening. The waiting message lives in the first reserved row rather than above the list, so
   it costs no height of its own. Measured after the fix: constant 123px across six first-visit
   moves, sampled every 30ms.
+- **The eval beside a Maia move comes from the search that scored that move, not
+  from the panel's lines.** `verdictsForMoves` returns the score alongside the
+  classification for exactly this reason: a move only the constrained search
+  reached is graded against that search's baseline, so showing the panel's
+  number next to that grade would print a verdict and a figure that disagree.
+  Both number columns are fixed-width — a probability is 3.6% or 60.5% wide, and
+  letting it size itself shifted the eval column beside it row by row.
+- **`SettingsPopover` flips above its button when there is no room below.**
+  The chart pane's gear sits at the bottom of the page: hanging downwards left
+  the explorer's panel 160px tall and scrolling, measured at a 960px viewport.
+  It opens upward there and downward everywhere else, which is why the place it
+  computes carries either a `top` or a `bottom`, never both.
+- **Two settings menus, and the split between them is deliberate.** The gear on
+  the engine panel is Stockfish's search and nothing else; the hamburger at the
+  right of the move-nav row is what the board draws — the arrow numbers and
+  whether Maia runs at all. They were one menu under a heading carrying the
+  engine's name, which is the wrong home for Maia's switch. Both hang off
+  `SettingsPopover`, which owns the placement and the click-away: it ignores
+  pointerdowns on its own anchor, because closing there as well as in the
+  button's onClick made a second press on the gear look like it did nothing.
+  The `SettingsPage` mirrors the same two groups.
+- **The bottom panel is two panes, each with its own tab strip.** Charts on the
+  left (Evaluation, Move Times, Opening Explorer), summaries on the right
+  (Phase Accuracy, Move Classification, Comments), so a reader can have one of
+  each open at once —
+  that is the whole point of the split, and merging them back into one strip
+  takes it away. The `@container/panels` wrapper and the `@[44rem]/panels:`
+  query are deliberately on **different** elements: an element cannot query
+  itself, and with both on the flex row it stayed stacked at every width,
+  measured at 1232px.
+- **The explorer's hover arrow is an outline, not a stroke.** Every other arrow
+  on this board is a stroked path with a marker on the end, which can only ever
+  be one colour; this one is filled *and* bordered, so `arrowOutline` traces the
+  shaft and the head as a single closed polygon. The knight's move is the part
+  that needed thought: offsetting a right-angled turn puts the join at the
+  corner plus **both** normals (`n1 + n2`) on one side and its negation on the
+  other, and anything less pinches the outline at the bend. Verified against the
+  arithmetic in the running app on 30 August 2026 — for g1f3 the polygon's nine
+  points came out exactly where the geometry says. It is drawn in its own SVG at
+  z-15, under react-chessboard's arrows at z-20, because it is a shadow of a
+  move nobody has played: an engine candidate along the same squares should lie
+  on top of it rather than be tinted by it.
+- **A badge on the board is a stack, not a value.** Two arrows can point at one
+  square and mean different things — an eval and Maia's probability — and the
+  labels used to be keyed by square alone, so the second one was either dropped
+  or a duplicate React key. `groupBySquare` in `BoardViewer` renders a column
+  per square; `App` concatenates Maia's labels after the scores so the score is
+  always the badge on top. The played move's own eval is in that list too now,
+  and it is the one label that comes from the review rather than from the live
+  search — look it up by node id (`deeperEvals`) or by ply *only* after
+  `isMainline`, or a variation borrows the mainline's number again.
 - **The hover preview is fixed across and follows the row down.** Two separate bugs, one in each
   axis: anchored to the hovered move it slid sideways as you read a variation, and pinned
   entirely to the first line it covered the lines below. Its left comes from `firstTokenRef`, its
@@ -183,6 +242,99 @@ the harness's drag tool (mouse events) cannot move a piece. Drive it with a
 - Verified live on 11 August 2026 against the sample Sicilian in this repo: at the position after
   21…d6, Maia at 600 plays exd6 33.8% (a Mistake) over the engine's b4 23.6%, and at 1500 those
   invert to b4 37.4% / exd6 9.3%. That is the feature working, and a useful smoke test.
+
+- **`accessibilityLayer={false}` on both charts, and it has to stay off.**
+  Recharts' accessibility layer gives a chart focus when it is clicked and then
+  answers ArrowLeft/ArrowRight itself, walking its own tooltip index — without
+  calling `preventDefault`, so the app's window-level handler runs too. One key
+  press then moved two things: recharts by one *move*, the board by one *ply*.
+  Click either chart and step on with the arrows and they were out of step
+  immediately. That is the bug Chuck reported on the clock chart; the eval
+  chart had it too and nobody had noticed. Nothing is lost by turning it off —
+  the keyboard path here is the app's own, which moves the board.
+- **The clock chart has exactly one indicator, and one input.** The move on the
+  board draws a dashed `ReferenceLine` and two `ReferenceDot`s on the clock
+  curves. There is deliberately **no `Tooltip`** on it: its cursor drew a second
+  vertical line and its `activeDot` drew those same two dots, all following the
+  *pointer* while the line followed the *board*. Reference marks rather than an
+  overlay of our own because recharts places them with its own scales — the
+  dots land on the curves without this file knowing anything about the chart's
+  vertical geometry, which it could not work out honestly. The cost is that the
+  line sits at the move's tick rather than the ply's half-band; the readout row
+  names the exact move instead.
+- **The click handler's geometry is still hand-rolled.** `plyForClockClick` in
+  `gameModel.ts` works the band out from `CLOCK_PLOT_INSET` — the chart margins
+  plus the two y-axis widths — because recharts will not say where a band is.
+  Change either margin there and this has to follow. The box it measures must
+  stay exactly the chart's box: the padding belongs on the wrapper outside it,
+  or every click reads 8px off.
+- **Nothing here reads recharts' active-tooltip state.** The click handler
+  already avoided it because a tap that never moved a pointer leaves it empty;
+  the hover readout avoids it because `onMouseMove` on the chart gave an
+  undefined `activeLabel` even for a mousemove that demonstrably reached the
+  element (recharts 3.1). Both compute from the pointer's x instead.
+- **The clock chart reports in a fixed row, not a tooltip.** A popover
+  following the pointer covered the bars it was describing — 150px of chart has
+  nowhere to put one. The row above the plot shows the hovered move, falling
+  back to the move on the board and saying so. Its height is fixed, because a
+  row that appeared on hover would nudge the chart out from under the pointer.
+
+## The Lichess opening explorer
+
+- **Both endpoints need an OAuth token now.** They did not until somewhere
+  between 17 December 2025 and 3 March 2026 — the published spec gained
+  `security: OAuth2: []` on `/masters` and `/lichess` in that window, and an
+  unauthenticated request gets a bare nginx **401**, not JSON. Any token
+  satisfies it (no scope is named), so the session the study import already
+  signs in for is enough. If this feature ever "breaks with a 401", check
+  whether the stored session expired before suspecting the client.
+- **The host is `explorer.lichess.org`.** `explorer.lichess.ovh` is the old
+  name and 401s the same way, so a 401 is not evidence you have the wrong host.
+- **CORS is fine, and this was checked rather than assumed** — the mistake the
+  old Lichess import made. An `Authorization` header makes the request
+  non-simple, so the browser preflights it; measured from the running app on
+  30 August 2026, the preflight passes and a bogus token comes back as a
+  readable 401. The one thing no session here could verify is an authenticated
+  200: getting a token needs Chuck's own Lichess sign-in.
+- **The two databases take different filters, and different *units*.**
+  `/lichess` filters by speed, rating band and month (`YYYY-MM`); `/masters`
+  has no speed or band at all and takes a **year** (`YYYY`). That is the spec,
+  not a simplification. `ExplorerSettings` keeps both date pairs so switching
+  databases does not discard what was typed in the other, and a month sent to
+  masters would filter *nothing* rather than erroring — which is why
+  `loadExplorerSettings` throws away a value of the wrong shape instead of
+  passing it on.
+- **`/player` is a stream, and that is the whole difference.** It indexes an
+  account on demand and answers with newline-delimited JSON: every line is a
+  complete result, the last one is the finished one, blank lines are
+  keep-alives, and `queuePosition` says how many accounts are ahead of this
+  one. `readNdjson` hands each line to the caller so the table fills in and
+  sharpens while Lichess works, and only the final line is cached — a partial
+  stream cached as an answer would be wrong for the life of the tab. It also
+  reports `averageOpponentRating` where the other two report `averageRating`;
+  same column, different name, and it is the opponents' rating that means
+  anything there.
+- **A player stream can be cut short, and has to be.** It holds the client's
+  one slot for as long as indexing takes, so a newer position aborts the
+  running stream rather than queueing behind it — the only case where the
+  client abandons a request that is already in flight. `player` and `color`
+  are both required by the spec: a player query missing them is not a wider
+  query, it is a 400, so the client refuses to send one.
+- **A full selection is sent as no parameter at all.** Every speed and every
+  band is the endpoint's own default, so spelling the whole list out is a
+  longer URL saying the same thing — and it would split the cache from the
+  unfiltered answer for the same position. The filters are part of the cache
+  key, so narrowing them asks again rather than showing the wider result.
+- **The rate limiting is the part with tests.** Lichess asks for one request at
+  a time and a full minute's silence after a 429, and says the limits are
+  deliberately unpublished. `ExplorerClient` therefore holds one queue with at
+  most one *waiting* job — a newer position rejects the one waiting with
+  `ExplorerAbandonedError` rather than queueing behind it, which is the same
+  lesson as Maia's `abandon` — caches every answer for the tab's life, and
+  after a 429 refuses to send at all until the cooldown expires. The component
+  adds a 350ms settle so a held arrow key queues nothing. `ExplorerClient`
+  takes its `fetch`, which is what lets `explorer.test.ts` prove all of that
+  without a network.
 
 ## Conventions
 
@@ -214,12 +366,20 @@ Deployed at <https://chessnoter.vercel.app> from `main` (auto-deploy on push).
 The version in the header is `major.minor` from `package.json` plus a build
 number derived from the commit's timestamp, so it changes on every commit.
 
-**v2.1 shipped on 16 August 2026** and is what production serves. Work happens
-on `main` again — the `v2.1` branch was merged and deleted. Two tags bracket it:
-`v2.1.0` on the release merge, `v2.0-final` on the last v2.0 release, which is
-what a rollback goes back to (`git revert -m 1` the merge, or redeploy that tag
-from Vercel). `v2.0.0` and `v1.6-final` bracket the release before it, the same
-way.
+**v2.5 is the app's own name and a wider one: it is called Chessnotes.** It
+began as a converter for ChessNoteR's `%emt` clocks and was named after them,
+and it has grown into a reviewer, a repertoire editor and an opening-preparation
+tool. ChessNoteR is still credited — the conversion is still there and still the
+way most games get in — but the header no longer links out, and the credit lives
+in the help where the conversion is explained. What is *not* renamed: the
+`chessnoter.vercel.app` deployment, the `ChessNoteR-app` remote, this working
+directory, and every reference to the ChessNoteR *device* and its file format,
+which are a real product and not this app.
+
+**v2.1 shipped on 16 August 2026.** Two tags bracket it: `v2.1.0` on the release
+merge, `v2.0-final` on the last v2.0 release, which is what a rollback goes back
+to (`git revert -m 1` the merge, or redeploy that tag from Vercel). `v2.0.0` and
+`v1.6-final` bracket the release before it, the same way.
 
 What v2.1 changed, in one line: Maia-3 runs beside Stockfish, so the panel shows
 what a human of a given rating would probably play next to what is actually

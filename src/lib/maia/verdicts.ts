@@ -61,8 +61,21 @@ export function movesToSearch(wanted: string[], covered: ScoredMove[]): string[]
   return best && !missing.includes(best) ? [best, ...missing] : missing
 }
 
+/** What the engine makes of one of Maia's moves: its score, and the grade. */
+export interface Verdict {
+  classification: Classification
+  /**
+   * White-POV, and from whichever search scored this move — so a move only the
+   * constrained search covered carries that search's number, which is shallower
+   * than the panel's and may differ from the same move's eval in the lines
+   * opposite. That is the same rule the classification follows, and the
+   * alternative is showing a number the grade beside it was not derived from.
+   */
+  score: Score
+}
+
 /**
- * A classification per move, or no entry for one nothing has scored yet.
+ * A verdict per move, or no entry for one nothing has scored yet.
  *
  * `isBest` is decided by the panel's own search, not by whichever search a move
  * happened to be scored in — the green "best" belongs to the engine's actual
@@ -73,18 +86,23 @@ export function verdictsForMoves(
   primary: ScoredMove[],
   constrained: ScoredMove[],
   whiteToMove: boolean,
-): Map<string, Classification> {
-  const verdicts = new Map<string, Classification>()
+): Map<string, Verdict> {
+  const verdicts = new Map<string, Verdict>()
   const bestUci = primary[0]?.uci
   for (const group of [primary, constrained]) {
     const best = group[0]
     if (!best) continue
     for (const move of group) {
       if (!wanted.includes(move.uci) || verdicts.has(move.uci)) continue
-      verdicts.set(
-        move.uci,
-        classifyCandidate(best.score, move.score, whiteToMove, move.uci === bestUci),
-      )
+      verdicts.set(move.uci, {
+        classification: classifyCandidate(
+          best.score,
+          move.score,
+          whiteToMove,
+          move.uci === bestUci,
+        ),
+        score: move.score,
+      })
     }
   }
   return verdicts

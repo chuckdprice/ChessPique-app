@@ -133,6 +133,12 @@ export default function EvalChart({ analysis, moves, ply, onPlyChange, opening }
         <AreaChart
           data={rows}
           margin={{ top: 8, right: 12, bottom: 4, left: 0 }}
+          // The same reason as the clock chart: clicking this chart focuses
+          // it, and recharts would then answer the arrow keys by walking its
+          // own tooltip while the app's handler walks the board. One key, two
+          // things moving, and the tooltip's line drifting away from the line
+          // marking the position.
+          accessibilityLayer={false}
           onClick={(state) => {
             const label = state?.activeLabel
             if (label != null) onPlyChange(Number(label))

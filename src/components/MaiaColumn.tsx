@@ -1,4 +1,6 @@
 import { MAIA_RATINGS } from '../lib/maia/model'
+import { formatScore } from '../lib/engine/uci'
+import type { Score } from '../lib/engine/uci'
 import { isColoured } from '../lib/maia/verdicts'
 import type { Classification } from '../lib/engine/analysis'
 import type { MaiaStatus } from '../lib/maia/session'
@@ -21,6 +23,8 @@ export interface MaiaRow {
   prob: number
   /** Absent until the engine has scored this move. */
   classification?: Classification
+  /** White-POV, from the same search the classification came from. */
+  score?: Score
 }
 
 const COLOUR: Record<Classification, string> = {
@@ -85,6 +89,14 @@ export default function MaiaColumn({
   progress,
   error,
 }: MaiaColumnProps) {
+  // Finished means every row is here AND every one of them carries the score
+  // it was graded on. `busy` alone is not enough: it is false for the render or
+  // two between arriving at a position and the colouring search starting, and a
+  // tick that goes green in that gap is green at exactly the moment it has
+  // least to say. A decided position has nothing to compute and never ticks.
+  const complete =
+    !busy && !gameOver && rows.length > 0 && rows.every((row) => row.score != null)
+
   return (
     // Narrower than the engine's lines and able to give way: a move and a
     // percentage need far less room than a principal variation, but a fixed
@@ -117,7 +129,17 @@ export default function MaiaColumn({
         {/* After the chevron rather than before it: appearing mid-heading
             pushed the chevron along and shortened the title to "Human Mo…"
             every time the engine started scoring. At the end it costs nothing
-            already on screen. */}
+            already on screen.
+
+            The tick is the engine's depth badge in another form — it goes green
+            when there is nothing left to work out, so a list that has stopped
+            changing reads as finished rather than as stalled. It says nothing
+            about the moves; it says the numbers beside them are final. */}
+        {/* The gold ring says "running" — nothing else on this page is loud
+            enough to, by design — and the tick beside it says "finished". Two
+            badges rather than one bicoloured one: the ring is the thing the eye
+            catches while it spins, and it should be gone when there is nothing
+            to wait for rather than sitting there in another colour. */}
         {busy && (
           <BusyRing
             pct={null}
@@ -125,6 +147,31 @@ export default function MaiaColumn({
             ariaLabel="Scoring Maia's moves"
           />
         )}
+
+        <span
+          title={
+            complete
+              ? 'Every move here has been scored — these verdicts are final'
+              : 'Scoring these moves with the engine — the colours are not final yet'
+          }
+          aria-label={complete ? 'Scoring complete' : "Scoring Maia's moves"}
+          className={`shrink-0 rounded px-1 py-0.5 leading-none ${
+            complete ? 'bg-class-best text-white' : 'bg-buff-soft text-ink-mute'
+          }`}
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            className="size-2.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M20 6 9 17l-5-5" />
+          </svg>
+        </span>
 
         {/* A real <select> laid over the heading: 21 ratings want the platform's
             own picker, especially on a phone, and the heading stays the thing
@@ -167,9 +214,30 @@ export default function MaiaColumn({
               ? COLOUR[row.classification]
               : 'text-ink'
           return (
-            <li key={row.uci} className={`flex items-baseline justify-between py-0.5 ${colour}`}>
-              <span className="truncate font-semibold">{row.san}</span>
-              <span className="shrink-0 tabular-nums">{(row.prob * 100).toFixed(1)}%</span>
+            <li key={row.uci} className={`flex items-baseline gap-2 py-0.5 ${colour}`}>
+              <span className="min-w-0 flex-1 truncate font-semibold">{row.san}</span>
+              {/* The eval sits between the move and its probability, so the two
+                  numbers read left to right as "what it is worth, how likely it
+                  is". It keeps the row's colour — it is the number that decided
+                  that colour — but not its weight, so the move stays the thing
+                  the eye lands on. Fixed width, and a dash while the colouring
+                  search is still out, so the percentages never shift sideways
+                  as the scores arrive. */}
+              <span
+                className={`w-10 shrink-0 text-right tabular-nums ${
+                  row.score ? '' : 'text-ink-mute'
+                }`}
+                title={row.score ? 'Stockfish’s score for this move' : 'Not scored yet'}
+              >
+                {row.score ? formatScore(row.score) : '—'}
+              </span>
+              {/* Fixed width here too. Left to size itself, this column pushed
+                  the eval beside it a few pixels left or right depending on
+                  whether the probability read 60.5% or 3.6%, and a column of
+                  numbers that does not line up is worse than no column. */}
+              <span className="w-12 shrink-0 text-right tabular-nums">
+                {(row.prob * 100).toFixed(1)}%
+              </span>
             </li>
           )
         })}

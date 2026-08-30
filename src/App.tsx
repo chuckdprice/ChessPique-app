@@ -38,6 +38,7 @@ import { buildChartRows } from './lib/gameModel'
 import {
   addLine,
   addMove,
+  addMoveSan,
   applyMainlineTiming,
   deleteFrom,
   demote,
@@ -63,10 +64,12 @@ import {
   applyAppearance,
   loadAppearance,
   loadEngineSettings,
+  loadExplorerSettings,
   saveAppearance,
   saveEngineSettings,
+  saveExplorerSettings,
 } from './lib/settings'
-import type { AppearanceSettings, EngineSettings } from './lib/settings'
+import type { AppearanceSettings, EngineSettings, ExplorerSettings } from './lib/settings'
 
 // The analysis page owns every heavy dependency in the app — recharts for the
 // eval and clock charts, react-chessboard for the board — and none of it is
@@ -96,8 +99,9 @@ function findHeader(headers: Array<{ name: string; value: string }>, name: strin
 const ENGINE_ARROW_ALPHA = [0.95, 0.7, 0.52, 0.4, 0.3]
 const ENGINE_ARROW_RGB = '38, 122, 255'
 const NEXT_MOVE_ARROW = 'rgba(244, 130, 32, 0.95)'
-// The one arrow colour that is a theme variable rather than a literal: the
-// engine's shade-by-rank needs a numeric alpha, and Maia's does not.
+// The one arrow colour that is a theme variable rather than a literal, which
+// is why Maia's own shade-by-rank rides on the overlay's `opacity` instead of
+// on an alpha inside the colour: a var cannot carry one.
 const MAIA_ARROW = 'var(--maia)'
 
 /** Credited in every converted PGN, so a shared file says where it came from. */
@@ -222,10 +226,12 @@ export default function App() {
   // draft, so a pick is seen on the page behind it; only Save writes it down.
   const [appearance, setAppearance] = useState<AppearanceSettings>(loadAppearance)
   const [engineSettings, setEngineSettings] = useState<EngineSettings>(loadEngineSettings)
+  const [explorerSettings, setExplorerSettings] =
+    useState<ExplorerSettings>(loadExplorerSettings)
   const [engineOn, setEngineOn] = useState(false)
   const [liveScore, setLiveScore] = useState<Score | null>(null)
   const [engineMoves, setEngineMoves] = useState<EngineArrow[]>([])
-  const [maiaMove, setMaiaMove] = useState<MaiaMove | null>(null)
+  const [maiaMoves, setMaiaMoves] = useState<MaiaMove[] | null>(null)
   const [analysis, setAnalysis] = useState<GameAnalysis | null>(null)
   const [analysisProgress, setAnalysisProgress] = useState<{ done: number; total: number } | null>(
     null,
@@ -406,7 +412,7 @@ export default function App() {
     setDeeperEvals((prev) => withDeeperEval(prev, at, { score, depth }, reviewDepth))
   }, [])
   const handleEngineMoves = useCallback((lines: EngineArrow[]) => setEngineMoves(lines), [])
-  const handleMaiaMove = useCallback((move: MaiaMove | null) => setMaiaMove(move), [])
+  const handleMaiaMoves = useCallback((moves: MaiaMove[] | null) => setMaiaMoves(moves), [])
 
   /** Move the board to a node. Navigation never changes the game. */
   const handleNavigate = useCallback((nodeId: string) => setCurrentId(nodeId), [])
@@ -498,6 +504,23 @@ export default function App() {
     return true
   }, [])
 
+  /**
+   * The same, from SAN — what a row in the opening explorer is.
+   *
+   * Not routed through handlePieceMove: castling, en passant and promotion all
+   * survive SAN intact, and the explorer's own UCI spells castling as the king
+   * taking its rook, which is not a king move any board would accept.
+   */
+  const handlePlaySan = useCallback((san: string) => {
+    const current = gameRef.current
+    if (!current) return false
+    const added = addMoveSan(current.tree, currentIdRef.current, san)
+    if (!added) return false
+    setGame({ ...current, tree: added.tree })
+    setCurrentId(added.nodeId)
+    return true
+  }, [])
+
   const handlePromote = useCallback((nodeId: string, toMainline: boolean) => {
     setGame((prev) =>
       prev
@@ -533,6 +556,11 @@ export default function App() {
   const handleEngineSettingsSave = useCallback((next: EngineSettings) => {
     setEngineSettings(next)
     saveEngineSettings(next)
+  }, [])
+
+  const handleExplorerSettingsSave = useCallback((next: ExplorerSettings) => {
+    setExplorerSettings(next)
+    saveExplorerSettings(next)
   }, [])
 
   /**
@@ -741,6 +769,7 @@ export default function App() {
   // itself: the object is replaced by any engine setting changing, and the
   // arrows have no business being rebuilt because the hash size moved.
   const showArrowEvals = engineSettings.arrowEvals
+  const showMaiaArrowEvals = engineSettings.maia && engineSettings.maiaArrowEvals
 
   /**
    * Three kinds of arrow, in two layers.
@@ -766,6 +795,23 @@ export default function App() {
     const nextMove =
       nextNode?.from && nextNode.to ? ([nextNode.from, nextNode.to] as const) : null
 
+    // What the played move led to. The live engine's deeper answer wins, as it
+    // does in the move list and the bar; failing that the review's, but only
+    // for a node the review actually covered — a variation move borrowing the
+    // mainline's eval at its ply is the one bug this file has to keep not
+    // having. Null leaves the arrow unlabelled, exactly as before.
+    const playedScore =
+      nextNode && analysis
+        ? (deeperEvals.get(nextNode.id)?.score ??
+          (isMainline(game.tree, nextNode.id) ? (analysis.evals[nextNode.ply] ?? null) : null))
+        : null
+
+    // Every legal move Maia scored, for the badges, and the few its column
+    // lists, for the arrows. The arrow count follows the column's so the two
+    // never disagree about what Maia is saying.
+    const maiaProb = new Map((maiaMoves ?? []).map((move) => [move.uci, move.prob]))
+    const maiaTop = (maiaMoves ?? []).slice(0, engineSettings.multiPv)
+
     // Only the engine's own candidates need de-duplicating now: mid-search it
     // can list the same first move under two multipv slots, and the board still
     // keys its arrows by the pair of squares. The overlay has no such limit.
@@ -778,6 +824,9 @@ export default function App() {
 
     const list: Arrow[] = []
     const labels: EvalLabel[] = []
+    // In arrow order, so the percentages claim squares in the same order the
+    // scores did.
+    const engineUcis: string[] = []
     engineMoves.slice(0, ENGINE_ARROW_ALPHA.length).forEach((line, i) => {
       // A line the engine has not given a move for yet holds its place, so the
       // arrows below it keep the rank — and the shade — of their own line.
@@ -787,6 +836,7 @@ export default function App() {
       const key = `${from}${to}`
       if (seen.has(key)) return
       seen.add(key)
+      engineUcis.push(line.uci)
       const color = `rgba(${ENGINE_ARROW_RGB}, ${ENGINE_ARROW_ALPHA[i]})`
       list.push({ startSquare: from, endSquare: to, color })
       // Labels are built here rather than beside the board so that a candidate
@@ -804,32 +854,90 @@ export default function App() {
       }
     })
 
-    // Maia's single arrow. One, never a set: this is a claim about what a
-    // human would play, not another ranking of what is good, and shading it by
-    // probability would make it read as one more engine line.
+    // Maia's arrows: one per move its column lists, faded likeliest→least the
+    // way the engine's fade best→worst. This was deliberately a single arrow
+    // once — a claim about what a human would play, not another ranking — but
+    // three of them ranked is what the column beside the board already shows,
+    // and the board disagreeing with it was the confusing part.
     const overlay: OverlayArrow[] = []
-    if (maiaMove) {
-      const from = maiaMove.uci.slice(0, 2)
-      const to = maiaMove.uci.slice(2, 4)
-      overlay.push({ from, to, color: MAIA_ARROW })
-      if (showArrowEvals && !labelled.has(to)) {
-        labelled.add(to)
-        // Outlined rather than filled: a filled badge is how the engine's own
-        // best move is marked, and this is not that.
-        labels.push({
-          square: to,
-          text: `${Math.round(maiaMove.prob * 100)}%`,
-          best: false,
-          color: MAIA_ARROW,
-        })
-      }
+    // Kept apart from the scores and concatenated last, so that where a square
+    // carries both, the score is always the badge on top and the percentage
+    // always the one under it. Pushed inline they would swap places depending
+    // on which arrow happened to share the square.
+    const maiaLabels: EvalLabel[] = []
+    // Maia scores every legal move, so any arrow on the board can carry the
+    // probability of a human playing it — the engine's candidates and the move
+    // actually played included. One per square, first arrow to reach it: two
+    // different moves can land on one square, and a second badge there would
+    // read as belonging to the first.
+    const percentAt = new Set<string>()
+    const addPercent = (uci: string, to: string) => {
+      const prob = maiaProb.get(uci)
+      if (!showMaiaArrowEvals || prob == null || percentAt.has(to)) return
+      percentAt.add(to)
+      // Outlined rather than filled: a filled badge is how the engine's own
+      // best move is marked, and this is not that.
+      const pct = prob * 100
+      maiaLabels.push({
+        square: to,
+        // "<1%" rather than a rounded "0%": every move on this board is one
+        // Maia gave some weight to, and printing zero beside an arrow says it
+        // would never be played, which is not what the model said.
+        text: pct < 0.5 ? '<1%' : `${Math.round(pct)}%`,
+        best: false,
+        color: MAIA_ARROW,
+      })
     }
 
-    if (nextMove) {
+    for (const uci of engineUcis) addPercent(uci, uci.slice(2, 4))
+
+    maiaTop.forEach((move, i) => {
+      const from = move.uci.slice(0, 2)
+      const to = move.uci.slice(2, 4)
+      overlay.push({
+        from,
+        to,
+        color: MAIA_ARROW,
+        // Opacity rather than an alpha in the colour: Maia's is a theme
+        // variable, and a var cannot carry one.
+        opacity: ENGINE_ARROW_ALPHA[i] ?? 0.3,
+      })
+      addPercent(move.uci, to)
+    })
+
+    if (nextMove && nextNode?.uci) {
       overlay.push({ from: nextMove[0], to: nextMove[1], color: NEXT_MOVE_ARROW })
+      // The move actually played is usually not one of the engine's, which is
+      // why it is drawn at all — and until now that was also why it was the one
+      // arrow on the board with no number on it. It gets the same badge as the
+      // rest, in its own orange, unless a candidate already put a score on that
+      // square: the played move being the engine's choice too is agreement, not
+      // a reason to print the same evaluation twice.
+      const to = nextMove[1]
+      if (showArrowEvals && playedScore && !labelled.has(to)) {
+        labelled.add(to)
+        labels.push({
+          square: to,
+          text: formatScore(playedScore),
+          best: false,
+          color: NEXT_MOVE_ARROW,
+        })
+      }
+      addPercent(nextNode.uci, to)
     }
-    return { arrows: list, overlayArrows: overlay, evalLabels: labels }
-  }, [engineOn, engineMoves, maiaMove, game, currentId, showArrowEvals])
+    return { arrows: list, overlayArrows: overlay, evalLabels: [...labels, ...maiaLabels] }
+  }, [
+    engineOn,
+    engineMoves,
+    maiaMoves,
+    engineSettings.multiPv,
+    game,
+    currentId,
+    showArrowEvals,
+    showMaiaArrowEvals,
+    analysis,
+    deeperEvals,
+  ])
 
   const playedLikeTooltip =
     `Estimated "played like" rating for this game.\n\n` +
@@ -849,18 +957,12 @@ export default function App() {
           <NavToggle onOpen={() => setNavOpen(true)} />
           <BrandMark />
           <div className="min-w-0 flex-1">
+            {/* The app's own name, and no longer a link: it began as a
+                converter for ChessNoteR's files and was named after them, and
+                it has grown into something wider than that. ChessNoteR is
+                still credited, in the help where the conversion is explained. */}
             <h1 className="font-display text-xl font-semibold leading-tight tracking-tight">
-              {/* Only the device's name links out; "Game Analysis" is this app. */}
-              <a
-                href="https://chessnoter.com/"
-                target="_blank"
-                rel="noopener noreferrer"
-                title="ChessNoteR — chessnoter.com"
-                className="underline-offset-4 hover:underline"
-              >
-                ChessNoteR
-              </a>{' '}
-              Game Analysis
+              Chessnotes
             </h1>
             <p className="text-[11px] leading-tight text-buff/70">
               <span className="font-score">v{__APP_VERSION__}</span>
@@ -972,6 +1074,7 @@ export default function App() {
               deeperEvals={deeperEvals}
               opening={opening}
               onPieceMove={handlePieceMove}
+              onPlaySan={handlePlaySan}
               onPromote={handlePromote}
               onDemote={handleDemote}
               onDelete={handleDelete}
@@ -996,10 +1099,12 @@ export default function App() {
               engineOn={engineOn}
               onEngineOnChange={setEngineOn}
               engineSettings={engineSettings}
+              explorerSettings={explorerSettings}
+              onExplorerSettingsChange={handleExplorerSettingsSave}
               onEngineSettingsChange={setEngineSettings}
               onTopScore={handleTopScore}
               onEngineMoves={handleEngineMoves}
-              onMaiaMove={handleMaiaMove}
+              onMaiaMoves={handleMaiaMoves}
               onCommentChange={handleCommentChange}
               arrows={arrows}
               overlayArrows={overlayArrows}

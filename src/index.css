@@ -46,6 +46,22 @@
   --phase-middlegame: #c98500;
   --phase-endgame: #d03b3b;
 
+  /* Opening explorer result bars. Not the board's colours and not a theme's:
+     these three mean White won / drawn / Black won, and a reader coming from
+     lichess expects light, grey, dark in that order whatever the theme. */
+  --explorer-white: #e8e3d6;
+  --explorer-white-ink: #3a372f;
+  --explorer-draw: #9c968a;
+  --explorer-draw-ink: #ffffff;
+  --explorer-black: #3a3733;
+  --explorer-black-ink: #f0ece2;
+
+  /* The hover hint from the opening explorer: a shadow of a move, not a claim
+     about it. Ink rather than an accent, and translucent, so it reads as
+     something lying on the board rather than drawn on it. */
+  --hint-arrow-fill: rgba(35, 34, 30, 0.26);
+  --hint-arrow-line: rgba(35, 34, 30, 0.6);
+
   /* ---- Accent and board: the Tournament Green theme's own values ----
      Every theme replaces these as inline properties on <html>; they are here
      so the first paint, before that runs, is already the default theme. */
@@ -89,6 +105,20 @@
   --class-blunder: #ef5350;
   --phase-middlegame: #e9a92a;
   --phase-endgame: #ef5350;
+
+  /* Pulled off pure white and pure black, which glare on a dark page; the
+     light-to-dark ordering that carries the meaning is untouched. */
+  --explorer-white: #ded8c8;
+  --explorer-white-ink: #2b2925;
+  --explorer-draw: #6f6a60;
+  --explorer-draw-ink: #f2f1ec;
+  --explorer-black: #2a2825;
+  --explorer-black-ink: #cfc9bb;
+
+  /* A dark shadow on a dark board is no shadow at all, so this one is cast in
+     light ink; it reads the same way against the squares. */
+  --hint-arrow-fill: rgba(240, 238, 230, 0.24);
+  --hint-arrow-line: rgba(240, 238, 230, 0.55);
 }
 
 @theme inline {
@@ -119,6 +149,13 @@
   --color-class-blunder: var(--class-blunder);
 
   --color-maia: var(--maia);
+
+  --color-explorer-white: var(--explorer-white);
+  --color-explorer-white-ink: var(--explorer-white-ink);
+  --color-explorer-draw: var(--explorer-draw);
+  --color-explorer-draw-ink: var(--explorer-draw-ink);
+  --color-explorer-black: var(--explorer-black);
+  --color-explorer-black-ink: var(--explorer-black-ink);
 }
 
 html {

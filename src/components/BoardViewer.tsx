@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import { Chessboard, defaultArrowOptions } from 'react-chessboard'
 import type { Arrow, PieceRenderObject, SquareHandlerArgs } from 'react-chessboard'
 import { PIECE_CODES, pieceSrc } from '../lib/appearance'
@@ -37,6 +38,29 @@ export interface OverlayArrow {
   from: string
   to: string
   color: string
+  /**
+   * Fade, for a set of arrows that are ranked. Applied to the whole group so
+   * the head fades with the shaft — Maia's colour is a theme variable and
+   * cannot carry an alpha of its own the way the engine's rgba does.
+   */
+  opacity?: number
+}
+
+/**
+ * Labels by destination square, in the order they were given.
+ *
+ * Two arrows can point at one square and mean different things — the engine's
+ * score for a candidate and Maia's probability for the same move — so the badge
+ * is a stack, not a single value.
+ */
+function groupBySquare(labels: EvalLabel[]): Map<string, EvalLabel[]> {
+  const groups = new Map<string, EvalLabel[]>()
+  for (const label of labels) {
+    const group = groups.get(label.square)
+    if (group) group.push(label)
+    else groups.set(label.square, [label])
+  }
+  return groups
 }
 
 /** A score printed at the head of an engine arrow. */
@@ -59,6 +83,13 @@ interface BoardViewerProps {
   arrows: Arrow[]
   /** Drawn over `arrows`, thinner — see OverlayArrow. */
   overlayArrows: OverlayArrow[]
+  /**
+   * A move being pointed at somewhere else — a row in the opening explorer —
+   * shown as a filled, bordered arrow lying under the engine's rather than
+   * over them. It is a hint about a move nobody has played, so it reads as a
+   * shadow on the board rather than as another claim about the position.
+   */
+  hintArrow?: { from: string; to: string } | null
   evalLabels: EvalLabel[]
   /** Play a move, which writes it into the game. False snaps the piece back. */
   onPieceMove: (from: string, to: string) => boolean
@@ -168,6 +199,87 @@ const ARROW_SHORTEN = SQUARE / 8
 const ENGINE_ARROW_STROKE = SQUARE / 5
 const OVERLAY_ARROW_STROKE = ENGINE_ARROW_STROKE * 0.55
 
+/** Whether these two squares are a knight's move apart, which bends the arrow. */
+function isKnightMove(dx: number, dy: number, r: number): boolean {
+  return Math.abs(Math.hypot(1, 2) * SQUARE - r) < 0.001 && Math.abs(dx) !== Math.abs(dy)
+}
+
+/**
+ * The outline of an arrow, as one closed shape.
+ *
+ * The other arrows here are strokes with a marker on the end, which can only
+ * ever be one colour. This one has to be filled *and* bordered — a shadow lying
+ * on the board rather than a line drawn over it — so the shaft and the head are
+ * traced as a single polygon that can take a fill and a stroke of its own.
+ *
+ * The corner of a knight's move is where the work is. Offsetting a right-angled
+ * turn by `w` puts the join where the two offset edges meet, which for
+ * perpendicular legs is the corner plus both normals — `n1 + n2` on one side and
+ * its negation on the other. Anything less and the outline pinches at the bend.
+ */
+function arrowOutline(from: string, to: string, orientation: 'white' | 'black'): string {
+  const a = squareCenter(from, orientation)
+  const b = squareCenter(to, orientation)
+  const dx = b.left - a.left
+  const dy = b.top - a.top
+  const r = Math.hypot(dx, dy)
+  if (r === 0) return ''
+
+  // The same proportions as the engine's arrows, read off the marker they use.
+  const w = ENGINE_ARROW_STROKE / 2
+  const headHalf = ENGINE_ARROW_STROKE * 1.25
+  const headLength = ENGINE_ARROW_STROKE * 1.7
+
+  const pt = (x: number, y: number) => `${x.toFixed(2)},${y.toFixed(2)}`
+
+  if (isKnightMove(dx, dy, r)) {
+    const verticalFirst = Math.abs(dx) < Math.abs(dy)
+    const corner = { x: verticalFirst ? a.left : b.left, y: verticalFirst ? b.top : a.top }
+    const leg1 = { x: corner.x - a.left, y: corner.y - a.top }
+    const len1 = Math.hypot(leg1.x, leg1.y)
+    const u1 = { x: leg1.x / len1, y: leg1.y / len1 }
+    const leg2 = { x: b.left - corner.x, y: b.top - corner.y }
+    const len2 = Math.hypot(leg2.x, leg2.y)
+    const u2 = { x: leg2.x / len2, y: leg2.y / len2 }
+    const n1 = { x: -u1.y, y: u1.x }
+    const n2 = { x: -u2.y, y: u2.x }
+    // Stop short of the target's centre, as every other arrow here does.
+    const tip = {
+      x: corner.x + u2.x * (len2 - ARROW_SHORTEN),
+      y: corner.y + u2.y * (len2 - ARROW_SHORTEN),
+    }
+    const base = { x: tip.x - u2.x * headLength, y: tip.y - u2.y * headLength }
+    const join = { x: n1.x + n2.x, y: n1.y + n2.y }
+    return [
+      `M${pt(a.left + n1.x * w, a.top + n1.y * w)}`,
+      `L${pt(corner.x + join.x * w, corner.y + join.y * w)}`,
+      `L${pt(base.x + n2.x * w, base.y + n2.y * w)}`,
+      `L${pt(base.x + n2.x * headHalf, base.y + n2.y * headHalf)}`,
+      `L${pt(tip.x, tip.y)}`,
+      `L${pt(base.x - n2.x * headHalf, base.y - n2.y * headHalf)}`,
+      `L${pt(base.x - n2.x * w, base.y - n2.y * w)}`,
+      `L${pt(corner.x - join.x * w, corner.y - join.y * w)}`,
+      `L${pt(a.left - n1.x * w, a.top - n1.y * w)}`,
+      'Z',
+    ].join(' ')
+  }
+
+  const u = { x: dx / r, y: dy / r }
+  const n = { x: -u.y, y: u.x }
+  const tip = { x: a.left + u.x * (r - ARROW_SHORTEN), y: a.top + u.y * (r - ARROW_SHORTEN) }
+  const base = { x: tip.x - u.x * headLength, y: tip.y - u.y * headLength }
+  return [
+    `M${pt(a.left + n.x * w, a.top + n.y * w)}`,
+    `L${pt(base.x + n.x * w, base.y + n.y * w)}`,
+    `L${pt(base.x + n.x * headHalf, base.y + n.y * headHalf)}`,
+    `L${pt(tip.x, tip.y)}`,
+    `L${pt(base.x - n.x * headHalf, base.y - n.y * headHalf)}`,
+    `L${pt(base.x - n.x * w, base.y - n.y * w)}`,
+    `L${pt(a.left - n.x * w, a.top - n.y * w)}`,
+    'Z',
+  ].join(' ')
+}
+
 /** An arrow's path, L-shaped for a knight's move exactly as the library draws it. */
 function arrowPath(from: string, to: string, orientation: 'white' | 'black'): string {
   const a = squareCenter(from, orientation)
@@ -243,6 +355,7 @@ export default function BoardViewer({
   analysis,
   arrows,
   overlayArrows,
+  hintArrow,
   evalLabels,
   onPieceMove,
   pieceSet,
@@ -333,6 +446,26 @@ export default function BoardViewer({
           boardStyle: { width: '100%', height: '100%' },
         }}
       />
+      {/* Under the library's arrows at z-20, which is the whole point: this is
+          a shadow of a move being considered, and an engine candidate along
+          the same squares should lie on top of it rather than be tinted by
+          it. */}
+      {hintArrow && (
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 100 100"
+          className="pointer-events-none absolute inset-0 z-[15] size-full"
+        >
+          <path
+            d={arrowOutline(hintArrow.from, hintArrow.to, orientation)}
+            fill="var(--hint-arrow-fill)"
+            stroke="var(--hint-arrow-line)"
+            strokeWidth={0.35}
+            strokeLinejoin="round"
+          />
+        </svg>
+      )}
+
       {/* Between the library's arrows (z-20) and the labels (z-30), so a Maia
           or played-move arrow lies over an engine candidate sharing its
           squares rather than being dropped for it. */}
@@ -357,7 +490,7 @@ export default function BoardViewer({
               // same squares are exactly the case this overlay exists for.
               const id = `overlay-${i}-${arrow.from}-${arrow.to}`
               return (
-                <g key={id}>
+                <g key={id} opacity={arrow.opacity ?? 1}>
                   {/* Marker units are stroke widths, so the head thins with the
                       shaft and the two stay in proportion. */}
                   <marker
@@ -387,15 +520,21 @@ export default function BoardViewer({
       {/* Over the arrow layer, which react-chessboard puts at z-index 20 in
           this same stacking context: below it, the arrowhead a label belongs
           to painted across the label and ate its first two characters. */}
-      {evalLabels.map((label) => {
-        const at = squareCenter(label.square, orientation)
+      {/* Grouped by square, because two badges can now share one: a score from
+          the engine or the played move, and Maia's probability for the same
+          destination. They stack rather than overwrite — one key per square
+          was also a duplicate React key waiting to happen. */}
+      {[...groupBySquare(evalLabels)].map(([square, group]) => {
+        const at = squareCenter(square, orientation)
         return (
           <div
-            key={label.square}
-            className="pointer-events-none absolute z-30 -translate-x-1/2 -translate-y-1/2"
+            key={square}
+            className="pointer-events-none absolute z-30 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-px"
             style={{ left: `${at.left}%`, top: `${at.top}%` }}
           >
+            {group.map((label, i) => (
             <span
+              key={i}
               className="block rounded font-score font-semibold leading-none tabular-nums shadow-md"
               style={{
                 // Sized off the board, not in fixed pixels: a badge wider than
@@ -418,6 +557,7 @@ export default function BoardViewer({
               {label.text}
               {label.best && <span className="align-super text-[0.7em]">★</span>}
             </span>
+            ))}
           </div>
         )
       })}
@@ -446,6 +586,12 @@ interface BoardNavProps {
   onStepForward: () => void
   onRotate: () => void
   orientation: 'white' | 'black'
+  /**
+   * The board's own settings menu, rendered at the right end of the row.
+   * Passed in rather than built here so this file stays about the board and
+   * knows nothing about the settings.
+   */
+  menu?: (className: string) => ReactNode
 }
 
 /** "12. h3" / "13... Bg6" for a node, or null for the starting position. */
@@ -462,6 +608,7 @@ export function BoardNav({
   onStepForward,
   onRotate,
   orientation,
+  menu,
 }: BoardNavProps) {
   // A heavier outline and a lift, because these sit on the bare page rather
   // than in a card and were reading as flat text next to the board.
@@ -482,15 +629,25 @@ export function BoardNav({
 
   // Exactly the board's width, so the row's ends line up with the board's
   // edges rather than running past them into the page margin. The cluster is
-  // centred on the board and the rotate button is taken out of the flow to
-  // hold that right edge, so the one does not push the other off centre; the
-  // cluster's own width stops short of it on both sides.
+  // centred on the board and the two end buttons are taken out of the flow to
+  // hold its edges, so neither pushes the other off centre; the cluster's own
+  // width stops short of them on both sides.
   return (
     <div
       className="relative flex w-(--board-size) max-w-full items-center justify-center"
       role="group"
       aria-label="Move navigation"
     >
+      <button
+        type="button"
+        className={`${face} absolute left-0 rounded-md px-1.5`}
+        onClick={onRotate}
+        aria-label={`Rotate board — view from ${orientation === 'white' ? "Black's" : "White's"} side`}
+        title="Rotate board"
+      >
+        <NavIcon d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6" />
+      </button>
+
       <div className="flex w-full max-w-[min(20rem,calc(100%-5rem))] items-center">
         <button
           type="button"
@@ -535,15 +692,7 @@ export function BoardNav({
         </button>
       </div>
 
-      <button
-        type="button"
-        className={`${face} absolute right-0 rounded-md px-1.5`}
-        onClick={onRotate}
-        aria-label={`Rotate board — view from ${orientation === 'white' ? "Black's" : "White's"} side`}
-        title="Rotate board"
-      >
-        <NavIcon d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6" />
-      </button>
+      {menu?.(`${face} absolute right-0 rounded-md px-1.5`)}
       <span className="sr-only" aria-live="polite">
         {currentLabel ?? 'Starting position'}
       </span>

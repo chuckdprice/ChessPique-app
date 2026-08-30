@@ -22,10 +22,19 @@ export interface EngineSettings {
   /** Print each candidate's score at the head of its arrow on the board. */
   arrowEvals: boolean
   /**
-   * Show Maia-3's human-move predictions beside the engine's. Off by default:
-   * turning it on is what fetches the 43 MB model.
+   * Show Maia-3's human-move predictions beside the engine's. On by default,
+   * which means the 46 MB model is fetched the first time the Move Evals pane
+   * is opened — nothing downloads while the pane is shut, and every failure
+   * path still falls back to Stockfish alone.
    */
   maia: boolean
+  /**
+   * Print Maia's probability at the head of its arrow. Separate from
+   * `arrowEvals` because it answers a different question — how likely, not how
+   * good — and a board carrying both numbers on every square is a board some
+   * readers want back.
+   */
+  maiaArrowEvals: boolean
   /**
    * The rating Maia conditions on, or null to follow the review's "played like"
    * estimate for whoever is on move.
@@ -38,6 +47,64 @@ export interface EngineSettings {
   maiaRating: number | null
 }
 
+/** Rating bands the opening explorer offers, as the API's enum names them. */
+export const EXPLORER_RATINGS = [0, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2500] as const
+
+/** Game speeds, in the order Lichess lists them. */
+export const EXPLORER_SPEEDS = [
+  'ultraBullet',
+  'bullet',
+  'blitz',
+  'rapid',
+  'classical',
+  'correspondence',
+] as const
+
+export type ExplorerSpeed = (typeof EXPLORER_SPEEDS)[number]
+
+/** Rated or casual, which only the player database can filter on. */
+export const EXPLORER_MODES = ['casual', 'rated'] as const
+export type ExplorerMode = (typeof EXPLORER_MODES)[number]
+
+/** How many past opponents the player dialog offers as one-click buttons. */
+export const RECENT_PLAYERS_KEPT = 8
+
+/**
+ * The opening explorer's filters.
+ *
+ * The two databases filter on different things and at different granularities
+ * — Lichess games by speed, rating band and *month*, master games by *year*
+ * alone — so the date range is two pairs rather than one. Lichess's own panel
+ * does the same, and a year typed into a month field is the sort of thing that
+ * silently returns nothing.
+ */
+export interface ExplorerSettings {
+  db: 'masters' | 'lichess' | 'player'
+  /**
+   * Shared by the Lichess and player databases, which both filter on speed and
+   * both take a month. Masters has neither, and its own year pair below. One
+   * preference rather than two: "I care about rapid and classical" is a fact
+   * about the reader, not about which database they are looking at.
+   */
+  speeds: ExplorerSpeed[]
+  /** `YYYY-MM`, or empty for no bound. */
+  since: string
+  until: string
+  /** Lichess database only. Empty means every band. */
+  ratings: number[]
+  /** `YYYY`, or empty for no bound. Masters database. */
+  mastersSince: string
+  mastersUntil: string
+  /** Player database. The Lichess username whose games are being read. */
+  player: string
+  /** Which side to look for them on — the endpoint requires one. */
+  playerColor: 'white' | 'black'
+  /** Player database only; masters and Lichess games are all rated. */
+  modes: ExplorerMode[]
+  /** Usernames looked up before, newest first, for the player dialog. */
+  recentPlayers: string[]
+}
+
 export const DEFAULT_APPEARANCE: AppearanceSettings = {
   theme: 'tournament',
   board: 'tournament',
@@ -48,11 +115,32 @@ export const DEFAULT_ENGINE: EngineSettings = {
   multiPv: 3,
   hashMb: 128,
   arrowEvals: true,
-  maia: false,
+  maia: true,
+  maiaArrowEvals: true,
   maiaRating: null,
 }
 
+/**
+ * Everything on, and no date bounds: the API's own default is every speed and
+ * every band, and a filter nobody asked for is a filter that quietly hides
+ * games. Narrowing is what the gear is for.
+ */
+export const DEFAULT_EXPLORER: ExplorerSettings = {
+  db: 'lichess',
+  speeds: [...EXPLORER_SPEEDS],
+  since: '',
+  until: '',
+  ratings: [...EXPLORER_RATINGS],
+  mastersSince: '',
+  mastersUntil: '',
+  player: '',
+  playerColor: 'white',
+  modes: [...EXPLORER_MODES],
+  recentPlayers: [],
+}
+
 const APPEARANCE_KEY = 'chessnoter.appearance'
+const EXPLORER_KEY = 'chessnoter.explorer'
 const ENGINE_KEY = 'chessnoter.engine'
 
 function load<T>(key: string, fallback: T): T {
@@ -97,12 +185,83 @@ export function loadEngineSettings(): EngineSettings {
   // A setting saved before this one existed merges the default in as any other
   // missing key would, but a file hand-edited to a string would not.
   e.arrowEvals = e.arrowEvals !== false
-  e.maia = e.maia === true
+  e.maia = e.maia !== false
+  e.maiaArrowEvals = e.maiaArrowEvals !== false
   e.maiaRating =
     typeof e.maiaRating === 'number' && Number.isFinite(e.maiaRating)
       ? nearestRating(e.maiaRating)
       : null
   return e
+}
+
+/** `YYYY-MM` for the Lichess database, `YYYY` for masters; '' for no bound. */
+function cleanMonth(value: unknown): string {
+  return typeof value === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(value) ? value : ''
+}
+function cleanYear(value: unknown): string {
+  return typeof value === 'string' && /^\d{4}$/.test(value) ? value : ''
+}
+
+export function loadExplorerSettings(): ExplorerSettings {
+  const e = load(EXPLORER_KEY, DEFAULT_EXPLORER)
+  // Every field is re-derived from the allowed values rather than trusted: a
+  // speed or band this build no longer knows would go straight into a query
+  // string, and the endpoint answers a bad filter with a 400.
+  const speeds = Array.isArray(e.speeds)
+    ? EXPLORER_SPEEDS.filter((s) => (e.speeds as unknown[]).includes(s))
+    : DEFAULT_EXPLORER.speeds
+  const ratings = Array.isArray(e.ratings)
+    ? EXPLORER_RATINGS.filter((r) => (e.ratings as unknown[]).includes(r))
+    : DEFAULT_EXPLORER.ratings
+  const modes = Array.isArray(e.modes)
+    ? EXPLORER_MODES.filter((m) => (e.modes as unknown[]).includes(m))
+    : DEFAULT_EXPLORER.modes
+  return {
+    db: e.db === 'masters' || e.db === 'player' ? e.db : 'lichess',
+    // An empty list would ask for nothing at all rather than for everything,
+    // and no click in the panel can produce one — but a hand-edited entry can.
+    speeds: speeds.length > 0 ? [...speeds] : [...DEFAULT_EXPLORER.speeds],
+    ratings: ratings.length > 0 ? [...ratings] : [...DEFAULT_EXPLORER.ratings],
+    since: cleanMonth(e.since),
+    until: cleanMonth(e.until),
+    mastersSince: cleanYear(e.mastersSince),
+    mastersUntil: cleanYear(e.mastersUntil),
+    // Lichess usernames are 2-30 of these; anything else was never a username
+    // and would come back as a 404 dressed up as an empty explorer.
+    player: typeof e.player === 'string' && isUsername(e.player) ? e.player : '',
+    playerColor: e.playerColor === 'black' ? 'black' : 'white',
+    modes: modes.length > 0 ? [...modes] : [...DEFAULT_EXPLORER.modes],
+    recentPlayers: Array.isArray(e.recentPlayers)
+      ? (e.recentPlayers as unknown[])
+          .filter((n): n is string => typeof n === 'string' && isUsername(n))
+          .slice(0, RECENT_PLAYERS_KEPT)
+      : [],
+  }
+}
+
+/** Lichess's own rule for a username, so a typo never reaches the API. */
+export function isUsername(value: string): boolean {
+  return /^[a-zA-Z0-9][\w-]{1,29}$/.test(value)
+}
+
+/**
+ * The name moved to the front, without duplicates.
+ *
+ * Case is kept as typed — Lichess displays what you signed up with — but the
+ * comparison ignores it, because looking up the same player twice with a
+ * different capitalisation should not fill the dialog with the same person.
+ */
+export function withRecentPlayer(recent: string[], name: string): string[] {
+  const lower = name.toLowerCase()
+  return [name, ...recent.filter((n) => n.toLowerCase() !== lower)].slice(0, RECENT_PLAYERS_KEPT)
+}
+
+export function saveExplorerSettings(e: ExplorerSettings): void {
+  try {
+    localStorage.setItem(EXPLORER_KEY, JSON.stringify(e))
+  } catch {
+    /* ignore */
+  }
 }
 
 export function saveEngineSettings(e: EngineSettings): void {

@@ -40,6 +40,7 @@ export default function SettingsPage({ engine, onEngineChange }: SettingsPagePro
     engine.hashMb === DEFAULT_ENGINE.hashMb &&
     engine.arrowEvals === DEFAULT_ENGINE.arrowEvals &&
     engine.maia === DEFAULT_ENGINE.maia &&
+    engine.maiaArrowEvals === DEFAULT_ENGINE.maiaArrowEvals &&
     engine.maiaRating === DEFAULT_ENGINE.maiaRating
 
   return (
@@ -101,6 +102,15 @@ export default function SettingsPage({ engine, onEngineChange }: SettingsPagePro
             disabled
             caption="Single-threaded in browser WASM."
           />
+        </Section>
+
+        {/* The same split the two menus on the analysis page make: the gear on
+            the engine panel is Stockfish, the menu on the board is what the
+            board draws. */}
+        <Section
+          title="Board"
+          caption="What is drawn on the board. The board's own menu offers these too."
+        >
           <SwitchRow
             label="Scores on arrows"
             caption="Print each candidate move's evaluation at the head of its arrow on the board. The best move's is filled in."
@@ -112,6 +122,12 @@ export default function SettingsPage({ engine, onEngineChange }: SettingsPagePro
             caption={MAIA_CAPTION}
             checked={engine.maia}
             onChange={(v) => onEngineChange({ ...engine, maia: v })}
+          />
+          <SwitchRow
+            label="Maia % on arrows"
+            caption="Print how likely a human is to play the move at the head of its arrow. Maia scores every legal move, so the engine's candidates and the move actually played carry one too."
+            checked={engine.maiaArrowEvals}
+            onChange={(v) => onEngineChange({ ...engine, maiaArrowEvals: v })}
           />
         </Section>
       </div>

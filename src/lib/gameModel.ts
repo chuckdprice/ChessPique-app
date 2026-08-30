@@ -273,6 +273,45 @@ export interface ChartRow {
   blackPly: number | null
 }
 
+/**
+ * Where the clock chart's plot area sits inside its container, in pixels.
+ *
+ * The x axis is a band scale — one band per move number — and recharts offers
+ * no way to ask it where a band is, so the click handler and the hover readout
+ * work it out from the geometry. These are the chart's margins plus the width
+ * of the two y axes; change either there and this has to follow.
+ */
+export const CLOCK_PLOT_INSET = { left: 12 + 58, right: 8 + 48 }
+
+/**
+ * The ply a click at `clientX` picked, or null for a click outside the plot.
+ *
+ * Worked out from the geometry rather than from recharts' active-tooltip state,
+ * which is only populated by hovering: a tap that never moves a pointer first —
+ * every touch tap, and any click a test or assistive tech synthesises — arrives
+ * with no active move at all, and reading it would silently jump to move 1.
+ *
+ * Each band holds both of the move's plies — White's bar left of the tick and
+ * Black's right — so which half of the band was hit is which side was meant.
+ */
+export function plyForClockClick(
+  rows: ChartRow[],
+  plot: { left: number; right: number },
+  clientX: number,
+): number | null {
+  const left = plot.left + CLOCK_PLOT_INSET.left
+  const right = plot.right - CLOCK_PLOT_INSET.right
+  const band = (right - left) / rows.length
+  if (!(band > 0) || clientX < left || clientX > right) return null
+
+  const offset = (clientX - left) / band
+  const row = rows[Math.min(Math.floor(offset), rows.length - 1)]
+  if (!row) return null
+
+  const black = offset % 1 >= 0.5
+  return (black ? (row.blackPly ?? row.whitePly) : (row.whitePly ?? row.blackPly)) ?? null
+}
+
 /** Group per-ply timing data into one row per integer move number. */
 export function buildChartRows(moves: Move[]): ChartRow[] {
   const byNumber = new Map<number, ChartRow>()

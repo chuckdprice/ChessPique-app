@@ -566,3 +566,40 @@ describe('the flat view the rest of the app reads', () => {
     expect(mainlineMoves(promoted).map((m) => m.san)).toEqual(['e4', 'c5'])
   })
 })
+
+describe('the moves a UCI would get wrong', () => {
+  // The opening explorer plays its rows by SAN for exactly these three. Its
+  // own UCI spells castling as the king taking its rook — e1h1 for O-O — which
+  // no board accepts as a king move, and it carries no promotion piece at all.
+  it('castles on both sides', () => {
+    const opening = ['e4', 'e5', 'Nf3', 'Nc6', 'Bc4', 'Bc5']
+    const short = play(emptyTree(), [...opening, 'O-O'])
+    expect(sans(short.tree)).toEqual([...opening, 'O-O'])
+    expect(short.tree.nodes.get(short.id)?.from).toBe('e1')
+    // The king's own squares, not the rook's, which is what the arrow needs.
+    expect(short.tree.nodes.get(short.id)?.to).toBe('g1')
+
+    const long = play(emptyTree(), ['d4', 'd5', 'Bf4', 'Bf5', 'Nc3', 'Nc6', 'Qd2', 'Qd7', 'O-O-O'])
+    expect(sans(long.tree).at(-1)).toBe('O-O-O')
+    expect(long.tree.nodes.get(long.id)?.to).toBe('c1')
+  })
+
+  it('captures en passant', () => {
+    const { tree, id } = play(emptyTree(), ['e4', 'a6', 'e5', 'd5', 'exd6'])
+    expect(sans(tree).at(-1)).toBe('exd6')
+    // The pawn lands on an empty square and takes one beside it, so the
+    // destination is not where the captured pawn was.
+    expect(tree.nodes.get(id)?.to).toBe('d6')
+    expect(tree.nodes.get(id)?.fen.split(' ')[0]).not.toContain('4P3')
+  })
+
+  it('promotes to the piece the move names, not always a queen', () => {
+    const opening = ['e4', 'd5', 'e5', 'd4', 'e6', 'd3', 'exf7+', 'Kd7']
+    const queened = play(emptyTree(), [...opening, 'fxg8=Q'])
+    expect(sans(queened.tree).at(-1)).toBe('fxg8=Q')
+    // The old path passed a hard-coded queen whatever the row said, so this
+    // is the case it could not have played at all.
+    const knighted = play(emptyTree(), [...opening, 'fxg8=N'])
+    expect(sans(knighted.tree).at(-1)).toBe('fxg8=N')
+  })
+})

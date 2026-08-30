@@ -1,13 +1,25 @@
-# ChessNoteR Game Analysis
+# Chessnotes
 
-A static web app for chess games and opening repertoires: it converts PGN files exported by
-the [ChessNoteR](https://chessnoter.com) e-notation device into standard PGNs that Lichess and
-Chess.com can use, reviews the game with Stockfish, and lets you edit the moves — including
-variations — and export the result.
+A static web app for reading, editing and preparing chess games. Everything runs in the
+browser: the engines, the conversion and the editing all happen on your own machine, and no
+game you open is ever uploaded.
 
-ChessNoteR writes elapsed-move-time comments like `{[%emt 0:01:23]}` and occasional bare
-clock readings like `{56:00}`. This app converts them into one `{[%clk h:mm:ss]}` comment
-per move and normalizes the `TimeControl` tag (for example `G70/d10` → `4200d10`).
+It does four things:
+
+- **Reviews** a game with Stockfish — an evaluation bar, per-move classification, accuracy by
+  phase, and a "played like" rating estimate — and, beside that, what a human of a given
+  rating would probably have played, from Maia-3.
+- **Edits** a game as a *tree* of moves, which is what makes an opening repertoire editable
+  here rather than only a game you played.
+- **Prepares** an opening from the Lichess opening databases, including one opponent's own
+  games from the position on the board.
+- **Converts** the PGN files exported by the [ChessNoteR](https://chessnoter.com) e-notation
+  device, which is where the app started and where its name came from.
+
+That last one, in full: ChessNoteR writes elapsed-move-time comments like `{[%emt 0:01:23]}`
+and occasional bare clock readings like `{56:00}`. Chessnotes converts them into one
+`{[%clk h:mm:ss]}` comment per move and normalizes the `TimeControl` tag (for example
+`G70/d10` → `4200d10`), which is what Lichess and Chess.com understand.
 
 A game is held as a **tree of moves** rather than a list, so a position can have more than one
 continuation. That is what makes an opening repertoire editable here: alternatives sit under
@@ -29,9 +41,12 @@ the help.
   holds the `%clk` output with the switches for what goes into it above, and beneath it the
   ways out: copy, download, open on Lichess or Chess.com, or save into a Lichess study.
 - **Game Analysis**: board, engine, move list, and charts in one screen.
-- **Settings**: how the engine searches — search time, number of lines, memory. The same
-  values as the gear on the analysis page, which stays as the shortcut for while you are
-  looking at a position.
+- **Settings**: two sections, matching the two menus on the analysis page. *Engine* is how
+  Stockfish searches — search time, number of lines, memory — the same values as the gear on
+  the engine panel. *Board* is what gets drawn on the board — the arrow numbers, and whether
+  Maia runs — the same values as the menu at the end of the move-navigation row. Both menus
+  stay as the shortcut for while you are looking at a position, and both close when you click
+  anywhere else.
 - **New game**: an empty board, seeded with the Seven Tag Roster and today's date so the file
   is valid from its first move. It asks before replacing a game that has moves in it.
 
@@ -92,20 +107,30 @@ On the analysis page you can:
   carries no clocks. Even trades cancel out, so four pawns apiece show nothing and five against
   four show one pawn
 - Turn the engine on to get arrows for its top lines — shaded from best to worst — with the
-  move actually played highlighted in gold
+  move actually played highlighted in gold and drawn in orange. With **Scores on arrows** on,
+  every arrow carries its evaluation at the head, the played move's included — which is worth
+  most exactly when that move is *not* one the engine listed
 - Read the engine's verdict under every inaccuracy, mistake, and blunder in the move list. The
   line it would have played instead is added to the game as a variation of that move, so it can
   be walked with the arrow keys, promoted, or deleted like any other
 - Review the game with Stockfish 18: an eval bar beside the board, per-move classification
   (Best, Inaccuracy → Blunder; Good and Excellent stay unmarked) in the move list, on the board
-  and as dots on the evaluation graph, and five analysis tabs shown as icons that name
-  themselves on hover — Evaluation, Phase Accuracy, Move Classification, Move Times and
-  Comments. Only marked classifications are coloured in the move list (best green,
+  and as dots on the evaluation graph, and five analysis views shown as icons that name
+  themselves on hover. They sit in two panels side by side, each with its own tabs, so two are
+  open at once: the left holds Evaluation, Move Times and the Opening Explorer, the right holds
+  Phase Accuracy, Move Classification and Comments. Read the eval chart against the
+  classification counts, or keep it open beside the comment box while writing the game up. The
+  two stack on a narrow window. Only marked classifications are coloured in the move list (best green,
   inaccuracies blue, mistakes and blunders warmer); Good and Excellent are left plain so the
   moves worth finding stand out
 - See which opening was played, named over the evaluation chart as `ECO: Name`
 - Click either chart to jump the board to that move — on the Move Times chart, the left half
-  of a move is White's and the right half is Black's
+  of a move is White's and the right half is Black's. Both charts mark the move the board is
+  on with a vertical line — on the Move Times chart a dashed one, with a dot on each player's
+  remaining-time curve — and the Move Times chart reports its figures in a fixed row above
+  the plot — time left on the left, time spent on the right — which follows the pointer's move
+  as you sweep across it and falls back to the move on the board. It reads rather than
+  hovering, so nothing is ever covered by the numbers describing it
 - Play moves yourself: drag a piece, or click it and then click where it should go — a clicked
   piece marks its legal squares, a dot to move to and a red ring around a piece it can take.
   A move played at a position that already has one is kept as a **variation** of it, listed
@@ -155,6 +180,41 @@ Searched positions are remembered for as long as the tab is open, keyed by posit
 by game, so a review only pays for what is genuinely new. Adding a move to the end of a
 sixteen-move game took 21s before and 2s after.
 
+## Opening explorer
+
+The **Opening Explorer** tab on the left panel is the [Lichess opening
+explorer](https://lichess.org/analysis#explorer) for the position on the board: the moves played
+from here, how often, and how each one scored, over either the **Masters** database (OTB games
+between titled players) or the **Lichess** one (rated online games). Clicking a row plays that
+move into the game, so a line can be walked straight out of the database and kept as a
+variation, and pointing at one lays a translucent grey arrow on the board — a shadow of the
+move, drawn under the engine's own arrows rather than over them.
+
+It needs a Lichess sign-in. Lichess added an OAuth requirement to both explorer endpoints in
+early 2026, and an unauthenticated request is refused outright — so the tab offers the same
+sign-in the study export uses rather than failing. No scope beyond the default is asked for,
+and only the position on the board is ever sent.
+
+A third tab, **Player**, reads one Lichess player's games instead — their repertoire from this
+position and how it has scored, which is what you want when preparing for a game against
+someone. Pick them from the *Personal opening explorer* dialog, which remembers the last eight
+names as one-click buttons, and swap between their games as White and as Black from the header.
+Lichess indexes an account on demand, so the table fills in and sharpens as the answer streams
+in, saying where in the queue it is while it waits.
+
+The gear at the right of the chart panel's tab strip carries the filters, one set per
+database, matching Lichess's own: for the Lichess database, time control, average-rating band
+and a `YYYY-MM` range; for the player database, time control, rated or casual, and the same
+month range; for masters, a range of years — master games have no speed, rating or casual games
+to filter on. The two date ranges are kept separately, so switching databases does not throw away
+what you typed in the other, and a filter narrowed here re-asks rather than showing the wider
+answer. The choices are saved on this device.
+
+It is deliberately quiet with their server: one request in flight at a time as Lichess asks,
+a 350ms pause before a position is looked up at all (so holding an arrow key costs nothing),
+every answer cached for the life of the tab, and a full minute of silence after a 429 rather
+than retrying into it.
+
 ## Human moves (Maia 3)
 
 Stockfish answers *what is best*. **Maia-3** answers *what is tempting* — the move a human of
@@ -162,23 +222,30 @@ a given rating would actually play. The interesting case is when the two disagre
 third of 600-rated players would choose can be the one that throws the game away, and that
 collision is what this overlay puts on screen.
 
-Off by default. Switching it on in engine settings downloads a 46 MB model once and keeps it in
-IndexedDB; nothing is uploaded, and if the download or the model fails the app behaves exactly
+On by default, so the 46 MB model is fetched the first time the **Move Evals** pane is opened
+and kept in IndexedDB; nothing is uploaded, and if the download or the model fails the app behaves exactly
 as it does with Stockfish alone. Both engines run only while the **Move Evals** pane is twisted
 open — opening it starts them, closing it stops them. Open, the pane gains:
 
-- **A column of the likeliest human moves**, with probabilities, to the left of the engine's
-  lines. The two lists are independent rankings: Maia's is sorted by how likely a human is to
-  play the move, Stockfish's by how good the move is. Row 3 of one has nothing to do with row 3
-  of the other.
+- **A column of the likeliest human moves**, each with Stockfish's score for it and how likely
+  a human is to play it, to the left of the engine's lines. The two lists are independent
+  rankings: Maia's is sorted by how likely a human is to play the move, Stockfish's by how good
+  the move is. Row 3 of one has nothing to do with row 3 of the other. A move's score is the one
+  the search that covered it returned, so a move only the constrained search reached can differ
+  slightly from the same move's eval in the lines opposite; it is always the number its own
+  colour was derived from. A dash means nothing has scored the move yet.
 - **A colour per Maia move**, from that move's *own* Stockfish score, using the same win-%-loss
   thresholds and the same `--class-*` colours as the move list. Green is the engine's own choice;
   blue, orange and red are Inaccuracy, Mistake and Blunder. *Good* and *Excellent* stay in plain
   ink, exactly as they go unmarked in the move list.
-- **One violet arrow** on the board, on Maia's single likeliest move — never a set, and never
-  shaded by probability, so it never reads as another engine line. It and the played-move arrow
-  are drawn thinner than the engine's and over the top of them, so a move all three agree on
-  still shows all three rather than whichever was drawn last.
+- **A violet arrow per listed move**, faded likeliest→least the way the engine's fade
+  best→worst. Under the **Maia % on arrows** switch, *every* arrow on the board carries the
+  probability of a human playing it — the engine's candidates and the move actually played
+  included, since Maia scores every legal move. A percentage answers a different question from a
+  score, so it does not give way to one: where a square carries both, the badges stack, score
+  above percentage. Maia's arrows and the played-move arrow are drawn thinner than the engine's
+  and over the top of them, so a move all three agree on still shows all three rather than
+  whichever was drawn last.
 - **A rating**, chosen from the column's own heading (`Maia 1500: Human Moves`), from 600 to 2600
   in hundreds. It defaults to the "played like" estimate for whoever is on move, so it follows
   the level actually being played and changes with the side to move; picking a rating pins it.

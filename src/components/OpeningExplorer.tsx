@@ -300,7 +300,11 @@ export default function OpeningExplorer({
 
   return (
     <div className="flex h-full min-h-0 flex-col px-3">
-      <div className="flex items-center gap-2 pb-1">
+      {/* Wraps rather than squeezing: the player tab's label is a name and a
+          colour now, and on a phone it and the opening cannot share one line.
+          The opening drops to a second line whole, which beats either of them
+          being broken mid-phrase. */}
+      <div className="flex flex-wrap items-center gap-x-2 pb-1">
         <div role="tablist" aria-label="Opening database" className="flex gap-1">
           {(['masters', 'lichess', 'player'] as const).map((id) => (
             <button
@@ -312,53 +316,44 @@ export default function OpeningExplorer({
               // picker: the tab is useless until it has a name, and making the
               // reader find the gear to supply one is a step for nothing.
               onClick={() => {
-                if (id === 'player' && !settings.player) onPickingChange(true)
+                // Clicking the player tab when it is already the one showing
+                // asks who to show — the name is in the tab now, so the tab is
+                // where you go to change it. The colour swap lives in the gear.
+                if (id === 'player' && (!settings.player || db === 'player')) {
+                  onPickingChange(true)
+                }
                 onSettingsChange({ ...settings, db: id })
               }}
-              className={`rounded-md px-2 py-0.5 text-xs font-semibold transition-colors ${
+              className={`whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-semibold transition-colors ${
                 db === id ? 'bg-buff-soft text-ink' : 'text-ink-mute hover:text-ink'
               }`}
             >
-              {id === 'masters' ? 'Masters' : id === 'lichess' ? 'Lichess' : 'Player'}
+              {/* The player tab carries whose games it is showing, but only
+                  while it is the one showing them: unselected it is just the
+                  name of a database, like the two beside it. */}
+              {id === 'masters'
+                ? 'Masters'
+                : id === 'lichess'
+                  ? 'Lichess'
+                  : db === 'player' && settings.player
+                    ? `Player (${settings.player} as ${settings.playerColor})`
+                    : 'Player'}
             </button>
           ))}
         </div>
         {/* The opening's name is the header on lichess too, and it is the one
             thing here that names what you are looking at. */}
-        {/* Whose games, then what the position is called — the opening keeps
-            the same place it has on the other two tabs, with the player in
-            front of it rather than instead of it. Both halves are the control
-            for the thing they name. */}
-        <span className="flex min-w-0 flex-1 items-baseline gap-1 overflow-hidden text-xs">
-          {db === 'player' && settings.player && (
-            <>
-              <button
-                type="button"
-                onClick={() => onPickingChange(true)}
-                title="Look up a different player"
-                className="max-w-32 shrink-0 truncate font-semibold text-ink hover:underline"
-              >
-                {settings.player}
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  onSettingsChange({
-                    ...settings,
-                    playerColor: settings.playerColor === 'white' ? 'black' : 'white',
-                  })
-                }
-                title="Look for their games on the other side"
-                className="shrink-0 text-ink-mute hover:underline"
-              >
-                ({settings.playerColor})
-              </button>
-            </>
-          )}
-          <span className="min-w-0 truncate font-semibold text-felt-bright">
-            {result?.opening ? `${result.opening.eco} ${result.opening.name}` : ''}
+        {/* What the position is called, after whichever tab is showing it and
+            in the same place for all three. The pipe is a separator, so it
+            only appears when there is something to separate. */}
+        {result?.opening && (
+          <span className="flex min-w-0 flex-1 items-baseline gap-1.5 overflow-hidden text-xs">
+            <span className="shrink-0 text-ink-mute">|</span>
+            <span className="min-w-0 truncate font-semibold text-felt-bright">
+              {`${result.opening.eco} ${result.opening.name}`}
+            </span>
           </span>
-        </span>
+        )}
         {loading && (
           <span className="shrink-0 text-[10px] text-ink-mute">
             {/* The player database indexes an account on demand, and says how

@@ -12,8 +12,19 @@
  * and its engine review, which is the very thing the user is trying to save.
  */
 
-/** Identifies this app on the Lichess authorization screen. */
-const CLIENT_ID = 'https://chessnoter.vercel.app/'
+/**
+ * Identifies this app on the Lichess authorization screen.
+ *
+ * Whatever origin the app is being served from, rather than a domain written
+ * down here: lila does not tie the client id to the redirect at all — its own
+ * error text for a missing one reads "client_id required (choose any)" — it is
+ * only a label on the consent screen and a value that has to stay the same
+ * between the two calls of one sign-in. Deriving it means the screen names the
+ * site you are actually on, and that a domain rename cannot leave it lying.
+ */
+function clientId(): string {
+  return redirectUri()
+}
 
 /**
  * Everything the Studies API offers: reading private studies and creating or
@@ -290,7 +301,7 @@ export async function signIn(
     const state = randomString()
     const url = new URL(AUTHORIZE_URL)
     url.searchParams.set('response_type', 'code')
-    url.searchParams.set('client_id', CLIENT_ID)
+    url.searchParams.set('client_id', clientId())
     url.searchParams.set('redirect_uri', redirectUri())
     url.searchParams.set('scope', SCOPES)
     url.searchParams.set('code_challenge_method', 'S256')
@@ -314,7 +325,7 @@ export async function signIn(
         code,
         code_verifier: verifier,
         redirect_uri: redirectUri(),
-        client_id: CLIENT_ID,
+        client_id: clientId(),
       }),
     })
     if (!response.ok) {

@@ -105,7 +105,7 @@ const NEXT_MOVE_ARROW = 'rgba(244, 130, 32, 0.95)'
 const MAIA_ARROW = 'var(--maia)'
 
 /** Credited in every converted PGN, so a shared file says where it came from. */
-const ANNOTATOR_URL = 'https://chessnoter.vercel.app/'
+const ANNOTATOR_URL = 'https://chessnotes.vercel.app/'
 
 /**
  * The Seven Tag Roster a game started here begins with.

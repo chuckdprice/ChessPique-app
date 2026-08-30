@@ -52,7 +52,7 @@ the help.
 
 ### What goes into the converted PGN
 
-Every converted game is tagged `[Annotator "https://chessnoter.vercel.app/"]`, so a file that
+Every converted game is tagged `[Annotator "https://chessnotes.vercel.app/"]`, so a file that
 gets passed around says where it was made, and `ECO` / `Opening` whenever the opening is known
 (see [Opening names](#opening-names)). All three are shown read-only in the *PGN Header Editor*
 whether or not the source file carried them — the opening as one `ECO: Name` field, since it

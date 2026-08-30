@@ -362,7 +362,7 @@ the harness's drag tool (mouse events) cannot move a piece. Drive it with a
 
 ## State of play
 
-Deployed at <https://chessnoter.vercel.app> from `main` (auto-deploy on push).
+Deployed at <https://chessnotes.vercel.app> from `main` (auto-deploy on push).
 The version in the header is `major.minor` from `package.json` plus a build
 number derived from the commit's timestamp, so it changes on every commit.
 
@@ -371,10 +371,19 @@ began as a converter for ChessNoteR's `%emt` clocks and was named after them,
 and it has grown into a reviewer, a repertoire editor and an opening-preparation
 tool. ChessNoteR is still credited — the conversion is still there and still the
 way most games get in — but the header no longer links out, and the credit lives
-in the help where the conversion is explained. What is *not* renamed: the
-`chessnoter.vercel.app` deployment, the `ChessNoteR-app` remote, this working
-directory, and every reference to the ChessNoteR *device* and its file format,
+in the help where the conversion is explained. The Vercel project and domain followed
+(`chessnotes-app`, `chessnotes.vercel.app`), which is what `ANNOTATOR_URL`
+writes into every converted PGN. What is *not* renamed: the `ChessNoteR-app`
+git remote, this working directory, the `chessnoter.*` localStorage keys —
+renaming those would silently drop everyone's saved settings and their Lichess
+session — and every reference to the ChessNoteR *device* and its file format,
 which are a real product and not this app.
+
+The Lichess sign-in survives a domain rename by construction: the redirect URI
+is built from `window.location`, and the client id is now derived the same way
+rather than naming a domain. lila does not tie the two together — its error for
+a missing client id says "choose any" — so it is only the label on the consent
+screen.
 
 **v2.1 shipped on 16 August 2026.** Two tags bracket it: `v2.1.0` on the release
 merge, `v2.0-final` on the last v2.0 release, which is what a rollback goes back

@@ -77,7 +77,7 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
           <Section title="What it does">
             <p>
-              <strong>Chessnotes</strong> is somewhere to keep, read and prepare chess games in
+              <strong>ChessPique</strong> is somewhere to keep, read and prepare chess games in
               the browser. Nothing you load is uploaded anywhere: the engines, the conversion
               and the editing all run on this machine.
             </p>
@@ -92,7 +92,7 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
                 ChessNoteR
               </a>{' '}
               writes each move's elapsed time as <code>{'{[%emt 0:01:23]}'}</code>, which most
-              chess sites ignore. Chessnotes rebuilds those into the running clock comments{' '}
+              chess sites ignore. ChessPique rebuilds those into the running clock comments{' '}
               <code>{'{[%clk 1:07:00]}'}</code> that Lichess and Chess.com understand, and tidies
               the <Ui>TimeControl</Ui> tag. A PGN that already has <code>%clk</code> times works
               too, as does a plain move list with no clocks at all — you just won't get the
@@ -114,6 +114,12 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               And it reads the Lichess opening databases from the position on the board, one
               player's games included, which is how you prepare for an opponent you are about to
               face.
+            </p>
+            <p>
+              What it remembers, it remembers here: the theme and board, how the engine
+              searches, what the board draws, the explorer's filters and the players you have
+              looked up, and your Lichess sign-in until it expires. Games are not among them —
+              a game lives in the tab until you export it, so keep the PGN.
             </p>
           </Section>
 
@@ -345,7 +351,7 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
             <p>
               This one tab needs a Lichess sign-in: Lichess now requires one for its explorer, so
               the panel offers the same sign-in the study export uses. Only the position on the
-              board is ever sent, and Chessnotes keeps to one request at a time so as not to lean
+              board is ever sent, and ChessPique keeps to one request at a time so as not to lean
               on their server.
             </p>
             <p>

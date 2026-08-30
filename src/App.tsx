@@ -105,7 +105,7 @@ const NEXT_MOVE_ARROW = 'rgba(244, 130, 32, 0.95)'
 const MAIA_ARROW = 'var(--maia)'
 
 /** Credited in every converted PGN, so a shared file says where it came from. */
-const ANNOTATOR_URL = 'https://chessnotes.vercel.app/'
+const ANNOTATOR_URL = 'https://chesspique.vercel.app/'
 
 /**
  * The Seven Tag Roster a game started here begins with.
@@ -962,7 +962,7 @@ export default function App() {
                 it has grown into something wider than that. ChessNoteR is
                 still credited, in the help where the conversion is explained. */}
             <h1 className="font-display text-xl font-semibold leading-tight tracking-tight">
-              Chessnotes
+              ChessPique
             </h1>
             <p className="text-[11px] leading-tight text-buff/70">
               <span className="font-score">v{__APP_VERSION__}</span>

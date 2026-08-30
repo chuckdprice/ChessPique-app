@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { BOARDS, PIECE_SETS, THEMES, boardById, pieceSetById, themeById } from './appearance'
 import type { ThemeVar } from './appearance'
+import { legacyKey, readStored } from './storage'
 import {
   DEFAULT_APPEARANCE,
   DEFAULT_EXPLORER,
@@ -84,20 +85,20 @@ describe('loadAppearance', () => {
   // accent name. Both fields are gone; a stored one must not survive as a theme
   // id, and must not be written back out either.
   it('turns the old dark preference into a dark theme', () => {
-    localStorage.setItem('chessnoter.appearance', JSON.stringify({ theme: 'dark', accent: 'blue' }))
+    localStorage.setItem('chesspique.appearance', JSON.stringify({ theme: 'dark', accent: 'blue' }))
     const loaded = loadAppearance()
     expect(themeById(loaded.theme).base).toBe('dark')
     expect(loaded).not.toHaveProperty('accent')
   })
 
   it('turns the old light preference into a light theme', () => {
-    localStorage.setItem('chessnoter.appearance', JSON.stringify({ theme: 'light', accent: 'red' }))
+    localStorage.setItem('chesspique.appearance', JSON.stringify({ theme: 'light', accent: 'red' }))
     expect(loadAppearance().theme).toBe(DEFAULT_APPEARANCE.theme)
   })
 
   it('replaces a board or piece set that no longer exists', () => {
     localStorage.setItem(
-      'chessnoter.appearance',
+      'chesspique.appearance',
       JSON.stringify({ theme: 'arctic', board: 'gone', pieces: 'gone' }),
     )
     expect(loadAppearance()).toEqual({
@@ -108,7 +109,7 @@ describe('loadAppearance', () => {
   })
 
   it('survives a corrupt entry', () => {
-    localStorage.setItem('chessnoter.appearance', '{not json')
+    localStorage.setItem('chesspique.appearance', '{not json')
     expect(loadAppearance()).toEqual(DEFAULT_APPEARANCE)
   })
 })
@@ -131,7 +132,7 @@ describe('engine settings', () => {
 
   it('keeps a switch the reader turned off', () => {
     localStorage.setItem(
-      'chessnoter.engine',
+      'chesspique.engine',
       JSON.stringify({ maia: false, maiaArrowEvals: false }),
     )
     const e = loadEngineSettings()
@@ -140,7 +141,7 @@ describe('engine settings', () => {
   })
 
   it('gives settings saved before the arrow switch existed the default', () => {
-    localStorage.setItem('chessnoter.engine', JSON.stringify({ maia: true, multiPv: 4 }))
+    localStorage.setItem('chesspique.engine', JSON.stringify({ maia: true, multiPv: 4 }))
     const e = loadEngineSettings()
     expect(e.maiaArrowEvals).toBe(true)
     expect(e.multiPv).toBe(4)
@@ -163,7 +164,7 @@ describe('opening explorer settings', () => {
 
   it('keeps a saved filter, in the canonical order', () => {
     localStorage.setItem(
-      'chessnoter.explorer',
+      'chesspique.explorer',
       JSON.stringify({ db: 'masters', speeds: ['rapid', 'blitz'], ratings: [1800, 1400] }),
     )
     const e = loadExplorerSettings()
@@ -176,7 +177,7 @@ describe('opening explorer settings', () => {
 
   it('drops a speed or band this build does not know', () => {
     localStorage.setItem(
-      'chessnoter.explorer',
+      'chesspique.explorer',
       JSON.stringify({ speeds: ['blitz', 'hyperbullet'], ratings: [1600, 4000] }),
     )
     const e = loadExplorerSettings()
@@ -185,7 +186,7 @@ describe('opening explorer settings', () => {
   })
 
   it('refuses a filter that would ask for nothing at all', () => {
-    localStorage.setItem('chessnoter.explorer', JSON.stringify({ speeds: [], ratings: [] }))
+    localStorage.setItem('chesspique.explorer', JSON.stringify({ speeds: [], ratings: [] }))
     const e = loadExplorerSettings()
     expect(e.speeds).toEqual(DEFAULT_EXPLORER.speeds)
     expect(e.ratings).toEqual(DEFAULT_EXPLORER.ratings)
@@ -193,7 +194,7 @@ describe('opening explorer settings', () => {
 
   it('throws away a date that is not the shape its endpoint takes', () => {
     localStorage.setItem(
-      'chessnoter.explorer',
+      'chesspique.explorer',
       JSON.stringify({
         since: '2024',
         until: '2024-13',
@@ -221,7 +222,7 @@ describe('the player database\'s settings', () => {
 
   it('throws away anything that is not a Lichess username', () => {
     localStorage.setItem(
-      'chessnoter.explorer',
+      'chesspique.explorer',
       JSON.stringify({ player: 'not a username', recentPlayers: ['DragonBeard', 'x', 12] }),
     )
     const e = loadExplorerSettings()
@@ -233,7 +234,7 @@ describe('the player database\'s settings', () => {
 
   it('keeps a valid player, colour and mode', () => {
     localStorage.setItem(
-      'chessnoter.explorer',
+      'chesspique.explorer',
       JSON.stringify({ player: 'DragonBeard', playerColor: 'black', modes: ['rated'] }),
     )
     const e = loadExplorerSettings()
@@ -243,7 +244,7 @@ describe('the player database\'s settings', () => {
   })
 
   it('falls back to white for a colour the endpoint would refuse', () => {
-    localStorage.setItem('chessnoter.explorer', JSON.stringify({ playerColor: 'either' }))
+    localStorage.setItem('chesspique.explorer', JSON.stringify({ playerColor: 'either' }))
     expect(loadExplorerSettings().playerColor).toBe('white')
   })
 
@@ -259,5 +260,53 @@ describe('the player database\'s settings', () => {
     for (let i = 0; i < 20; i += 1) recent = withRecentPlayer(recent, `player${i}`)
     expect(recent).toHaveLength(8)
     expect(recent[0]).toBe('player19')
+  })
+})
+
+describe('the keys the rename left behind', () => {
+  beforeEach(() => {
+    globalThis.localStorage = fakeStorage()
+  })
+  afterEach(() => {
+    localStorage.clear()
+  })
+
+  it('knows what each key used to be called', () => {
+    expect(legacyKey('chesspique.engine')).toBe('chessnoter.engine')
+    expect(legacyKey('chesspique.lichess')).toBe('chessnoter.lichess')
+    // Not one of ours: nothing to migrate from.
+    expect(legacyKey('someone.else')).toBeNull()
+  })
+
+  it('adopts what the old name held, and takes the old name away', () => {
+    localStorage.setItem('chessnoter.engine', '{"multiPv":5}')
+    expect(readStored('chesspique.engine')).toBe('{"multiPv":5}')
+    // Moved, not copied: a stale value left behind could come back later and
+    // read as settings rising from the dead.
+    expect(localStorage.getItem('chesspique.engine')).toBe('{"multiPv":5}')
+    expect(localStorage.getItem('chessnoter.engine')).toBeNull()
+  })
+
+  it('prefers the new name when both exist', () => {
+    localStorage.setItem('chessnoter.engine', '{"multiPv":1}')
+    localStorage.setItem('chesspique.engine', '{"multiPv":5}')
+    expect(readStored('chesspique.engine')).toBe('{"multiPv":5}')
+  })
+
+  it('carries real settings across the rename', () => {
+    // What a browser that last ran the app under its old name is holding.
+    localStorage.setItem('chessnoter.appearance', JSON.stringify({ theme: 'arctic' }))
+    localStorage.setItem('chessnoter.engine', JSON.stringify({ multiPv: 5, maia: false }))
+    localStorage.setItem('chessnoter.explorer', JSON.stringify({ db: 'masters' }))
+
+    expect(loadAppearance().theme).toBe('arctic')
+    expect(loadEngineSettings().multiPv).toBe(5)
+    expect(loadEngineSettings().maia).toBe(false)
+    expect(loadExplorerSettings().db).toBe('masters')
+  })
+
+  it('is quiet when there is nothing under either name', () => {
+    expect(readStored('chesspique.engine')).toBeNull()
+    expect(loadEngineSettings().multiPv).toBe(3)
   })
 })

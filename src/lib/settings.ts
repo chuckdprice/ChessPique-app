@@ -1,6 +1,7 @@
 /** Persisted user settings: appearance (theme, board, pieces) and engine options. */
 
 import { BOARDS, PIECE_SETS, THEMES, boardById, themeById } from './appearance'
+import { readStored } from './storage'
 import { nearestRating } from './maia/model'
 
 export interface AppearanceSettings {
@@ -139,13 +140,15 @@ export const DEFAULT_EXPLORER: ExplorerSettings = {
   recentPlayers: [],
 }
 
-const APPEARANCE_KEY = 'chessnoter.appearance'
-const EXPLORER_KEY = 'chessnoter.explorer'
-const ENGINE_KEY = 'chessnoter.engine'
+const APPEARANCE_KEY = 'chesspique.appearance'
+const EXPLORER_KEY = 'chesspique.explorer'
+const ENGINE_KEY = 'chesspique.engine'
 
 function load<T>(key: string, fallback: T): T {
   try {
-    const raw = localStorage.getItem(key)
+    // readStored, not getItem: these keys were `chessnoter.*` before the app
+    // was renamed, and a reader's saved settings move across on first read.
+    const raw = readStored(key)
     if (!raw) return fallback
     return { ...fallback, ...(JSON.parse(raw) as Partial<T>) }
   } catch {

@@ -12,7 +12,13 @@ import type { ExplorerMove, ExplorerResult } from '../lib/lichess/explorer'
 import { EXPLORER_MODES, EXPLORER_RATINGS, EXPLORER_SPEEDS, withRecentPlayer } from '../lib/settings'
 import type { ExplorerSettings } from '../lib/settings'
 import PlayerDialog from './PlayerDialog'
-import { loadSession, openSignInWindow, saveSession, signIn } from '../lib/lichess/oauth'
+import {
+  clearSession,
+  loadSession,
+  openSignInWindow,
+  saveSession,
+  signIn,
+} from '../lib/lichess/oauth'
 import type { LichessSession } from '../lib/lichess/oauth'
 import { fetchAccount } from '../lib/lichess/studies'
 
@@ -233,6 +239,10 @@ export default function OpeningExplorer({
                 'step to another position after that to try again.',
             )
           } else if (failure instanceof ExplorerAuthError) {
+            // Drop it from storage too, not just from this component: a token
+            // Lichess has stopped accepting would otherwise be loaded and
+            // spent again on every mount.
+            clearSession()
             setSession(null)
             setError(null)
           } else if (failure instanceof ExplorerNeedsPlayerError) {

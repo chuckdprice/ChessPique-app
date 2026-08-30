@@ -7,7 +7,7 @@ export default function BrandMark({ size = 34 }: { size?: number }) {
   return (
     <img
       src={`${import.meta.env.BASE_URL}icon.svg`}
-      alt="Chessnotes"
+      alt="ChessPique"
       width={size}
       height={size}
       className="shrink-0"

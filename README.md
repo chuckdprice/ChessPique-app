@@ -1,4 +1,4 @@
-# Chessnotes
+# ChessPique
 
 A static web app for reading, editing and preparing chess games. Everything runs in the
 browser: the engines, the conversion and the editing all happen on your own machine, and no
@@ -14,10 +14,10 @@ It does four things:
 - **Prepares** an opening from the Lichess opening databases, including one opponent's own
   games from the position on the board.
 - **Converts** the PGN files exported by the [ChessNoteR](https://chessnoter.com) e-notation
-  device, which is where the app started and where its name came from.
+  device, which is where the app started and still how most games get in.
 
 That last one, in full: ChessNoteR writes elapsed-move-time comments like `{[%emt 0:01:23]}`
-and occasional bare clock readings like `{56:00}`. Chessnotes converts them into one
+and occasional bare clock readings like `{56:00}`. ChessPique converts them into one
 `{[%clk h:mm:ss]}` comment per move and normalizes the `TimeControl` tag (for example
 `G70/d10` → `4200d10`), which is what Lichess and Chess.com understand.
 
@@ -52,7 +52,7 @@ the help.
 
 ### What goes into the converted PGN
 
-Every converted game is tagged `[Annotator "https://chessnotes.vercel.app/"]`, so a file that
+Every converted game is tagged `[Annotator "https://chesspique.vercel.app/"]`, so a file that
 gets passed around says where it was made, and `ECO` / `Opening` whenever the opening is known
 (see [Opening names](#opening-names)). All three are shown read-only in the *PGN Header Editor*
 whether or not the source file carried them — the opening as one `ECO: Name` field, since it
@@ -429,6 +429,25 @@ from this app's own origin rather than a third party — see
 [`public/maia3/NOTICE.md`](public/maia3/NOTICE.md) for the attribution, the source
 links and the ICLR 2026 citation. The corresponding source for this application is
 this repository, which is public.
+
+## What is kept in your browser
+
+Nothing is ever uploaded, so everything ChessPique remembers is remembered here, in
+`localStorage`, under four keys:
+
+| Key | Holds |
+| --- | --- |
+| `chesspique.appearance` | theme, board colours, piece set |
+| `chesspique.engine` | Stockfish's search settings, and what the board draws |
+| `chesspique.explorer` | opening explorer database, filters, and the players looked up |
+| `chesspique.lichess` | the Lichess sign-in, until it expires or you sign out |
+
+Games are not among them: a game lives in the tab until you export it. Clearing site data for
+this site resets the app to a first visit and signs you out of Lichess, and nothing else.
+
+These keys were `chessnoter.*` until the app was renamed on 30 August 2026. The first read
+under each new name adopts whatever the old one held and removes the old key, so a rename
+costs nobody their settings or their signed-in session.
 
 ## How clocks are computed
 

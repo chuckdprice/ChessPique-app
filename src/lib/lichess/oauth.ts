@@ -12,6 +12,8 @@
  * and its engine review, which is the very thing the user is trying to save.
  */
 
+import { readStored } from '../storage'
+
 /**
  * Identifies this app on the Lichess authorization screen.
  *
@@ -34,7 +36,7 @@ export const SCOPES = 'study:read study:write'
 
 const AUTHORIZE_URL = 'https://lichess.org/oauth'
 const TOKEN_URL = 'https://lichess.org/api/token'
-const STORAGE_KEY = 'chessnoter.lichess'
+const STORAGE_KEY = 'chesspique.lichess'
 /**
  * How the pop-up hands its result back: a BroadcastChannel, with localStorage
  * as the fallback (writing fires a `storage` event in every other window).
@@ -46,8 +48,8 @@ const STORAGE_KEY = 'chessnoter.lichess'
  * Both were observed in the field. These two channels only need the windows
  * to share an origin, which they always do.
  */
-const RESULT_CHANNEL = 'chessnoter.lichess-oauth'
-const RESULT_KEY = 'chessnoter.lichess-oauth-result'
+const RESULT_CHANNEL = 'chesspique.lichess-oauth'
+const RESULT_KEY = 'chesspique.lichess-oauth-result'
 /**
  * The state of a sign-in currently in flight, written before the pop-up is
  * sent to Lichess. It is what tells the returning document that it is a
@@ -55,7 +57,7 @@ const RESULT_KEY = 'chessnoter.lichess-oauth-result'
  * redirect URI's query with `code` and `state` rather than adding to it
  * (lila, Protocol.scala: `value.withQuery(s"code=...&state=...")`).
  */
-const PENDING_KEY = 'chessnoter.lichess-oauth-pending'
+const PENDING_KEY = 'chesspique.lichess-oauth-pending'
 /** A sign-in older than this was abandoned; its code is no longer expected. */
 const PENDING_TTL_MS = 10 * 60 * 1000
 
@@ -127,7 +129,9 @@ function setPendingState(state: string | null): void {
 
 export function loadSession(): LichessSession | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    // The one stored value a rename must not lose: signing out everybody who
+    // had signed in would be the whole cost of the new name. See storage.ts.
+    const raw = readStored(STORAGE_KEY)
     if (!raw) return null
     const session = JSON.parse(raw) as LichessSession
     if (!session.token || session.expiresAt < Date.now()) return null

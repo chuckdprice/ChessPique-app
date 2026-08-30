@@ -365,15 +365,19 @@ this repository, which is public.
 
 ## How clocks are computed
 
-The logic mirrors `chessnoter_clk_convert.py` (kept in this repo as the reference
-implementation):
+The logic follows `chessnoter_clk_convert.py` (kept in this repo as the reference
+implementation) except where noted:
 
 - Bare clock comments (`{56:00}`) and existing `[%clk]` comments are authoritative anchors.
-- **Delay** (e.g. `G70/d10`): a move within the delay costs nothing; otherwise the full
-  elapsed time is subtracted.
-- **Increment** (e.g. `G90+30`): a move within the increment adds the unused portion;
-  otherwise the full elapsed time is subtracted.
+- **Delay** (e.g. `G70/d10`): the delay is free time, so a move costs whatever it
+  spent beyond it — nothing at all if it finished within the delay.
+- **Increment** (e.g. `G90+30`): the increment is paid after every move, so a move
+  costs its elapsed time less the increment, and a quick one leaves the clock higher.
 - Moves with no timing data reuse the previous clock and produce a warning.
+
+The Python reference subtracts the *whole* elapsed time once a move passes the
+delay or increment, which charges the bonus a second time on every such move and
+compounds over a game. This app does not.
 
 If the PGN has no usable `TimeControl` tag, the app asks for the starting time and
 delay/increment via the "Time control override" fields.

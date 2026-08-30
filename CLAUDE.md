@@ -94,6 +94,15 @@ the harness's drag tool (mouse events) cannot move a piece. Drive it with a
   boundary with `mainlinePlyOf` and `nodeAtMainlinePly`. Looking analysis up by
   a ply you did not check is on the mainline is a real bug that has happened
   once: a variation move quietly borrowed the mainline's verdict at that depth.
+- **The converter deliberately disagrees with `chessnoter_clk_convert.py` about
+  delay and increment.** The Python reference subtracts the entire elapsed time
+  once a move exceeds the bonus, which charges the bonus twice on every such
+  move; over a G70/d10 game that ran Chuck's clock to zero on move 37 of a game
+  he finished with 35 seconds. `applyTimeRule` now spends `emt - bonus`
+  throughout. Measured against the 13 scoresheet clock readings in that game,
+  the corrected rule is off by a mean 7.8s and the old one by 35.7s, always low.
+  `converted_game.pgn` is a golden file of *this* app's output, so don't
+  "restore" it to the Python script's numbers.
 - **Don't run `npx prettier`.** There is no config, so it applies its own
   defaults — semicolons and double quotes — and reformats an entire file against
   the house style (no semicolons, single quotes). It produced a 220-line diff

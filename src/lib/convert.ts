@@ -417,22 +417,19 @@ export function applyTimeRule(
   emtSeconds: number,
   tc: TimeControl,
 ): number {
-  // Delay mode: if elapsed time is within the delay, clock is unchanged;
-  // otherwise subtract the full elapsed time.
+  // Both bonuses are the same arithmetic: the clock pays for the move minus
+  // whatever the time control gives back. A delay gives back at most the move
+  // itself, so it can never raise the clock; an increment is paid in full and
+  // can. Subtracting the whole elapsed time once it passed the delay — which
+  // this did until Chuck found a game where it flagged him on move 37 and the
+  // real clock had 35 seconds on it — charges the delay again on every move,
+  // and the error compounds over a long game.
   if (tc.mode === 'delay' && tc.amountSeconds) {
-    if (emtSeconds <= tc.amountSeconds) {
-      return previousClock
-    }
-    return previousClock - emtSeconds
+    return previousClock - Math.max(0, emtSeconds - tc.amountSeconds)
   }
 
-  // Increment mode: if elapsed time is within the increment, add the unused
-  // increment; otherwise subtract the full elapsed time.
   if (tc.mode === 'increment' && tc.amountSeconds) {
-    if (emtSeconds <= tc.amountSeconds) {
-      return previousClock + (tc.amountSeconds - emtSeconds)
-    }
-    return previousClock - emtSeconds
+    return previousClock - emtSeconds + tc.amountSeconds
   }
 
   return previousClock - emtSeconds
@@ -483,9 +480,9 @@ export function calculateClocks(moves: Move[], tc: TimeControl | null): string[]
  * delay — both leave the clock untouched — so an unmoved clock reads as the full
  * delay. That is an upper bound, not a measurement.
  *
- * Note this is the physical clock's behaviour, not the inverse of applyTimeRule,
- * which subtracts the entire elapsed time once it exceeds the delay. Round-trip
- * of a PGN this app converted will therefore not reproduce the original %emt.
+ * This is the exact inverse of applyTimeRule everywhere the drop is non-zero,
+ * so a PGN this app converted round-trips to its original %emt; only the moves
+ * inside the delay lose the distinction described above.
  */
 export function deriveSpentTimes(moves: Move[], tc: TimeControl | null): void {
   const previous: Record<'w' | 'b', number | null> = {

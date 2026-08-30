@@ -87,9 +87,12 @@ describe('parseTimecontrolHeader', () => {
 describe('convertPgn on the ChessNoteR sample game', () => {
   const result = convertPgn(samplePgn)
 
-  it('matches the reference converter movetext exactly', () => {
-    // converted_game.pgn was produced by chessnoter_clk_convert.py (its
+  it('matches the golden movetext exactly', () => {
+    // converted_game.pgn started as chessnoter_clk_convert.py's output (its
     // player-name headers were later hand-edited, so compare movetext only).
+    // Its clocks were regenerated when the delay rule was fixed: the Python
+    // reference charges the delay twice on every move past it, so the two
+    // deliberately no longer agree.
     const expectedMovetext = expectedPgn.split('\n\n')[1].trim()
     const actualMovetext = result.pgn.split('\n\n')[1].trim()
     expect(actualMovetext).toBe(expectedMovetext)
@@ -135,8 +138,8 @@ describe('convertPgn on the ChessNoteR sample game', () => {
     expect(clockAtPly(moves, ply, 'b', start)).toBe(moves[15].clkSeconds)
 
     // Past the final move, the last known clock persists for both.
-    expect(clockAtPly(moves, moves.length, 'w', start)).toBe(1607) // 29. Qb7# 0:26:47
-    expect(clockAtPly(moves, moves.length, 'b', start)).toBe(3013) // 28... Kb8 0:50:13
+    expect(clockAtPly(moves, moves.length, 'w', start)).toBe(1627) // 29. Qb7# 0:27:07
+    expect(clockAtPly(moves, moves.length, 'b', start)).toBe(3073) // 28... Kb8 0:51:13
   })
 
   it('builds one chart row per move number', () => {
@@ -144,6 +147,32 @@ describe('convertPgn on the ChessNoteR sample game', () => {
     expect(rows).toHaveLength(29)
     expect(rows[28].whiteSan).toBe('Qb7#')
     expect(rows[28].blackSan).toBeNull()
+  })
+})
+
+describe('a delay is free time', () => {
+  // Chuck's game of 25 August 2026: G70/d10, and he finished it with well
+  // under a minute on his clock. Charging the full elapsed time on every move
+  // past the delay ran him to 0:00:00 around move 37 — a flag he never lost.
+  const flynn = readFileSync(
+    join(fixtures, 'Flynn-Price-DCC August Tuesdays-4-2026.08.25.pgn'),
+    'utf-8',
+  )
+
+  it('leaves Black on the clock he actually finished with', () => {
+    const { moves } = convertPgn(flynn)
+    const black = moves.filter((m) => m.color === 'b')
+    expect(black.every((m) => m.clkSeconds !== null && m.clkSeconds > 0)).toBe(true)
+    // 43. Rh8# ends it with Black on 35s: the last anchor, 31... Rg7 {06:45},
+    // less each later move's time beyond the delay.
+    expect(black[black.length - 1].clkSeconds).toBe(35)
+  })
+
+  it('charges a move only what it spends past the delay', () => {
+    const pgn = ['[TimeControl "G70/d10"]', '', '1. d4 {[%emt 0:00:25]} d5 {[%emt 0:00:09]} *']
+    const { moves } = convertPgn(pgn.join('\n'))
+    expect(moves[0].clkSeconds).toBe(4200 - 15)
+    expect(moves[1].clkSeconds).toBe(4200)
   })
 })
 
@@ -155,10 +184,10 @@ describe('convertPgn edge cases', () => {
       '1. e4 {[%emt 0:00:04]} e5 {[%emt 0:00:30]} *',
     ].join('\n')
     const { moves } = convertPgn(pgn)
-    // 4s move within 10s increment: 300 + (10 - 4) = 306
+    // 4s move within 10s increment: 300 - 4 + 10 = 306
     expect(moves[0].clkSeconds).toBe(306)
-    // 30s move beyond increment: 300 - 30 = 270
-    expect(moves[1].clkSeconds).toBe(270)
+    // 30s move beyond it is the same arithmetic: 300 - 30 + 10 = 280
+    expect(moves[1].clkSeconds).toBe(280)
   })
 
   it('warns and reuses the clock when timing is missing', () => {
@@ -173,7 +202,8 @@ describe('convertPgn edge cases', () => {
     expect(() => convertPgn(pgn)).toThrow(ConvertError)
     const { moves, timeControl } = convertPgn(pgn, { startMinutes: 70, delay: 10 })
     expect(timeControl).toEqual({ startSeconds: 4200, mode: 'delay', amountSeconds: 10 })
-    expect(moves[0].clkSeconds).toBe(4200 - 30)
+    // A delay is free time, so a 30s move under d10 costs 20s.
+    expect(moves[0].clkSeconds).toBe(4200 - 20)
   })
 
   it('rejects a PGN with no moves', () => {
@@ -283,7 +313,7 @@ describe('move comments', () => {
     const { moves, result, pgn } = convertPgn(annotated)
     expect(pgn).not.toContain('a solid reply')
     const withComments = buildPgn([], moves, result, { comments: true })
-    expect(withComments).toContain('{[%clk 1:09:48] a solid reply}')
+    expect(withComments).toContain('{[%clk 1:09:58] a solid reply}')
   })
 
   it('strips a stray brace that would corrupt the comment it is written into', () => {

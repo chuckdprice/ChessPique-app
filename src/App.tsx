@@ -18,6 +18,7 @@ import { importPgn, LichessApiError } from './lib/lichess/studies'
 import { clearSession, loadSession } from './lib/lichess/oauth'
 import { tagsOf } from './lib/multiPgn'
 import type { GameOrigin, LibraryGame } from './lib/gameLibrary'
+import { rememberGame, rememberStudy } from './lib/recents'
 import type { PgnExtras } from './components/PgnExtrasSwitches'
 import {
   convertPgn,
@@ -815,22 +816,37 @@ export default function App() {
     return pgnWithMovetext(withExtraTags(headers, generatedHeaders), movetext)
   }, [game, headers, generatedHeaders, analysis])
 
-  const handleOpenFromLibrary = useCallback((chapter: LibraryGame, studyId: string) => {
-    const { movetext } = splitHeadersAndMovetext(chapter.pgn)
-    handleConvert(
-      chapter.pgn,
-      {},
-      chapter.chapterId
-        ? {
-            studyId,
-            chapterId: chapter.chapterId,
-            loadedKey: mainlineUcis(parseMoveTree(movetext).tree).join(' '),
-            loadedTags: [...tagsOf(chapter.pgn)].map(([name, value]) => ({ name, value })),
-          }
-        : null,
-    )
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  const handleOpenFromLibrary = useCallback(
+    (chapter: LibraryGame, studyId: string, studyName: string) => {
+      const { movetext } = splitHeadersAndMovetext(chapter.pgn)
+      handleConvert(
+        chapter.pgn,
+        {},
+        chapter.chapterId
+          ? {
+              studyId,
+              chapterId: chapter.chapterId,
+              loadedKey: mainlineUcis(parseMoveTree(movetext).tree).join(' '),
+              loadedTags: [...tagsOf(chapter.pgn)].map(([name, value]) => ({ name, value })),
+            }
+          : null,
+      )
+      // Recorded on the way in rather than on the way out: a game the reader
+      // opened is one they were working on whether or not they saved it.
+      if (chapter.chapterId) {
+        rememberGame({
+          studyId,
+          chapterId: chapter.chapterId,
+          studyName,
+          chapterName: chapter.chapterName ?? 'Untitled game',
+          openedAt: Date.now(),
+        })
+        rememberStudy({ studyId, studyName, openedAt: Date.now() })
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
+    [],
+  )
 
   /**
    * Write the loaded game back to a study.
@@ -840,7 +856,7 @@ export default function App() {
    * swallowed — it leaves new moves beside stale tags, which is worth knowing.
    */
   const handleSaveToLibrary = useCallback(
-    async (mode: 'update' | 'new', studyId: string) => {
+    async (mode: 'update' | 'new', studyId: string, studyName: string) => {
       const session = loadSession()
       if (!session || !libraryPgn || !game) return
       const client = libraryClient.current!
@@ -872,6 +888,14 @@ export default function App() {
             name: `${named('White', 'White')} – ${named('Black', 'Black')}`,
           })
           if (!chapter) throw new Error('Lichess did not say which chapter it made.')
+          rememberGame({
+            studyId,
+            chapterId: chapter.id,
+            studyName,
+            chapterName: chapter.name,
+            openedAt: Date.now(),
+          })
+          rememberStudy({ studyId, studyName, openedAt: Date.now() })
           // Adopt the new chapter, or the next save makes another one, and the
           // one after that a third.
           setOrigin({

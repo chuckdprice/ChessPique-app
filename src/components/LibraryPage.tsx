@@ -15,6 +15,18 @@ import {
 } from '../lib/gameLibrary'
 import type { CachedStudy, LibraryGame } from '../lib/gameLibrary'
 import LichessStudyPicker from './LichessStudyPicker'
+import {
+  loadRecentGames,
+  loadRecentStudies,
+  prunedStudies,
+  saveRecentGames,
+  saveRecentStudies,
+  withoutGame,
+  withoutStudies,
+} from '../lib/recents'
+import type { RecentGame, RecentStudy } from '../lib/recents'
+import { gameOf } from '../lib/gameLibrary'
+import { summarize } from '../lib/multiPgn'
 
 export type SaveState =
   | { kind: 'saving' }
@@ -26,12 +38,12 @@ interface LibraryPageProps {
   client: LibraryClient
   /** The chapter currently loaded, so the list can say which one it is. */
   openChapterId: string | null
-  onOpen: (game: LibraryGame, studyId: string) => void
+  onOpen: (game: LibraryGame, studyId: string, studyName: string) => void
   /** The loaded game's name, or null when there is nothing to save. */
   gameName: string | null
   /** True when the loaded game came from a chapter this session opened. */
   canUpdate: boolean
-  onSave: (mode: 'update' | 'new', studyId: string) => void
+  onSave: (mode: 'update' | 'new', studyId: string, studyName: string) => void
   saveState: SaveState
 }
 
@@ -68,6 +80,9 @@ export default function LibraryPage({
   const [loadingGames, setLoadingGames] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [recentGames, setRecentGames] = useState<RecentGame[]>(loadRecentGames)
+  const [recentStudies, setRecentStudies] = useState<RecentStudy[]>(loadRecentStudies)
+  const [openingRecent, setOpeningRecent] = useState<string | null>(null)
 
   const handleFailure = useCallback((e: unknown) => {
     // A rejected token is worth nothing. Dropping it here is what stops a dead
@@ -144,6 +159,44 @@ export default function LibraryPage({
     })
   }, [listed, studies, cache])
 
+  /**
+   * Drop recents whose study the listing no longer has.
+   *
+   * A recent entry offering to open a game that is gone is worse than no entry
+   * at all, and a study's absence from a finished listing is the only notice
+   * this app ever gets. A single chapter deleted inside a study that still
+   * exists cannot be caught here — that one is found on the click, below.
+   */
+  useEffect(() => {
+    if (!listed) return
+    const live = studies.map((s) => s.id)
+    setRecentGames((current) => {
+      const next = withoutStudies(current, current.map((g) => g.studyId).filter((id) => !live.includes(id)))
+      if (next.length === current.length) return current
+      saveRecentGames(next)
+      return next
+    })
+    setRecentStudies((current) => {
+      const next = prunedStudies(current, live)
+      if (next.length === current.length) return current
+      saveRecentStudies(next)
+      return next
+    })
+  }, [listed, studies])
+
+  /**
+   * Re-read the lists after App has written to them.
+   *
+   * They are recorded where the opening and saving happen, which is App, and
+   * displayed here; rather than lifting the state up for two lists that are
+   * only ever read in one place, this watches the two props that change when
+   * something has just been recorded.
+   */
+  useEffect(() => {
+    setRecentGames(loadRecentGames())
+    setRecentStudies(loadRecentStudies())
+  }, [openChapterId, saveState])
+
   const selected = studyId ? (cache.get(studyId) ?? null) : null
   const meta = studies.find((study) => study.id === studyId) ?? null
 
@@ -174,6 +227,59 @@ export default function LibraryPage({
       live = false
     }
   }, [session, meta, selected, client, handleFailure])
+
+  /**
+   * Open a game straight from the recents list.
+   *
+   * The cached study is tried first, so the common case costs nothing; failing
+   * that, one chapter is fetched rather than its whole study, because a recent
+   * entry is a shortcut and downloading sixty-three other games to honour it
+   * would not be one.
+   *
+   * A chapter that has been deleted inside a study that still exists is only
+   * discoverable here, on the click. It is dropped from the list and said so
+   * plainly rather than reported as a failure — the entry was a guess about
+   * what is still there, and it was wrong.
+   */
+  const handleOpenRecent = async (entry: RecentGame) => {
+    const key = `${entry.studyId}/${entry.chapterId}`
+    const forget = () => {
+      setRecentGames((current) => {
+        const next = withoutGame(current, entry.studyId, entry.chapterId)
+        saveRecentGames(next)
+        return next
+      })
+    }
+
+    const cached = gameOf(cache.get(entry.studyId) ?? null, entry.chapterId)
+    if (cached) {
+      onOpen(cached, entry.studyId, entry.studyName)
+      return
+    }
+    if (!session) return
+
+    setOpeningRecent(key)
+    setError(null)
+    try {
+      const pgn = await client.fetchChapter(session.token, entry.studyId, entry.chapterId)
+      const game: LibraryGame = { ...summarize(pgn), pgn }
+      if (!game.chapterId) {
+        forget()
+        setError(`“${entry.chapterName}” is no longer in ${entry.studyName}.`)
+        return
+      }
+      onOpen(game, entry.studyId, entry.studyName)
+    } catch (e) {
+      if (e instanceof LichessApiError && !e.unauthorized) {
+        forget()
+        setError(`“${entry.chapterName}” could not be opened, so it has left the list.`)
+        return
+      }
+      handleFailure(e)
+    } finally {
+      setOpeningRecent(null)
+    }
+  }
 
   const handleSignIn = async () => {
     setBusy(true)
@@ -239,9 +345,18 @@ export default function LibraryPage({
           canUpdate={canUpdate}
           studyName={meta?.name ?? null}
           state={saveState}
-          onSave={(mode) => onSave(mode, studyId)}
+          onSave={(mode) => onSave(mode, studyId, meta?.name ?? '')}
         />
       )}
+
+      <Recents
+        games={recentGames}
+        studies={recentStudies}
+        openingKey={openingRecent}
+        openChapterId={openChapterId}
+        onOpenGame={handleOpenRecent}
+        onPickStudy={setStudyId}
+      />
 
       <LichessStudyPicker
         studies={studies}
@@ -255,8 +370,96 @@ export default function LibraryPage({
         loading={loadingGames}
         studyChosen={!!meta}
         openChapterId={openChapterId}
-        onOpen={(game) => meta && onOpen(game, meta.id)}
+        onOpen={(game) => meta && onOpen(game, meta.id, meta.name)}
       />
+    </div>
+  )
+}
+
+/**
+ * The way back to what you were working on.
+ *
+ * Both lists are shortcuts over what the cache already holds, so neither is
+ * shown when it is empty — an empty shortcut is a row of chrome explaining that
+ * it has nothing to offer. The studies are chips rather than a second list of
+ * cards, because the picker below is already the list of studies and this is
+ * only the short way into it.
+ */
+function Recents({
+  games,
+  studies,
+  openingKey,
+  openChapterId,
+  onOpenGame,
+  onPickStudy,
+}: {
+  games: RecentGame[]
+  studies: RecentStudy[]
+  /** "studyId/chapterId" of the entry being fetched, if any. */
+  openingKey: string | null
+  openChapterId: string | null
+  onOpenGame: (entry: RecentGame) => void
+  onPickStudy: (studyId: string) => void
+}) {
+  if (games.length === 0 && studies.length === 0) return null
+
+  return (
+    <div className="rounded-xl border border-rule bg-card p-3 shadow-sm">
+      {games.length > 0 && (
+        <>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-mute">
+            Recent games
+          </h3>
+          <ul className="mt-1.5 flex flex-wrap gap-1.5">
+            {games.map((entry) => {
+              const key = `${entry.studyId}/${entry.chapterId}`
+              const current = entry.chapterId === openChapterId
+              return (
+                <li key={key}>
+                  <button
+                    type="button"
+                    onClick={() => onOpenGame(entry)}
+                    disabled={openingKey != null}
+                    title={`${entry.chapterName} — ${entry.studyName}`}
+                    className={`max-w-56 truncate rounded-lg border px-2.5 py-1 text-xs transition-colors disabled:opacity-50 ${
+                      current
+                        ? 'border-felt-bright bg-felt/10 font-medium'
+                        : 'border-rule hover:bg-buff-soft'
+                    }`}
+                  >
+                    {openingKey === key ? 'Opening…' : entry.chapterName}
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </>
+      )}
+
+      {studies.length > 0 && (
+        <>
+          <h3
+            className={`text-xs font-semibold uppercase tracking-wide text-ink-mute ${
+              games.length > 0 ? 'mt-3' : ''
+            }`}
+          >
+            Recent studies
+          </h3>
+          <ul className="mt-1.5 flex flex-wrap gap-1.5">
+            {studies.map((entry) => (
+              <li key={entry.studyId}>
+                <button
+                  type="button"
+                  onClick={() => onPickStudy(entry.studyId)}
+                  className="max-w-56 truncate rounded-lg border border-rule px-2.5 py-1 text-xs transition-colors hover:bg-buff-soft"
+                >
+                  {entry.studyName}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </div>
   )
 }

@@ -115,7 +115,7 @@ export default function PgnExtrasSwitches({
           runs for a minute or so and the evals appear only when it lands. */}
       {extras.evals && !hasEvals && (
         <p className="mt-1.5 text-xs text-ink-mute">
-          Evals are added once the engine review on the Game Analysis page finishes.
+          Evals are added once the engine review finishes.
         </p>
       )}
     </div>

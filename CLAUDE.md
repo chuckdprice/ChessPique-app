@@ -43,6 +43,8 @@ measurement, not folklore:
 | `computer` hover — React's `onPointerEnter` never fires from it | dispatch `pointerover` then `pointerenter` (`pointerType: 'mouse'`, `bubbles: true`) on the element |
 | `computer` hover *leaving* an element — the pointer teleports, so no `mouseout` and no `onMouseLeave` | dispatch `mouseout` with a `relatedTarget` outside; `onMouseMove` itself does fire from two hovers in a row |
 | Viewport size — `innerWidth`/`innerHeight` and `clientWidth`/`clientHeight` all read **0** while the pane is backgrounded | take the size from an element's rect, or treat 0 as "unknown" |
+| `resize_window` fires **neither** `window.resize` nor `ResizeObserver` — the layout changes silently, so anything that re-measures on a resize looks broken | dispatch `new Event('resize')` on `window` yourself, or force a re-render, then measure |
+| `ResizeObserver` — delivered with the frame, so a hidden pane gets nothing, not even the initial callback `observe()` promises | don't rely on it alone; pair it with a `resize` listener and a measure on every render |
 
 `getBoundingClientRect` and DOM attribute reads *are* reliable. So are
 screenshots. `computer` clicks and scrolls land even when the call reports a

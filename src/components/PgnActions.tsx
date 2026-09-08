@@ -46,7 +46,7 @@ const MAX_URL_CHARS = 8000
 const ICON_PROPS = {
   'aria-hidden': true,
   viewBox: '0 0 24 24',
-  className: 'size-4 shrink-0',
+  className: 'size-3.5 shrink-0',
   fill: 'none',
   stroke: 'currentColor',
   strokeWidth: 1.8,
@@ -85,7 +85,7 @@ const DownloadIcon = () => (
 const BRAND_ICON_PROPS = {
   'aria-hidden': true,
   viewBox: '0 0 24 24',
-  className: 'size-4 shrink-0',
+  className: 'size-3.5 shrink-0',
   fill: 'currentColor',
 }
 
@@ -180,12 +180,15 @@ export default function PgnActions({ pgn, fileName, compact = false }: PgnAction
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
-  const size = compact ? 'px-3 py-1.5 text-sm' : 'px-4 py-2.5'
+  // Compact is the size inside the game pane's tabs, where every control in
+  // the row — Copy, Download, the two analysis links and Lichess Study — has to
+  // agree on one height or the row reads as three different rows.
+  const size = compact ? 'px-2.5 py-1 text-xs' : 'px-4 py-2.5'
   const face =
     'inline-flex items-center rounded-lg bg-felt font-medium text-buff shadow-sm transition-colors hover:bg-felt-deep'
   const button = `${face} gap-1.5 ${size}`
   // Square, so a lone icon is centred rather than sitting in a label's slot.
-  const iconOnly = `${face} justify-center ${compact ? 'size-8' : 'size-11'}`
+  const iconOnly = `${face} justify-center ${compact ? 'size-6' : 'size-11'}`
 
   return (
     /* No shrink-0: it stopped the row being squeezed to the available width,

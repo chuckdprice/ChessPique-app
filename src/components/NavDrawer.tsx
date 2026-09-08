@@ -8,6 +8,9 @@ interface NavDrawerProps {
   onClose: () => void
   /** Start an empty game to build on the board. */
   onNewGame: () => void
+  /** Both land on the start page with that choice already open. */
+  onUpload: () => void
+  onPaste: () => void
   /** Analysis is unreachable until a game has been converted. */
   gameLoaded: boolean
   /** Appearance stays a modal; the nav is only how it is reached now. */
@@ -38,6 +41,8 @@ const ICON = {
   newGame: 'M12 5v14M5 12h14',
   pgn: 'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Zm0 0v5h5M9 13h6M9 17h4',
   analysis: 'M4 20h16M7 20v-6M12 20V8M17 20v-9',
+  upload: 'M12 16V4m0 0L8 8m4-4 4 4M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2',
+  library: 'M4 5.5A1.5 1.5 0 0 1 5.5 4H9v16H5.5A1.5 1.5 0 0 1 4 18.5v-13ZM9 4h9.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H9',
   appearance:
     'M12 3a9 9 0 1 0 0 18c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16a5 5 0 0 0 5-5c0-4.42-4.03-8-9-8Z',
   settings:
@@ -126,6 +131,8 @@ export default function NavDrawer({
   onNavigate,
   onClose,
   onNewGame,
+  onUpload,
+  onPaste,
   gameLoaded,
   onAppearance,
   onHelp,
@@ -174,19 +181,34 @@ export default function NavDrawer({
 
         <nav aria-label="Main" className="min-h-0 flex-1 overflow-y-auto p-2">
           <Group>Game</Group>
+          {/* The same four choices the start page offers, in the same order,
+              so the menu and the page never disagree about what the ways in
+              are. Game Analysis follows them: it is where all four lead. */}
           <Item
             innerRef={firstRef}
-            label="New game"
+            label="New Analysis"
             icon={<Icon d={ICON.newGame} />}
             hint="empty board"
             onSelect={onNewGame}
             onClose={onClose}
           />
           <Item
-            label="PGN File"
+            label="Open Study"
+            icon={<Icon d={ICON.library} />}
+            current={page === 'library'}
+            onSelect={() => onNavigate('library')}
+            onClose={onClose}
+          />
+          <Item
+            label="Upload PGN"
+            icon={<Icon d={ICON.upload} />}
+            onSelect={onUpload}
+            onClose={onClose}
+          />
+          <Item
+            label="Paste PGN"
             icon={<Icon d={ICON.pgn} />}
-            current={page === 'pgn'}
-            onSelect={() => onNavigate('pgn')}
+            onSelect={onPaste}
             onClose={onClose}
           />
           <Item

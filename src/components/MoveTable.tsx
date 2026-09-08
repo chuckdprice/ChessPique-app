@@ -15,6 +15,8 @@ import { classColor } from './ClassBadge'
 import MoveMenu from './MoveMenu'
 
 interface MoveTableProps {
+  /** Rendered inside a tab pane, which supplies the border and the scrolling. */
+  bare?: boolean
   tree: MoveTree
   /** The node the board is showing. */
   currentId: string
@@ -39,6 +41,7 @@ interface Row {
 }
 
 export default function MoveTable({
+  bare = false,
   tree,
   currentId,
   onNavigate,
@@ -354,9 +357,20 @@ export default function MoveTable({
   return (
     <section
       aria-label="Moves"
-      className="flex max-h-80 min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-rule bg-card shadow-sm sm:max-h-none"
+      // `bare` drops the card chrome and the scroller: inside a tab pane the
+      // pane already draws the border and owns the scrolling, and a second
+      // scroller nested in the first is the thing that made the list unable to
+      // reach its own last move.
+      className={
+        bare
+          ? 'flex min-h-0 flex-1 flex-col'
+          : 'flex max-h-80 min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-rule bg-card shadow-sm sm:max-h-none'
+      }
     >
-      <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-2 pb-1 pt-2">
+      <div
+        ref={listRef}
+        className={bare ? 'px-1' : 'min-h-0 flex-1 overflow-y-auto px-2 pb-1 pt-2'}
+      >
         <table className="w-full border-collapse">
           <colgroup>
             <col className="w-8" />

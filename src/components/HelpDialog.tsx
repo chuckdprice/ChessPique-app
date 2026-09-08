@@ -125,40 +125,52 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
 
           <Section title="Getting around">
             <p>
-              The button at the top left opens the menu. It reaches both pages —{' '}
-              <Ui>PGN File</Ui> and <Ui>Game Analysis</Ui>, the same two the bar under the header
-              shows — plus <Ui>Appearance</Ui> for the theme, board and pieces,{' '}
-              <Ui>Settings</Ui> for how the engine searches, and this help. <Key>Esc</Key> closes
-              it, as does a click anywhere outside it.
+              The app opens on four ways in: <Ui>New Analysis</Ui> for an empty board,{' '}
+              <Ui>Upload or Drop a .pgn File</Ui>, <Ui>Paste a PGN Game</Ui>, and{' '}
+              <Ui>Open from Lichess Study</Ui>. Take any of them and the analysis fills the
+              screen from then on.
             </p>
             <p>
-              <Ui>New game</Ui> on that menu starts an empty board with no moves, for building a
-              game or a repertoire by hand rather than importing one. It fills in the standard
-              tags for you — edit them on the <Ui>PGN Header Editor</Ui> — and the converted PGN
-              grows as you play. It asks first if the game already on the board has moves in it.
+              The button at the top left opens the menu, which carries those same four in the
+              same order, plus <Ui>Game Analysis</Ui> to come back to the board,{' '}
+              <Ui>Appearance</Ui> for the theme, board and pieces, <Ui>Settings</Ui> for how the
+              engine searches, and this help. <Key>Esc</Key> closes it, as does a click anywhere
+              outside it.
+            </p>
+            <p>
+              <Ui>New Analysis</Ui> starts an empty board with no moves, for building a game or a
+              repertoire by hand rather than importing one. It fills in the standard tags for you
+              — edit them in the <Ui>PGN Header</Ui> tab — and the converted PGN grows as you
+              play. It asks first if the game already on the board has moves in it, as do{' '}
+              <Ui>Upload PGN</Ui> and <Ui>Paste PGN</Ui>, which go back to those four choices.
             </p>
           </Section>
 
-          <Section title="Step 1 — PGN File">
+          <Section title="The game pane">
             <p>
-              The page is two panes. On the left, where the game comes in, under two tabs; on the
-              right, the file it turns into and the ways of taking it elsewhere.
+              Beside the board, under four icon tabs — hover one for its name. They are all about
+              the one game on the board: the moves, the tags, the PGN it came from and the PGN it
+              turns into.
             </p>
             <p>
-              <Ui>Original PGN</Ui> — paste your game in, or use{' '}
-              <Ui>Upload or drop a .pgn file</Ui>, which converts it straight away. Otherwise
-              press <Ui>Analyze Game</Ui>. If the clock times come out wrong, or you see an
-              error about the starting clock, set the starting time and any delay or increment in
-              the box under that button, then convert again — normally the PGN's own TimeControl
-              tag is used and you can leave it alone.
+              <Ui>Move List</Ui> — the game, variations and all, with the engine's verdicts
+              against the moves that earned one.
             </p>
             <p>
-              <Ui>PGN Header Editor</Ui> — the game's tags, on the second tab. Edit any of them
-              and the converted text, the download, and the file name all follow along.
+              <Ui>PGN Header</Ui> — the game's tags. Edit any of them and the converted text, the
+              download and the file name all follow along.
             </p>
             <p>
-              <Ui>Converted PGN</Ui> — the finished text on the right, with switches above it for
-              what goes in. All four start on. <Ui>Clocks</Ui> writes the converted times as{' '}
+              <Ui>Orig PGN</Ui> — the text the game was read from, still editable.{' '}
+              <Ui>Re-convert</Ui> reads it again and replaces the game on the board. If the clock
+              times come out wrong, or you see an error about the starting clock, set the starting
+              time and any delay or increment under <Ui>Time control override</Ui> on the start
+              page and convert again — normally the PGN's own TimeControl tag is used and you can
+              leave it alone.
+            </p>
+            <p>
+              <Ui>Converted PGN</Ui> — the finished text, with switches above it for what goes
+              in. All four start on. <Ui>Clocks</Ui> writes the converted times as{' '}
               <code>{'{[%clk 0:29:50]}'}</code> — the point of the whole exercise, but you can
               have the moves without them. <Ui>Evals</Ui> writes Stockfish's score on every move
               as <code>{'{[%eval 0.38]}'}</code>. <Ui>Comments</Ui> keeps any notes your source
@@ -166,8 +178,8 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               <code>{'{Inaccuracy. Bb5 was best.}'}</code>. <Ui>Variations</Ui> writes every
               bracketed line — the game's own variations, and the one the engine preferred after
               a weak move: <code>(5. Bb5 Nd7 6. Bxc6 bxc6)</code>. Off, the file is the mainline
-              alone. Evals, the engine's verdicts and its suggested lines all wait on the review
-              from step 2.
+              alone. Evals, the engine's verdicts and its suggested lines all wait on the engine
+              review.
             </p>
             <p>
               Under the text: <Ui>Copy</Ui> and <Ui>Download</Ui> take the file;{' '}
@@ -193,7 +205,7 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
             </p>
           </Section>
 
-          <Section title="Step 2 — Game Analysis">
+          <Section title="The board">
             <p>
               Stockfish reviews the whole game automatically; the banner above the board tracks its
               progress, and the charts fill in as it finishes. Everything else is usable while it
@@ -227,10 +239,13 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               heading is Stockfish's own settings: search time, number of lines and memory.
             </p>
             <p>
-              What gets <em>drawn</em> is the other menu — the one at the right-hand end of the
-              row of buttons under the board. It carries the arrow numbers and whether the human
-              moves run at all. Both menus close when you click anywhere else, and{' '}
-              <Ui>Settings</Ui> on the main menu offers the same two groups in one page.
+              Which engines run, and what gets <em>drawn</em>, is the other menu — the one at the
+              right-hand end of the row of buttons under the board. <Ui>Stockfish Engine</Ui> and{' '}
+              <Ui>Human moves (Maia 3)</Ui> each switch their own column on and off, and either
+              can run without the other. Under Stockfish, <Ui>Display arrows</Ui> keeps the list
+              while clearing the blue arrows off the board, which is worth having when the board
+              is busy. Both menus close when you click anywhere else, and <Ui>Settings</Ui> on the
+              main menu offers the same two groups in one page.
             </p>
             <p>
               Leaving the engine running on a move lets it search deeper than the whole-game
@@ -269,7 +284,7 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               different rating, anywhere from 600 to 2600. It starts at whatever the review
               reckons the player to move has been playing at, so it follows the game, and asking
               what a 1200 would play here against an 1800 is one of the more instructive things it
-              does. Turn it on under the gear; the first time costs a one-off model download,
+              does. Turn it on in the board menu; the first time costs a one-off model download,
               after which it is kept in the browser. Nothing is ever uploaded, and if it fails or
               you are offline the panel is simply Stockfish alone.
             </p>

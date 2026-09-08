@@ -1,8 +1,10 @@
 /**
  * The pages the app can show.
  *
- * Kept apart from either navigation component because both the step bar and the
- * left-nav name these, and neither owns the list: the steps are the two-stage
- * workflow, the nav is everything the app can reach.
+ * `start` is the way in — the four choices — and `analysis` is everything
+ * afterwards, taking the whole screen. There used to be a two-step bar above
+ * both, PGN File then Game Analysis, which asked a first-time reader to
+ * understand a workflow before the app would show them anything; the left-nav
+ * is the only navigation now.
  */
-export type Page = 'pgn' | 'analysis' | 'settings'
+export type Page = 'start' | 'analysis' | 'library' | 'settings'

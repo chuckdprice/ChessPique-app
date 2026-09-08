@@ -101,6 +101,8 @@ interface AnalysisPageProps {
   downloadName: string
   extras: PgnExtras
   onExtraChange: (id: keyof PgnExtras, on: boolean) => void
+  /** The chapter this game came from on Lichess, when it came from one. */
+  lichessUrl: string | null
 }
 
 /**
@@ -170,6 +172,7 @@ export default function AnalysisPage({
   downloadName,
   extras,
   onExtraChange,
+  lichessUrl,
 }: AnalysisPageProps) {
   const [orientation, setOrientation] = useState<'white' | 'black'>('white')
   // Lives here rather than in App because this is where the two ends meet: the
@@ -302,6 +305,7 @@ export default function AnalysisPage({
             extras={extras}
             onExtraChange={onExtraChange}
             hasEvals={analysis != null}
+            lichessUrl={lichessUrl}
           />
         </div>
 

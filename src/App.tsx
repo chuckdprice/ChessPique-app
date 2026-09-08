@@ -19,6 +19,7 @@ import { clearSession, loadSession } from './lib/lichess/oauth'
 import { tagsOf } from './lib/multiPgn'
 import type { GameOrigin, LibraryGame } from './lib/gameLibrary'
 import { rememberGame, rememberStudy } from './lib/recents'
+import { decodeGame, payloadInHash } from './lib/share'
 import type { PgnExtras } from './components/PgnExtrasSwitches'
 import {
   convertPgn,
@@ -163,6 +164,20 @@ function withEngineLines(tree: MoveTree, analysis: GameAnalysis): MoveTree {
   return next
 }
 
+/**
+ * Take the shared game out of the address bar.
+ *
+ * The fragment is left alone while the game it carries is the game on the
+ * board, so a reader can reload the link and get it back. The moment something
+ * else is loaded the two have parted company, and a fragment still naming the
+ * old game would hand it back on the next refresh — over whatever the reader
+ * had moved on to.
+ */
+function clearShareHash(): void {
+  if (!payloadInHash(window.location.hash)) return
+  history.replaceState(null, '', window.location.pathname + window.location.search)
+}
+
 /** Nothing conversion worked out, for a game that was not converted at all. */
 const NO_CONVERSION: ConvertResult = {
   pgn: '',
@@ -290,6 +305,40 @@ export default function App() {
   // What was showing when the dialog opened, to go back to on Cancel.
   const savedAppearance = useRef(appearance)
   useEffect(() => applyAppearance(appearance), [appearance])
+
+  /**
+   * A game handed over in the URL's fragment.
+   *
+   * Read once, at boot, before anything else has had a chance to put a game on
+   * the board. The fragment is checked rather than the query because that is
+   * where a share link carries its payload — and because the query is where
+   * Lichess returns an OAuth code, which this must not mistake for a game.
+   *
+   * A payload that will not decode is reported and the app left on its start
+   * page: a link mangled in transit is the likeliest cause, and that is worth
+   * saying rather than silently showing an empty board.
+   */
+  useEffect(() => {
+    const payload = payloadInHash(window.location.hash)
+    if (!payload) return
+    let live = true
+    decodeGame(payload)
+      .then((pgn) => {
+        if (live) handleConvert(pgn, {})
+      })
+      .catch(() => {
+        if (!live) return
+        setError(
+          'That shared link could not be read. It may have been shortened or broken in transit — ' +
+            'ask for it again, or paste the PGN itself below.',
+        )
+        setStartMode('paste')
+      })
+    return () => {
+      live = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Fetch the analysis chunk once the browser is idle, while the user is still
   // pasting or picking a PGN, so Convert never waits on a network round trip.
@@ -488,6 +537,7 @@ export default function App() {
    * until there is a move, and the converted PGN grows as the game does.
    */
   const startNewGame = useCallback(() => {
+    clearShareHash()
     // "*" — game in progress. PGN requires a termination marker, so without
     // one the file a new game exports is invalid from its first move.
     const tree = { ...emptyTree(), result: '*' }
@@ -818,6 +868,7 @@ export default function App() {
 
   const handleOpenFromLibrary = useCallback(
     (chapter: LibraryGame, studyId: string, studyName: string) => {
+      clearShareHash()
       const { movetext } = splitHeadersAndMovetext(chapter.pgn)
       handleConvert(
         chapter.pgn,
@@ -1230,7 +1281,10 @@ export default function App() {
           <StartPage
             mode={startMode}
             onModeChange={setStartMode}
-            onConvert={handleConvert}
+            onConvert={(text, options) => {
+              clearShareHash()
+              handleConvert(text, options)
+            }}
             onNewGame={handleNewGame}
             onOpenStudy={() => setPage('library')}
             error={error}
@@ -1332,6 +1386,9 @@ export default function App() {
               downloadName={downloadName}
               extras={pgnExtras}
               onExtraChange={handleExtraChange}
+              lichessUrl={
+                origin ? `https://lichess.org/study/${origin.studyId}/${origin.chapterId}` : null
+              }
             />
           </Suspense>
         )}

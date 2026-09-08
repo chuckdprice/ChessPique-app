@@ -322,16 +322,22 @@ from the start.
 
 Each is useful alone and none of them changes the spine.
 
-2. **Recents and the picker over the cache.** Recent games and recent studies
-   are views over what slice 1 already stores. Every entry must tolerate a 404
-   and prune itself — a chapter can be deleted, or a study made private, with
-   no notice to this app.
-3. **Sharing.** `#/g/<base64url(gzip(pgn))>` and a hash router; the app has no
-   routing at all today, so this is where it arrives. "View on Lichess" is the
-   chapter URL, which `importPgn` already returns. A share link opening in
-   another user's app, and their saving it into their own study, needs nothing
-   new beyond what slices 1 and 3 build — and no permission model, because
-   nothing is shared between accounts.
+2. **Recents and the picker over the cache.** *Done.* Two lists of shortcuts
+   over what slice 1 caches. The staleness is caught in two places because it
+   arrives two ways: a study that has gone is noticed when the listing comes
+   back without it, taking its games with it, and a chapter deleted inside a
+   study that still exists can only be found on the click, where the entry
+   drops itself and says so.
+3. **Sharing.** *Done.* `#/g/<base64url(gzip(pgn))>`, read once at boot. The
+   fragment rather than the query, because a fragment never reaches the server
+   and needs no rewrite rule on a static host — and because the query is where
+   Lichess returns an OAuth code. Measured end to end: a 43-move game is a
+   1294-character link, and it reopens with its clocks and its evals in a
+   browser with every trace of the session cleared. The evals are the part a
+   Lichess study could not have carried. "View on Lichess" sits beside it for a
+   game that came from a chapter. The fragment stays while its game is the game
+   on the board, so the link reloads, and is cleared the moment anything else
+   is loaded.
 4. **Folders and study creation.** `studyId → folder path`, held locally, with
    an "unfiled" bucket because the map will drift whenever a study is made or
    removed on lichess.org. Deletion links out; the app can only empty a study.

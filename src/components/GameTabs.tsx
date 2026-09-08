@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { copyText } from '../lib/clipboard'
+import { encodeGame, shareLink, SHARE_LINK_WARN_CHARS } from '../lib/share'
 import { loadSession, openSignInWindow, saveSession, signIn } from '../lib/lichess/oauth'
 import { fetchAccount } from '../lib/lichess/studies'
 import type { ConvertOptions } from '../lib/convert'
@@ -99,6 +100,8 @@ interface GameTabsProps {
   extras: PgnExtras
   onExtraChange: (id: keyof PgnExtras, on: boolean) => void
   hasEvals: boolean
+  /** The chapter this game came from on Lichess, when it came from one. */
+  lichessUrl: string | null
 }
 
 /**
@@ -139,12 +142,16 @@ export default function GameTabs({
   extras,
   onExtraChange,
   hasEvals,
+  lichessUrl,
 }: GameTabsProps) {
   const [tab, setTab] = useState<Tab>('moves')
   const [sourceCopied, setSourceCopied] = useState(false)
   const [studyOpen, setStudyOpen] = useState(false)
   const [authBusy, setAuthBusy] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
+  const [share, setShare] = useState<
+    { kind: 'idle' } | { kind: 'working' } | { kind: 'done'; long: boolean } | { kind: 'error' }
+  >({ kind: 'idle' })
 
   // The "Copied" confirmation goes back to reading "Copy" on its own.
   useEffect(() => {
@@ -158,6 +165,34 @@ export default function GameTabs({
   useEffect(() => {
     if (convertError) setTab('source')
   }, [convertError])
+
+  // The share confirmation goes back to reading "Share link" on its own, the
+  // way the Copy button does.
+  useEffect(() => {
+    if (share.kind !== 'done' && share.kind !== 'error') return
+    const timer = setTimeout(() => setShare({ kind: 'idle' }), 4000)
+    return () => clearTimeout(timer)
+  }, [share])
+
+  /**
+   * Put a link to this game on the clipboard.
+   *
+   * The whole PGN travels in the link, so what is shared is what the switches
+   * above say — including the evals, which a game sent through a Lichess study
+   * would lose, since Lichess strips every command it does not maintain itself.
+   */
+  const handleShare = async () => {
+    if (!convertedPgn) return
+    setShare({ kind: 'working' })
+    try {
+      const payload = await encodeGame(convertedPgn)
+      const link = shareLink(payload, window.location)
+      if (!(await copyText(link))) throw new Error('clipboard refused')
+      setShare({ kind: 'done', long: link.length > SHARE_LINK_WARN_CHARS })
+    } catch {
+      setShare({ kind: 'error' })
+    }
+  }
 
   return (
     <TabPane tabs={TABS} label="Game" tab={tab} onTab={setTab}>
@@ -253,6 +288,25 @@ export default function GameTabs({
             {convertedPgn ? (
               <>
                 <PgnActions pgn={convertedPgn} fileName={downloadName} compact />
+                <SmallButton onClick={() => void handleShare()} disabled={share.kind === 'working'}>
+                  {share.kind === 'working'
+                    ? 'Linking…'
+                    : share.kind === 'done'
+                      ? 'Link copied'
+                      : share.kind === 'error'
+                        ? 'Could not copy'
+                        : 'Share link'}
+                </SmallButton>
+                {lichessUrl && (
+                  <a
+                    href={lichessUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-lg border border-rule px-2.5 py-[3px] text-xs font-medium text-ink transition-colors hover:bg-buff-soft"
+                  >
+                    View on Lichess
+                  </a>
+                )}
                 <button
                   type="button"
                   onClick={() => {
@@ -288,10 +342,17 @@ export default function GameTabs({
               </>
             ) : (
               <p className="text-xs text-ink-mute">
-                Copy, download and the Lichess and Chess.com links appear once a game is converted.
+                Copy, download, the share link and the Lichess and Chess.com links appear once a
+                game is converted.
               </p>
             )}
           </div>
+          {share.kind === 'done' && share.long && (
+            <p className="mt-1.5 shrink-0 text-xs text-ink-mute">
+              That link is long enough that some chat and mail clients may break it. Sending it
+              as an attachment, or through a study, is safer for a game this size.
+            </p>
+          )}
         </div>
       )}
 

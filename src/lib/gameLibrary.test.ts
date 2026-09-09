@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { gameOf, parseStudy, staleStudyIds, vanishedStudyIds } from './gameLibrary'
+import { CACHE_SCHEMA, gameOf, parseStudy, staleStudyIds, vanishedStudyIds } from './gameLibrary'
 import type { CachedStudy } from './gameLibrary'
 
 const studyExport = readFileSync(
@@ -17,6 +17,7 @@ const meta = (id: string, updatedAt: number) => ({
 })
 
 const cached = (id: string, updatedAt: number): CachedStudy => ({
+  schema: CACHE_SCHEMA,
   id,
   name: `Study ${id}`,
   updatedAt,
@@ -40,6 +41,19 @@ describe('parseStudy', () => {
 
     expect(study.games[0].pgn).toContain('[Event ')
     expect(study.games[0].pgn).toContain('1. g3')
+  })
+
+  it('stamps the shape it was written in', () => {
+    // Without this, a study cached before `tags` existed came back with games
+    // missing the field, `game.tags.length` threw while rendering the list,
+    // and the page went blank — for exactly the studies you had opened before.
+    expect(parseStudy(meta('1UmQwWtW', 99), studyExport, 0).schema).toBe(CACHE_SCHEMA)
+  })
+
+  it('gives every game a tags array, even one with no root comment', () => {
+    for (const game of parseStudy(meta('1UmQwWtW', 99), studyExport, 0).games) {
+      expect(Array.isArray(game.tags)).toBe(true)
+    }
   })
 
   it('reads the list columns off the tags', () => {

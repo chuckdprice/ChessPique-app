@@ -5,6 +5,7 @@ import BrandMark from './components/BrandMark'
 import ConfirmDialog from './components/ConfirmDialog'
 import HelpDialog from './components/HelpDialog'
 import NavDrawer, { NavToggle } from './components/NavDrawer'
+import PageBoundary from './components/PageBoundary'
 import SettingsPage from './components/SettingsPage'
 import LibraryPage from './components/LibraryPage'
 import StartPage from './components/StartPage'
@@ -1410,6 +1411,11 @@ export default function App() {
       {/* --board-size lives in index.css: a short viewport needs a different
           height budget, and a media query cannot reach an inline style. */}
       <main className="app-main mx-auto flex w-full min-h-0 max-w-[1600px] flex-1 flex-col px-4 py-2 sm:px-6">
+        {/* Inside main, not around the whole app: the header and the menu are
+            the way out of a page that has failed, so they must not be inside
+            the thing that failed. Keyed by page, so leaving a broken one and
+            coming back is a fresh attempt. */}
+        <PageBoundary resetKey={page}>
         {page === 'start' && (
           <StartPage
             mode={startMode}
@@ -1446,6 +1452,7 @@ export default function App() {
         {page === 'settings' && (
           <SettingsPage engine={engineSettings} onEngineChange={handleEngineSettingsSave} />
         )}
+
 
         {page === 'analysis' && game && (
           <Suspense
@@ -1531,6 +1538,7 @@ export default function App() {
             />
           </Suspense>
         )}
+        </PageBoundary>
       </main>
 
       {navOpen && (

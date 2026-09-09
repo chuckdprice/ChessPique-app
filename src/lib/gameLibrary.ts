@@ -35,6 +35,21 @@ export interface LibraryGame {
 }
 
 export interface CachedStudy {
+  /**
+   * The shape this record was written in.
+   *
+   * Cached games gained a `tags` field with the tag feature, and a study cached
+   * before it had games with no such field — so `game.tags.length` threw while
+   * rendering the list, React unmounted the tree, and the whole page went
+   * blank. Opening a study you had never opened worked; opening one you had was
+   * fatal, which is a horrible shape for a bug.
+   *
+   * A version on the record is the fix that keeps working for the next field.
+   * Nothing here is a master copy — everything can be re-downloaded — so the
+   * right answer to a record of the wrong shape is to throw it away rather than
+   * to guess at what a missing field should have been.
+   */
+  schema: number
   id: string
   name: string
   /** Lichess's own last-modified, and the only thing that invalidates this. */
@@ -70,9 +85,16 @@ export interface GameOrigin {
   loadedTags: Array<{ name: string; value: string }>
 }
 
+/**
+ * Bump whenever `CachedStudy` or `LibraryGame` gains, loses or changes a field.
+ * Records written under any other number are discarded on read.
+ */
+export const CACHE_SCHEMA = 2
+
 /** A study export split into games, ready to cache. */
 export function parseStudy(meta: StudyMetadata, pgn: string, fetchedAt: number): CachedStudy {
   return {
+    schema: CACHE_SCHEMA,
     id: meta.id,
     name: meta.name,
     updatedAt: meta.updatedAt,
@@ -147,7 +169,14 @@ function transact<T>(mode: IDBTransactionMode, work: (store: IDBObjectStore) => 
  */
 export async function loadCachedStudies(): Promise<CachedStudy[]> {
   try {
-    return await transact<CachedStudy[]>('readonly', (store) => store.getAll())
+    const all = await transact<CachedStudy[]>('readonly', (store) => store.getAll())
+    const usable = all.filter((study) => study.schema === CACHE_SCHEMA)
+    // Swept rather than left to be overwritten: a record nothing will ever read
+    // again is only taking up a user's storage quota.
+    for (const study of all) {
+      if (study.schema !== CACHE_SCHEMA) void forgetCachedStudy(study.id)
+    }
+    return usable
   } catch {
     return []
   }

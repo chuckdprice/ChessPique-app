@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Page } from '../lib/pages'
+import type { RecentGame, RecentStudy } from '../lib/recents'
 
 interface NavDrawerProps {
   page: Page
@@ -11,6 +12,11 @@ interface NavDrawerProps {
   /** Both land on the start page with that choice already open. */
   onUpload: () => void
   onPaste: () => void
+  /** The last few opened, newest first, for the two submenus. */
+  recentStudies: RecentStudy[]
+  recentGames: RecentGame[]
+  onOpenRecentStudy: (entry: RecentStudy) => void
+  onOpenRecentGame: (entry: RecentGame) => void
   /** Analysis is unreachable until a game has been converted. */
   gameLoaded: boolean
   /** Appearance stays a modal; the nav is only how it is reached now. */
@@ -117,6 +123,95 @@ function Item({
   )
 }
 
+/**
+ * A menu item that opens a list under itself.
+ *
+ * The recents used to be two rows of chips on the library page, which put the
+ * way back to a game behind first going to the library — and made them the
+ * loudest thing there, above the studies they are shortcuts into. Here they sit
+ * with the other ways in, and cost nothing until they are asked for.
+ *
+ * It stays open while a choice is made and closes the drawer only when one is,
+ * so glancing at the list is not a decision.
+ */
+function Submenu<T>({
+  label,
+  icon,
+  items,
+  keyOf,
+  labelOf,
+  hintOf,
+  onSelect,
+  onClose,
+}: {
+  label: string
+  icon: React.ReactNode
+  items: T[]
+  keyOf: (item: T) => string
+  labelOf: (item: T) => string
+  hintOf?: (item: T) => string | undefined
+  onSelect: (item: T) => void
+  onClose: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const empty = items.length === 0
+
+  return (
+    <>
+      <button
+        type="button"
+        disabled={empty}
+        aria-expanded={empty ? undefined : open}
+        onClick={() => setOpen((o) => !o)}
+        className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors ${
+          empty ? 'cursor-not-allowed text-ink-mute/50' : 'text-ink hover:bg-buff-soft'
+        }`}
+      >
+        {icon}
+        <span className="min-w-0 flex-1 truncate">{label}</span>
+        {empty ? (
+          <span className="shrink-0 text-[11px] text-ink-mute">none yet</span>
+        ) : (
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            className={`size-4 shrink-0 text-ink-mute transition-transform ${open ? 'rotate-90' : ''}`}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="m9 6 6 6-6 6" />
+          </svg>
+        )}
+      </button>
+
+      {open && !empty && (
+        // Indented behind a rule, the same way the board menu marks a switch as
+        // belonging to the one above it.
+        <ul className="ml-5 space-y-0.5 border-l-2 border-rule pl-2">
+          {items.map((item) => (
+            <li key={keyOf(item)}>
+              <button
+                type="button"
+                onClick={() => {
+                  onSelect(item)
+                  onClose()
+                }}
+                title={hintOf?.(item)}
+                className="flex w-full items-baseline gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs text-ink transition-colors hover:bg-buff-soft"
+              >
+                <span className="min-w-0 flex-1 truncate">{labelOf(item)}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  )
+}
+
 /** A heading over a run of menu items. */
 function Group({ children }: { children: React.ReactNode }) {
   return (
@@ -133,6 +228,10 @@ export default function NavDrawer({
   onNewGame,
   onUpload,
   onPaste,
+  recentStudies,
+  recentGames,
+  onOpenRecentStudy,
+  onOpenRecentGame,
   gameLoaded,
   onAppearance,
   onHelp,
@@ -197,6 +296,25 @@ export default function NavDrawer({
             icon={<Icon d={ICON.library} />}
             current={page === 'library'}
             onSelect={() => onNavigate('library')}
+            onClose={onClose}
+          />
+          <Submenu
+            label="Open Recent Study…"
+            icon={<Icon d={ICON.library} />}
+            items={recentStudies}
+            keyOf={(s) => s.studyId}
+            labelOf={(s) => s.studyName}
+            onSelect={onOpenRecentStudy}
+            onClose={onClose}
+          />
+          <Submenu
+            label="Open Recent Game…"
+            icon={<Icon d={ICON.analysis} />}
+            items={recentGames}
+            keyOf={(g) => `${g.studyId}/${g.chapterId}`}
+            labelOf={(g) => g.chapterName}
+            hintOf={(g) => `${g.chapterName} — ${g.studyName}`}
+            onSelect={onOpenRecentGame}
             onClose={onClose}
           />
           <Item

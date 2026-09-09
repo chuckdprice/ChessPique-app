@@ -35,11 +35,12 @@ const STUDIES_KEY = 'chesspique.recent-studies'
 /**
  * How many of each are kept.
  *
- * Enough to cover a session's worth of moving between games, and short enough
- * that the list stays scannable — past about a dozen, finding the entry you
- * want in it is no easier than finding the game in its study.
+ * Ten, which is what the two menus show: a list long enough to cover a
+ * session's worth of moving between games, and short enough to read at a
+ * glance. Past that, finding the entry you want in it is no easier than
+ * finding the game in its study.
  */
-export const RECENTS_KEPT = 12
+export const RECENTS_KEPT = 10
 
 /** One game moved to the front, without duplicates. */
 export function withRecentGame(recent: RecentGame[], entry: RecentGame): RecentGame[] {

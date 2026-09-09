@@ -16,9 +16,18 @@ import type { Page } from './lib/pages'
 import { LibraryClient, tagDiff } from './lib/lichess/library'
 import { importPgn, LichessApiError } from './lib/lichess/studies'
 import { clearSession, loadSession } from './lib/lichess/oauth'
-import { tagsOf } from './lib/multiPgn'
+import { summarize, tagsOf } from './lib/multiPgn'
+import { gameOf, loadCachedStudies } from './lib/gameLibrary'
 import type { GameOrigin, LibraryGame } from './lib/gameLibrary'
-import { rememberGame, rememberStudy } from './lib/recents'
+import {
+  loadRecentGames,
+  loadRecentStudies,
+  rememberGame,
+  rememberStudy,
+  saveRecentGames,
+  withoutGame,
+} from './lib/recents'
+import type { RecentGame, RecentStudy } from './lib/recents'
 import { decodeGame, payloadInHash } from './lib/share'
 import type { PgnExtras } from './components/PgnExtrasSwitches'
 import {
@@ -223,6 +232,19 @@ export default function App() {
   const [startMode, setStartMode] = useState<StartMode>('menu')
   /** A start-page choice waiting on "the game on the board will be replaced". */
   const [confirmLeave, setConfirmLeave] = useState<StartMode | null>(null)
+  /**
+   * The recents, owned here because the menu that shows them is.
+   *
+   * They are also written here — opening a game and saving one are both this
+   * component's doing — so a single copy in App is the whole of it, and the
+   * library page no longer keeps one.
+   */
+  const [recentGames, setRecentGames] = useState<RecentGame[]>(loadRecentGames)
+  const [recentStudies, setRecentStudies] = useState<RecentStudy[]>(loadRecentStudies)
+  /** A study the nav asked the library to open on, consumed once it has. */
+  const [pendingStudyId, setPendingStudyId] = useState<string | null>(null)
+  /** Something the library should say when it opens, from a failed shortcut. */
+  const [libraryNotice, setLibraryNotice] = useState<string | null>(null)
   /**
    * The chapter this game came from, and may be written back over.
    *
@@ -885,19 +907,89 @@ export default function App() {
       // Recorded on the way in rather than on the way out: a game the reader
       // opened is one they were working on whether or not they saved it.
       if (chapter.chapterId) {
-        rememberGame({
-          studyId,
-          chapterId: chapter.chapterId,
-          studyName,
-          chapterName: chapter.chapterName ?? 'Untitled game',
-          openedAt: Date.now(),
-        })
-        rememberStudy({ studyId, studyName, openedAt: Date.now() })
+        setRecentGames(
+          rememberGame({
+            studyId,
+            chapterId: chapter.chapterId,
+            studyName,
+            chapterName: chapter.chapterName ?? 'Untitled game',
+            openedAt: Date.now(),
+          }),
+        )
+        setRecentStudies(rememberStudy({ studyId, studyName, openedAt: Date.now() }))
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     },
     [],
   )
+
+  /**
+   * Open a game straight from the menu, without going by way of the library.
+   *
+   * The cached study is tried first, so the common case costs nothing; failing
+   * that, one chapter is fetched rather than its whole study, because a
+   * shortcut that downloads sixty-three other games to honour itself is not
+   * one.
+   *
+   * A chapter deleted inside a study that still exists is only ever discovered
+   * here, on the click — no listing mentions chapters. It drops itself and says
+   * so on the library page, next to the study it was in, which is more use than
+   * an error over an empty board.
+   */
+  const handleOpenRecentGame = useCallback(
+    async (entry: RecentGame) => {
+      const forget = () => {
+        const next = withoutGame(loadRecentGames(), entry.studyId, entry.chapterId)
+        saveRecentGames(next)
+        setRecentGames(next)
+      }
+
+      const cached = gameOf(
+        (await loadCachedStudies()).find((study) => study.id === entry.studyId) ?? null,
+        entry.chapterId,
+      )
+      if (cached) {
+        handleOpenFromLibrary(cached, entry.studyId, entry.studyName)
+        return
+      }
+
+      const session = loadSession()
+      if (!session) {
+        // Nothing cached and nobody signed in: the library page is where that
+        // is explained, and it is one press from being fixed.
+        setPendingStudyId(entry.studyId)
+        setPage('library')
+        return
+      }
+
+      try {
+        const pgn = await libraryClient.current!.fetchChapter(
+          session.token,
+          entry.studyId,
+          entry.chapterId,
+        )
+        const game: LibraryGame = { ...summarize(pgn), pgn }
+        if (!game.chapterId) throw new LichessApiError('That chapter is no longer there.')
+        handleOpenFromLibrary(game, entry.studyId, entry.studyName)
+      } catch (e) {
+        if (e instanceof LichessApiError && e.unauthorized) clearSession()
+        else forget()
+        setLibraryNotice(
+          `“${entry.chapterName}” could not be opened, so it has left the recent list.`,
+        )
+        setPendingStudyId(entry.studyId)
+        setPage('library')
+      }
+    },
+    [handleOpenFromLibrary],
+  )
+
+  /** Open the library on a study the menu named. */
+  const handleOpenRecentStudy = useCallback((entry: RecentStudy) => {
+    setLibraryNotice(null)
+    setPendingStudyId(entry.studyId)
+    setPage('library')
+  }, [])
 
   /**
    * Write the loaded game back to a study.
@@ -939,14 +1031,16 @@ export default function App() {
             name: `${named('White', 'White')} – ${named('Black', 'Black')}`,
           })
           if (!chapter) throw new Error('Lichess did not say which chapter it made.')
-          rememberGame({
-            studyId,
-            chapterId: chapter.id,
-            studyName,
-            chapterName: chapter.name,
-            openedAt: Date.now(),
-          })
-          rememberStudy({ studyId, studyName, openedAt: Date.now() })
+          setRecentGames(
+            rememberGame({
+              studyId,
+              chapterId: chapter.id,
+              studyName,
+              chapterName: chapter.name,
+              openedAt: Date.now(),
+            }),
+          )
+          setRecentStudies(rememberStudy({ studyId, studyName, openedAt: Date.now() }))
           // Adopt the new chapter, or the next save makes another one, and the
           // one after that a third.
           setOrigin({
@@ -1298,6 +1392,9 @@ export default function App() {
         {page === 'library' && (
           <LibraryPage
             client={libraryClient.current}
+            selectStudyId={pendingStudyId}
+            onStudySelected={() => setPendingStudyId(null)}
+            notice={libraryNotice}
             openChapterId={origin?.chapterId ?? null}
             onOpen={handleOpenFromLibrary}
             gameName={game ? `${whiteName} – ${blackName}` : null}
@@ -1402,6 +1499,10 @@ export default function App() {
           onNewGame={handleNewGame}
           onUpload={() => handleStart('upload')}
           onPaste={() => handleStart('paste')}
+          recentStudies={recentStudies}
+          recentGames={recentGames}
+          onOpenRecentStudy={handleOpenRecentStudy}
+          onOpenRecentGame={(entry) => void handleOpenRecentGame(entry)}
           gameLoaded={!!game}
           onAppearance={handleAppearanceOpen}
           onHelp={() => setHelpOpen(true)}

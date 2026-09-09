@@ -342,7 +342,15 @@ Each is useful alone and none of them changes the spine.
    locally, because a study's metadata is a name and two dates and there is no
    field to write a folder into. A plain name rather than a path: nesting wants
    a tree to draw it and a way to move a branch, and neither earns its keep
-   until a reader has more folders than fit on a line. The map drifts by
+   until a reader has more folders than fit on a line.
+
+   Revised after use: a folder used to *be* the set of studies naming it, with
+   no separate record, which meant one could not exist before it had a member
+   and could not be renamed or deleted afterwards — emptying it deleted it, and
+   there was nothing to manage. Folders are their own objects now, with the old
+   bare id-to-name map read forward so nobody's grouping is lost. The bar is
+   also always on screen: hiding it until a folder existed meant the only trace
+   of the feature appeared after you had already found it. The map drifts by
    construction — a study made or deleted on lichess.org tells this app nothing
    — so it is pruned against the listing, and "unfiled" is a real place rather
    than an error state. A folder is exactly the studies naming it, so emptying

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { cleanFolderName, FOLDER_NAME_MAX, foldersOf } from '../lib/folders'
-import type { FolderFilter, FolderMap } from '../lib/folders'
+import { cleanFolderName, countIn, FOLDER_NAME_MAX, foldersOf } from '../lib/folders'
+import type { FolderFilter, Folders } from '../lib/folders'
 import type { StudyVisibility } from '../lib/lichess/library'
 
 const CHIP =
@@ -15,26 +15,40 @@ function sameFilter(a: FolderFilter, b: FolderFilter): boolean {
 /**
  * The folder bar over the study picker.
  *
- * Folders are this app's own idea — Lichess has nowhere to keep one — so the
- * bar is a filter over the studies the listing returned rather than a structure
- * anything else knows about. Unfiled is offered only when something is actually
- * unfiled, so a reader who has never made a folder sees no machinery at all.
+ * Always shown, even with no folders. It was hidden until one existed, on the
+ * theory that a reader who never files anything should see no machinery — but
+ * that also meant nobody could discover that folders are what group studies,
+ * because the only trace of the feature appeared after you had already used it.
+ * Empty, it is one line saying what folders are for and offering to make one.
+ *
+ * A named folder brings its own management with it: rename and delete are here,
+ * beside the thing they act on, rather than behind a settings page for a
+ * feature this small.
  */
 export function FolderBar({
   folders,
   filter,
   onFilter,
-  unfiledCount,
-  countOf,
+  ids,
+  onCreate,
+  onRename,
+  onRemove,
 }: {
-  folders: FolderMap
+  folders: Folders
   filter: FolderFilter
   onFilter: (filter: FolderFilter) => void
-  unfiledCount: number
-  countOf: (folder: string) => number
+  /** The studies the listing returned, for the counts. */
+  ids: string[]
+  onCreate: (name: string) => void
+  onRename: (from: string, to: string) => void
+  onRemove: (name: string) => void
 }) {
+  const [making, setMaking] = useState(false)
+  const [draft, setDraft] = useState('')
+  const [renaming, setRenaming] = useState<string | null>(null)
+  const [confirmRemove, setConfirmRemove] = useState<string | null>(null)
   const names = foldersOf(folders)
-  if (names.length === 0) return null
+  const unfiled = ids.filter((id) => !(id in folders.of)).length
 
   const chip = (f: FolderFilter, label: string, count: number) => (
     <li key={`${f.kind}:${f.kind === 'named' ? f.name : ''}`}>
@@ -48,13 +62,130 @@ export function FolderBar({
     </li>
   )
 
+  const commitNew = () => {
+    const cleaned = cleanFolderName(draft)
+    if (cleaned) {
+      onCreate(cleaned)
+      onFilter({ kind: 'named', name: cleaned })
+    }
+    setDraft('')
+    setMaking(false)
+  }
+
   return (
-    <ul className="flex flex-wrap items-center gap-1.5">
-      <li className="mr-0.5 text-xs text-ink-mute">Folders:</li>
-      {chip({ kind: 'all' }, 'All', unfiledCount + names.reduce((n, f) => n + countOf(f), 0))}
-      {names.map((name) => chip({ kind: 'named', name }, name, countOf(name)))}
-      {unfiledCount > 0 && chip({ kind: 'unfiled' }, 'Unfiled', unfiledCount)}
-    </ul>
+    <div className="rounded-xl border border-rule bg-card px-3 py-2 shadow-sm">
+      <ul className="flex flex-wrap items-center gap-1.5">
+        <li className="mr-0.5 text-xs font-medium">
+          Folders
+          <span className="ml-1 font-normal text-ink-mute">— your own grouping of these studies</span>
+        </li>
+        {names.length > 0 && chip({ kind: 'all' }, 'All', ids.length)}
+        {names.map((name) => chip({ kind: 'named', name }, name, countIn(folders, name, ids)))}
+        {names.length > 0 && unfiled > 0 && chip({ kind: 'unfiled' }, 'Unfiled', unfiled)}
+
+        <li>
+          {making ? (
+            <input
+              autoFocus
+              value={draft}
+              maxLength={FOLDER_NAME_MAX}
+              placeholder="Folder name"
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={commitNew}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur()
+                if (e.key === 'Escape') {
+                  setDraft('')
+                  setMaking(false)
+                }
+              }}
+              className="w-36 rounded-lg border border-rule bg-card px-2 py-1 text-xs"
+            />
+          ) : (
+            <button type="button" onClick={() => setMaking(true)} className={`${CHIP} ${PLAIN}`}>
+              + New folder
+            </button>
+          )}
+        </li>
+      </ul>
+
+      {/* Only for a named folder: All and Unfiled are not things that can be
+          renamed or deleted, and offering it would say otherwise. */}
+      {filter.kind === 'named' && (
+        <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-rule pt-2">
+          {renaming === filter.name ? (
+            <input
+              autoFocus
+              defaultValue={filter.name}
+              maxLength={FOLDER_NAME_MAX}
+              onBlur={(e) => {
+                const cleaned = cleanFolderName(e.target.value)
+                if (cleaned && cleaned !== filter.name) {
+                  onRename(filter.name, cleaned)
+                  onFilter({ kind: 'named', name: cleaned })
+                }
+                setRenaming(null)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') e.currentTarget.blur()
+                if (e.key === 'Escape') setRenaming(null)
+              }}
+              className="w-44 rounded-md border border-rule bg-card px-2 py-1 text-xs"
+            />
+          ) : (
+            <>
+              <span className="text-xs text-ink-mute">
+                {countIn(folders, filter.name, ids)}{' '}
+                {countIn(folders, filter.name, ids) === 1 ? 'study' : 'studies'} in{' '}
+                <b className="text-ink">{filter.name}</b>
+              </span>
+              <button type="button" onClick={() => setRenaming(filter.name)} className={`${CHIP} ${PLAIN}`}>
+                Rename
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmRemove(filter.name)}
+                className={`${CHIP} ${PLAIN}`}
+              >
+                Delete folder
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {confirmRemove && (
+        <div className="mt-2 rounded-lg border border-rule bg-buff-soft/40 px-3 py-2">
+          <p className="text-xs">
+            Delete <b>{confirmRemove}</b>?{' '}
+            {countIn(folders, confirmRemove, ids) === 1
+              ? 'The one study in it becomes'
+              : `The ${countIn(folders, confirmRemove, ids)} studies in it become`}{' '}
+            unfiled. Nothing on Lichess is touched — this folder only exists in this browser.
+          </p>
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                onRemove(confirmRemove)
+                onFilter({ kind: 'all' })
+                setConfirmRemove(null)
+              }}
+              className={`${CHIP} border-felt bg-felt text-buff hover:bg-felt-deep`}
+            >
+              Delete folder
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmRemove(null)}
+              className={`${CHIP} ${PLAIN}`}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -70,11 +201,11 @@ export function FolderPicker({
   studyId,
   onAssign,
 }: {
-  folders: FolderMap
+  folders: Folders
   studyId: string
   onAssign: (folder: string | null) => void
 }) {
-  const current = folders[studyId] ?? ''
+  const current = folders.of[studyId] ?? ''
   const [draft, setDraft] = useState(current)
 
   // Follows the selection: the box describes whichever study is chosen, and a
@@ -90,7 +221,7 @@ export function FolderPicker({
 
   return (
     <label className="flex items-center gap-2 text-xs text-ink-mute">
-      Folder
+      In folder
       <input
         list="chesspique-folders"
         value={draft}

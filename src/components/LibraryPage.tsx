@@ -17,13 +17,16 @@ import type { CachedStudy, LibraryGame } from '../lib/gameLibrary'
 import LichessStudyPicker from './LichessStudyPicker'
 import {
   assignFolder,
+  createFolder,
   filterIsStale,
   loadFolders,
   matchesFilter,
   pruneFolders,
+  removeFolder,
+  renameFolder,
   saveFolders,
 } from '../lib/folders'
-import type { FolderFilter, FolderMap } from '../lib/folders'
+import type { FolderFilter, Folders } from '../lib/folders'
 import { FolderBar, FolderPicker, NewStudyDialog } from './StudyFolders'
 import { allTags, matchesTagQuery } from '../lib/tags'
 import type { StudyVisibility } from '../lib/lichess/library'
@@ -88,7 +91,7 @@ export default function LibraryPage({
   const [loadingGames, setLoadingGames] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [folders, setFolders] = useState<FolderMap>(loadFolders)
+  const [folders, setFolders] = useState<Folders>(loadFolders)
   const [filter, setFilter] = useState<FolderFilter>({ kind: 'all' })
   const [newStudyOpen, setNewStudyOpen] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -182,7 +185,7 @@ export default function LibraryPage({
     const live = studies.map((s) => s.id)
     setFolders((current) => {
       const next = pruneFolders(current, live)
-      if (Object.keys(next).length === Object.keys(current).length) return current
+      if (Object.keys(next.of).length === Object.keys(current.of).length) return current
       saveFolders(next)
       return next
     })
@@ -213,17 +216,19 @@ export default function LibraryPage({
   // already knows how to show a list of studies, and folders are this app's
   // idea rather than anything Lichess would tell it about.
   const shown = studies.filter((study) => matchesFilter(folders, study.id, filter))
-  const countIn = (folder: string) =>
-    studies.filter((study) => folders[study.id] === folder).length
-  const unfiledCount = studies.filter((study) => !(study.id in folders)).length
+  const studyIds = studies.map((study) => study.id)
 
-  const setFolderOf = (id: string, folder: string | null) => {
+  /** Every folder change goes through here, so none of them forgets to save. */
+  const editFolders = (change: (current: Folders) => Folders) => {
     setFolders((current) => {
-      const next = assignFolder(current, id, folder)
+      const next = change(current)
+      if (next === current) return current
       saveFolders(next)
       return next
     })
   }
+  const setFolderOf = (id: string, folder: string | null) =>
+    editFolders((current) => assignFolder(current, id, folder))
 
   /**
    * Make a study, and file it where the bar is pointing.
@@ -390,8 +395,10 @@ export default function LibraryPage({
         folders={folders}
         filter={filter}
         onFilter={setFilter}
-        unfiledCount={unfiledCount}
-        countOf={countIn}
+        ids={studyIds}
+        onCreate={(name) => editFolders((current) => createFolder(current, name))}
+        onRename={(from, to) => editFolders((current) => renameFolder(current, from, to))}
+        onRemove={(name) => editFolders((current) => removeFolder(current, name))}
       />
 
       <LichessStudyPicker

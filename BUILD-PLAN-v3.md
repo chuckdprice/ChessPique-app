@@ -351,11 +351,23 @@ Each is useful alone and none of them changes the spine.
    rather than adding the study locally: the listing is what every other part of
    the page trusts, and a study this app invented would be a second source of
    truth. Deletion links out to lichess.org, as it always will.
-5. **Tags.** Free text in the root comment, the grammar fixed above, with an
-   autocomplete drawn from the local index from the first day — that alone
-   prevents most of the `#kaprov` drift for almost no code. Search and filter,
-   but no rename or bulk edit until the model has survived some real use: a
-   rename is one `POST /moves` per affected game.
+5. **Tags.** *Done.* Free text in the root comment, the grammar as fixed above,
+   suggested from what is already in the library so `#kaprov` mostly never gets
+   typed. Edited beside the PGN tags, because they are annotation and travel
+   through the same save, export and share link as the rest of the game — no
+   second store to keep in step. Filtered in the game list, where two tags
+   narrow rather than widen. Read out of a chapter's PGN by regex rather than by
+   replaying its moves, since a study is listed far more often than it is
+   opened. Still no rename or bulk edit: that is one `POST /moves` per affected
+   game and can wait for the model to survive some use.
+
+   One thing measured the hard way: tags cannot be found by looking at the last
+   *line* of the comment. `humanComment` collapses every run of whitespace, so a
+   comment written with a newline before its tags comes back with a space, and a
+   line-based rule lost every tag on the first re-read. They are the trailing run
+   of `#token`s instead, however they are spaced — and each must carry its `#`,
+   because "played", "well" and "approved" are all legal tag bodies and a
+   sentence was otherwise read as a row of tags.
 6. **Backup.** One JSON export and import covering settings, the folder map,
    recents and the tag index — with the tag index included so a restore is
    instant rather than triggering a full reindex. Built by **allowlist**, so

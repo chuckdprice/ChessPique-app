@@ -9,6 +9,7 @@
  */
 
 import { headerDict, splitHeadersAndMovetext } from './convert'
+import { tagsInPgn } from './tags'
 
 /**
  * A tag line, strictly: a name and a quoted value.
@@ -98,6 +99,8 @@ export interface GameSummary {
   date: string | null
   result: string | null
   event: string | null
+  /** The game's own labels, read from its root comment. */
+  tags: string[]
 }
 
 /**
@@ -121,5 +124,6 @@ export function summarize(pgn: string): GameSummary {
     date: get('Date'),
     result: get('Result'),
     event: get('Event'),
+    tags: tagsInPgn(pgn),
   }
 }

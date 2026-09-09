@@ -29,6 +29,7 @@ import {
 } from './lib/recents'
 import type { RecentGame, RecentStudy } from './lib/recents'
 import { decodeGame, payloadInHash } from './lib/share'
+import { parseTags, writeTags } from './lib/tags'
 import type { PgnExtras } from './components/PgnExtrasSwitches'
 import {
   convertPgn,
@@ -70,6 +71,7 @@ import {
   mainlineUcis,
   nextId,
   nodeAtMainlinePly,
+  nodeOf,
   previousId,
   parseMoveTree,
   promote,
@@ -245,6 +247,8 @@ export default function App() {
   const [pendingStudyId, setPendingStudyId] = useState<string | null>(null)
   /** Something the library should say when it opens, from a failed shortcut. */
   const [libraryNotice, setLibraryNotice] = useState<string | null>(null)
+  /** Tags across every cached study, for the editor's suggestions. */
+  const [knownTags, setKnownTags] = useState<string[]>([])
   /**
    * The chapter this game came from, and may be written back over.
    *
@@ -361,6 +365,21 @@ export default function App() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // The suggestions come from what is already in the library, so they are read
+  // once from the cache rather than kept in a second store of their own. A save
+  // moves them, which is what `saveState` is doing in the dependencies.
+  useEffect(() => {
+    let live = true
+    void loadCachedStudies().then((studies) => {
+      if (!live) return
+      const all = studies.flatMap((study) => study.games.flatMap((g) => g.tags))
+      setKnownTags([...new Set(all)].sort())
+    })
+    return () => {
+      live = false
+    }
+  }, [saveState])
 
   // Fetch the analysis chunk once the browser is idle, while the user is still
   // pasting or picking a PGN, so Convert never waits on a network round trip.
@@ -705,6 +724,26 @@ export default function App() {
    */
   const handleCommentChange = useCallback((nodeId: string, comment: string) => {
     setGame((prev) => (prev ? { ...prev, tree: setComment(prev.tree, nodeId, comment) } : prev))
+  }, [])
+
+  /**
+   * The game's own labels, which live in the root comment beside any note.
+   *
+   * Read from the tree rather than held beside it: they are part of the game,
+   * so they travel through the same save, the same export and the same share
+   * link as everything else, and nothing has to remember to keep a second copy
+   * in step.
+   */
+  const rootComment = game ? (nodeOf(game.tree, game.tree.root)?.comment ?? null) : null
+  const gameTags = useMemo(() => parseTags(rootComment).tags, [rootComment])
+
+  const handleTagsChange = useCallback((next: string[]) => {
+    setGame((prev) => {
+      if (!prev) return prev
+      const root = nodeOf(prev.tree, prev.tree.root)
+      const { prose } = parseTags(root?.comment ?? null)
+      return { ...prev, tree: setComment(prev.tree, prev.tree.root, writeTags(prose, next)) }
+    })
   }, [])
 
   const handleExtraChange = useCallback(
@@ -1483,6 +1522,9 @@ export default function App() {
               downloadName={downloadName}
               extras={pgnExtras}
               onExtraChange={handleExtraChange}
+              gameTags={gameTags}
+              onGameTagsChange={handleTagsChange}
+              knownTags={knownTags}
               lichessUrl={
                 origin ? `https://lichess.org/study/${origin.studyId}/${origin.chapterId}` : null
               }

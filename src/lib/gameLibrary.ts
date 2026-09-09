@@ -28,6 +28,8 @@ export interface LibraryGame {
   date: string | null
   result: string | null
   event: string | null
+  /** The game's own labels, read from its root comment. */
+  tags: string[]
   /** The chapter's PGN exactly as Lichess served it. */
   pgn: string
 }

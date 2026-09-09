@@ -14,6 +14,7 @@ import type { PgnExtras } from './PgnExtrasSwitches'
 import TabPane from './TabPane'
 import type { TabDef } from './TabPane'
 import TagEditor from './TagEditor'
+import GameTags from './GameTags'
 
 type Tab = 'moves' | 'headers' | 'source' | 'converted'
 
@@ -161,6 +162,10 @@ interface GameTabsProps {
   hasEvals: boolean
   /** The chapter this game came from on Lichess, when it came from one. */
   lichessUrl: string | null
+  /** The game's own labels, and every label already in use. */
+  gameTags: string[]
+  onGameTagsChange: (tags: string[]) => void
+  knownTags: string[]
 }
 
 /**
@@ -202,6 +207,9 @@ export default function GameTabs({
   onExtraChange,
   hasEvals,
   lichessUrl,
+  gameTags,
+  onGameTagsChange,
+  knownTags,
 }: GameTabsProps) {
   const [tab, setTab] = useState<Tab>('moves')
   const [sourceCopied, setSourceCopied] = useState(false)
@@ -252,7 +260,10 @@ export default function GameTabs({
       )}
 
       {tab === 'headers' && (
-        <div className="px-3">
+        <div className="space-y-4 px-3">
+          {/* Above the PGN tags, because these are the ones a reader chooses
+              and the ones below are mostly the game's own record. */}
+          <GameTags tags={gameTags} onChange={onGameTagsChange} known={knownTags} />
           <TagEditor
             headers={headers}
             onChange={onHeaderChange}

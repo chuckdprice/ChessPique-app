@@ -25,6 +25,7 @@ import {
 } from '../lib/folders'
 import type { FolderFilter, FolderMap } from '../lib/folders'
 import { FolderBar, FolderPicker, NewStudyDialog } from './StudyFolders'
+import { allTags, matchesTagQuery } from '../lib/tags'
 import type { StudyVisibility } from '../lib/lichess/library'
 
 export type SaveState =
@@ -92,6 +93,7 @@ export default function LibraryPage({
   const [newStudyOpen, setNewStudyOpen] = useState(false)
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
+  const [tagQuery, setTagQuery] = useState('')
 
   const handleFailure = useCallback((e: unknown) => {
     // A rejected token is worth nothing. Dropping it here is what stops a dead
@@ -438,6 +440,8 @@ export default function LibraryPage({
       )}
 
       <GameList
+        tagQuery={tagQuery}
+        onTagQuery={setTagQuery}
         study={selected}
         loading={loadingGames}
         studyChosen={!!meta}
@@ -509,12 +513,16 @@ function GameList({
   studyChosen,
   openChapterId,
   onOpen,
+  tagQuery,
+  onTagQuery,
 }: {
   study: CachedStudy | null
   loading: boolean
   studyChosen: boolean
   openChapterId: string | null
   onOpen: (game: LibraryGame) => void
+  tagQuery: string
+  onTagQuery: (query: string) => void
 }) {
   if (!studyChosen) {
     return <p className="text-sm text-ink-mute">Choose a study to see the games in it.</p>
@@ -526,10 +534,55 @@ function GameList({
     return <p className="text-sm text-ink-mute">No games in this study yet.</p>
   }
 
+  const known = allTags(study.games)
+  const shown = study.games.filter((game) => matchesTagQuery(game.tags, tagQuery))
+
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-rule bg-card shadow-sm">
+    <div className="flex min-h-0 flex-1 flex-col gap-2">
+      {/* Only where there is something to filter: a search box over a study
+          nobody has tagged is a control that can only ever empty the list. */}
+      {known.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <input
+            value={tagQuery}
+            onChange={(e) => onTagQuery(e.target.value)}
+            placeholder="Filter by tag…"
+            aria-label="Filter games by tag"
+            className="w-44 rounded-md border border-rule bg-card px-2 py-1 text-xs"
+          />
+          {known.slice(0, 10).map((tag) => {
+            const on = tagQuery.toLowerCase().split(/\s+/).includes(`#${tag}`)
+            return (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => onTagQuery(on ? '' : `#${tag}`)}
+                className={`rounded-lg border px-2 py-[3px] text-xs transition-colors ${
+                  on ? 'border-felt-bright bg-felt/10 font-medium' : 'border-rule hover:bg-buff-soft'
+                }`}
+              >
+                #{tag}
+              </button>
+            )
+          })}
+          {tagQuery && (
+            <button
+              type="button"
+              onClick={() => onTagQuery('')}
+              className="text-xs text-ink-mute underline hover:text-ink"
+            >
+              clear
+            </button>
+          )}
+        </div>
+      )}
+
+      {shown.length === 0 ? (
+        <p className="text-sm text-ink-mute">No games here carry that tag.</p>
+      ) : (
+      <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-rule bg-card shadow-sm">
       <ul className="divide-y divide-rule">
-        {study.games.map((game, i) => {
+        {shown.map((game, i) => {
           const current = game.chapterId != null && game.chapterId === openChapterId
           return (
             <li key={game.chapterId ?? `game-${i}`}>
@@ -544,6 +597,11 @@ function GameList({
                   {game.chapterName ?? nameOf(game)}
                 </span>
                 <span className="shrink-0 text-xs tabular-nums text-ink-mute">{game.result}</span>
+                {game.tags.length > 0 && (
+                  <span className="hidden shrink-0 truncate text-xs text-ink-mute sm:inline">
+                    {game.tags.map((tag) => `#${tag}`).join(' ')}
+                  </span>
+                )}
                 <span className="w-24 shrink-0 truncate text-right text-xs text-ink-mute">
                   {game.date}
                 </span>
@@ -552,6 +610,8 @@ function GameList({
           )
         })}
       </ul>
+      </div>
+      )}
     </div>
   )
 }

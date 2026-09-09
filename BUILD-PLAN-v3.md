@@ -419,7 +419,10 @@ Each is useful alone and none of them changes the spine.
 
 ## Release
 
-`npm version minor` — never by hand, and `--no-git-tag-version` to leave it for
-review — takes 2.5 to 3.0 when the branch is ready to merge. Tag `v2.5-final`
+`npm version major` — never by hand, and `--no-git-tag-version` to leave it for
+review — takes 2.5 to 3.0 when the branch is ready to merge. **Major, not
+minor**: this plan said minor for most of its life, and minor on 2.5.0 gives
+2.6.0. Only major and minor are read (the build number comes from the commit
+timestamp), so the difference is the whole version number. Tag `v2.5-final`
 on the last v2.5 release first, the way `v2.0-final` and `v1.6-final` bracket
 the releases before it, so a rollback has somewhere to go.

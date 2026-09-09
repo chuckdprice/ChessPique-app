@@ -338,9 +338,19 @@ Each is useful alone and none of them changes the spine.
    game that came from a chapter. The fragment stays while its game is the game
    on the board, so the link reloads, and is cleared the moment anything else
    is loaded.
-4. **Folders and study creation.** `studyId → folder path`, held locally, with
-   an "unfiled" bucket because the map will drift whenever a study is made or
-   removed on lichess.org. Deletion links out; the app can only empty a study.
+4. **Folders and study creation.** *Done.* `studyId → folder name`, held
+   locally, because a study's metadata is a name and two dates and there is no
+   field to write a folder into. A plain name rather than a path: nesting wants
+   a tree to draw it and a way to move a branch, and neither earns its keep
+   until a reader has more folders than fit on a line. The map drifts by
+   construction — a study made or deleted on lichess.org tells this app nothing
+   — so it is pruned against the listing, and "unfiled" is a real place rather
+   than an error state. A folder is exactly the studies naming it, so emptying
+   one deletes it, and the bar falls back to All rather than sitting on a name
+   nothing matches. Creation goes through `POST /api/study` and then re-lists
+   rather than adding the study locally: the listing is what every other part of
+   the page trusts, and a study this app invented would be a second source of
+   truth. Deletion links out to lichess.org, as it always will.
 5. **Tags.** Free text in the root comment, the grammar fixed above, with an
    autocomplete drawn from the local index from the first day — that alone
    prevents most of the `#kaprov` drift for almost no code. Search and filter,

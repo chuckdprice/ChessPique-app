@@ -27,6 +27,17 @@ import {
 import type { RecentGame, RecentStudy } from '../lib/recents'
 import { gameOf } from '../lib/gameLibrary'
 import { summarize } from '../lib/multiPgn'
+import {
+  assignFolder,
+  filterIsStale,
+  loadFolders,
+  matchesFilter,
+  pruneFolders,
+  saveFolders,
+} from '../lib/folders'
+import type { FolderFilter, FolderMap } from '../lib/folders'
+import { FolderBar, FolderPicker, NewStudyDialog } from './StudyFolders'
+import type { StudyVisibility } from '../lib/lichess/library'
 
 export type SaveState =
   | { kind: 'saving' }
@@ -83,6 +94,11 @@ export default function LibraryPage({
   const [recentGames, setRecentGames] = useState<RecentGame[]>(loadRecentGames)
   const [recentStudies, setRecentStudies] = useState<RecentStudy[]>(loadRecentStudies)
   const [openingRecent, setOpeningRecent] = useState<string | null>(null)
+  const [folders, setFolders] = useState<FolderMap>(loadFolders)
+  const [filter, setFilter] = useState<FolderFilter>({ kind: 'all' })
+  const [newStudyOpen, setNewStudyOpen] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
 
   const handleFailure = useCallback((e: unknown) => {
     // A rejected token is worth nothing. Dropping it here is what stops a dead
@@ -185,6 +201,31 @@ export default function LibraryPage({
   }, [listed, studies])
 
   /**
+   * Drop folder entries for studies the listing no longer has.
+   *
+   * The same notice-by-absence everything else here relies on. Kept apart from
+   * the recents pruning because the two lists are unrelated: a study can leave
+   * one without touching the other.
+   */
+  useEffect(() => {
+    if (!listed) return
+    const live = studies.map((s) => s.id)
+    setFolders((current) => {
+      const next = pruneFolders(current, live)
+      if (Object.keys(next).length === Object.keys(current).length) return current
+      saveFolders(next)
+      return next
+    })
+  }, [listed, studies])
+
+  // A folder is exactly the studies naming it, so emptying one deletes it —
+  // and the bar would then sit on a name nothing matches, showing an empty
+  // list with no way to tell why.
+  useEffect(() => {
+    if (filterIsStale(folders, filter)) setFilter({ kind: 'all' })
+  }, [folders, filter])
+
+  /**
    * Re-read the lists after App has written to them.
    *
    * They are recorded where the opening and saving happen, which is App, and
@@ -199,6 +240,45 @@ export default function LibraryPage({
 
   const selected = studyId ? (cache.get(studyId) ?? null) : null
   const meta = studies.find((study) => study.id === studyId) ?? null
+  // The picker is handed a filtered list rather than taught about folders: it
+  // already knows how to show a list of studies, and folders are this app's
+  // idea rather than anything Lichess would tell it about.
+  const shown = studies.filter((study) => matchesFilter(folders, study.id, filter))
+  const countIn = (folder: string) =>
+    studies.filter((study) => folders[study.id] === folder).length
+  const unfiledCount = studies.filter((study) => !(study.id in folders)).length
+
+  const setFolderOf = (id: string, folder: string | null) => {
+    setFolders((current) => {
+      const next = assignFolder(current, id, folder)
+      saveFolders(next)
+      return next
+    })
+  }
+
+  /**
+   * Make a study, and file it where the bar is pointing.
+   *
+   * Re-listing afterwards rather than adding it locally: the listing is what
+   * every other part of this page trusts, and a study invented here that the
+   * listing did not confirm would be a second source of truth.
+   */
+  const handleCreate = async (name: string, visibility: StudyVisibility) => {
+    if (!session) return
+    setCreating(true)
+    setCreateError(null)
+    try {
+      const { id } = await client.createStudy(session.token, { name, visibility })
+      if (filter.kind === 'named') setFolderOf(id, filter.name)
+      setNewStudyOpen(false)
+      setStudyId(id)
+      setListed(false)
+    } catch (e) {
+      setCreateError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setCreating(false)
+    }
+  }
 
   /**
    * Download the chosen study when there is no copy, or Lichess says the copy
@@ -336,9 +416,12 @@ export default function LibraryPage({
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-4">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="font-display text-lg font-semibold">
+        <h2 className="min-w-0 flex-1 font-display text-lg font-semibold">
           Library <span className="text-sm font-normal text-ink-mute">— {session.username}</span>
         </h2>
+        <button type="button" className={BUTTON} onClick={() => setNewStudyOpen(true)}>
+          New study…
+        </button>
         <button
           type="button"
           className={BUTTON}
@@ -396,12 +479,58 @@ export default function LibraryPage({
         onPickStudy={setStudyId}
       />
 
+      <FolderBar
+        folders={folders}
+        filter={filter}
+        onFilter={setFilter}
+        unfiledCount={unfiledCount}
+        countOf={countIn}
+      />
+
       <LichessStudyPicker
-        studies={studies}
+        studies={shown}
         loading={streaming}
         selectedId={studyId}
         onSelect={setStudyId}
       />
+
+      {meta && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-rule bg-card px-3 py-2 shadow-sm">
+          <span className="min-w-0 flex-1 truncate text-sm font-medium">{meta.name}</span>
+          <FolderPicker
+            folders={folders}
+            studyId={meta.id}
+            onAssign={(folder) => setFolderOf(meta.id, folder)}
+          />
+          {/* Out to Lichess, because there is no delete on the study API at
+              all: POST /study/{id}/delete is the web route, cookie
+              authenticated and without CORS, so a browser holding a Bearer
+              token cannot reach it. Saying so is better than a button that
+              could only ever fail. */}
+          <a
+            href={`https://lichess.org/study/${meta.id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Open this study on Lichess, where it can be renamed or deleted"
+            className="rounded-lg border border-rule px-2.5 py-1 text-xs font-medium transition-colors hover:bg-buff-soft"
+          >
+            Manage on Lichess
+          </a>
+        </div>
+      )}
+
+      {newStudyOpen && (
+        <NewStudyDialog
+          busy={creating}
+          error={createError}
+          folder={filter.kind === 'named' ? filter.name : null}
+          onCreate={(name, visibility) => void handleCreate(name, visibility)}
+          onClose={() => {
+            setNewStudyOpen(false)
+            setCreateError(null)
+          }}
+        />
+      )}
 
       <GameList
         study={selected}

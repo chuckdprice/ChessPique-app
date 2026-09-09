@@ -376,12 +376,20 @@ Each is useful alone and none of them changes the spine.
    of `#token`s instead, however they are spaced — and each must carry its `#`,
    because "played", "well" and "approved" are all legal tag bodies and a
    sentence was otherwise read as a row of tags.
-6. **Backup.** One JSON export and import covering settings, the folder map,
-   recents and the tag index — with the tag index included so a restore is
-   instant rather than triggering a full reindex. Built by **allowlist**, so
-   that `chesspique.lichess` — which holds a live OAuth bearer token — can
-   never be written into a file the user might mail to themselves, and so a
-   future key cannot leak in by being forgotten.
+6. **Backup.** *Done*, and smaller than this plan expected. There is no tag
+   index to carry: tags turned out to live inside the games' own PGNs on
+   Lichess, so they need no local storage and survive a wipe by themselves. The
+   study cache is derived and rebuilds on the next visit. What is genuinely
+   irreplaceable is the folder map, the two recents lists and the settings —
+   six keys — and that is what the file holds.
+
+   Built by **allowlist**, and that is a safety property rather than tidiness:
+   `chesspique.lichess` holds a live OAuth bearer token and a backup is a file
+   people mail to themselves. A blocklist would have leaked it the first time
+   somebody added a key and forgot to exclude it. The same list guards the way
+   back in, so a hand-edited backup cannot plant a token under a name the app
+   trusts — checked in the running app with a doctored file, not only in a unit
+   test.
 
 ## Traps
 

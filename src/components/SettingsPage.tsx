@@ -1,6 +1,7 @@
 import { DEFAULT_ENGINE } from '../lib/settings'
 import type { EngineSettings } from '../lib/settings'
 import { SliderRow, SwitchRow, MAIA_CAPTION } from './EngineSettings'
+import BackupSettings from './BackupSettings'
 
 interface SettingsPageProps {
   engine: EngineSettings
@@ -151,6 +152,8 @@ export default function SettingsPage({ engine, onEngineChange }: SettingsPagePro
             onChange={(v) => onEngineChange({ ...engine, maiaArrowEvals: v })}
           />
         </Section>
+
+        <BackupSettings />
       </div>
     </div>
   )

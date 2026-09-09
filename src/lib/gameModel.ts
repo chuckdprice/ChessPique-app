@@ -44,21 +44,42 @@ export function replayGame(moves: Move[]): ReplayedGame {
  * more than one answer. A position chess.js will not parse gets null: a board
  * that cannot say whether there is a check should not claim there is one.
  */
-export function checkedKingSquare(fen: string): string | null {
+/**
+ * The square of the king belonging to the side to move, when `wanted` holds.
+ *
+ * Both callers want the same king — the one being attacked is always the one
+ * whose turn it is — and differ only in how much trouble it has to be in.
+ */
+function kingInTrouble(fen: string, wanted: (chess: Chess) => boolean): string | null {
   let chess
   try {
     chess = new Chess(fen)
   } catch {
     return null
   }
-  if (!chess.isCheck()) return null
-  const inCheck = chess.turn()
+  if (!wanted(chess)) return null
+  const side = chess.turn()
   for (const rank of chess.board()) {
     for (const piece of rank) {
-      if (piece && piece.type === 'k' && piece.color === inCheck) return piece.square
+      if (piece && piece.type === 'k' && piece.color === side) return piece.square
     }
   }
   return null
+}
+
+export function checkedKingSquare(fen: string): string | null {
+  return kingInTrouble(fen, (chess) => chess.isCheck())
+}
+
+/**
+ * The square of a king that has been mated, or null.
+ *
+ * Narrower than `checkedKingSquare` on purpose: a checked king is a warning and
+ * gets the glow, a mated one is the end of the game and gets a marker of its
+ * own. Every mated king is also in check, so the two are drawn together.
+ */
+export function matedKingSquare(fen: string): string | null {
+  return kingInTrouble(fen, (chess) => chess.isCheckmate())
 }
 
 const FILES = 'abcdefgh'

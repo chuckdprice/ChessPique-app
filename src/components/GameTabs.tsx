@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { copyText } from '../lib/clipboard'
-import { encodeGame, shareLink, SHARE_LINK_WARN_CHARS } from '../lib/share'
 import { loadSession, openSignInWindow, saveSession, signIn } from '../lib/lichess/oauth'
 import { fetchAccount } from '../lib/lichess/studies'
 import type { ConvertOptions } from '../lib/convert'
@@ -149,9 +148,8 @@ export default function GameTabs({
   const [studyOpen, setStudyOpen] = useState(false)
   const [authBusy, setAuthBusy] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
-  const [share, setShare] = useState<
-    { kind: 'idle' } | { kind: 'working' } | { kind: 'done'; long: boolean } | { kind: 'error' }
-  >({ kind: 'idle' })
+  /** Set when a copied link came out long enough to warn about; cleared on its own. */
+  const [longLink, setLongLink] = useState(false)
 
   // The "Copied" confirmation goes back to reading "Copy" on its own.
   useEffect(() => {
@@ -166,33 +164,12 @@ export default function GameTabs({
     if (convertError) setTab('source')
   }, [convertError])
 
-  // The share confirmation goes back to reading "Share link" on its own, the
-  // way the Copy button does.
+  // The warning clears itself, so it does not outlive the link it was about.
   useEffect(() => {
-    if (share.kind !== 'done' && share.kind !== 'error') return
-    const timer = setTimeout(() => setShare({ kind: 'idle' }), 4000)
+    if (!longLink) return
+    const timer = setTimeout(() => setLongLink(false), 8000)
     return () => clearTimeout(timer)
-  }, [share])
-
-  /**
-   * Put a link to this game on the clipboard.
-   *
-   * The whole PGN travels in the link, so what is shared is what the switches
-   * above say — including the evals, which a game sent through a Lichess study
-   * would lose, since Lichess strips every command it does not maintain itself.
-   */
-  const handleShare = async () => {
-    if (!convertedPgn) return
-    setShare({ kind: 'working' })
-    try {
-      const payload = await encodeGame(convertedPgn)
-      const link = shareLink(payload, window.location)
-      if (!(await copyText(link))) throw new Error('clipboard refused')
-      setShare({ kind: 'done', long: link.length > SHARE_LINK_WARN_CHARS })
-    } catch {
-      setShare({ kind: 'error' })
-    }
-  }
+  }, [longLink])
 
   return (
     <TabPane tabs={TABS} label="Game" tab={tab} onTab={setTab}>
@@ -287,16 +264,12 @@ export default function GameTabs({
           <div className="mt-2 flex shrink-0 flex-wrap items-center gap-2">
             {convertedPgn ? (
               <>
-                <PgnActions pgn={convertedPgn} fileName={downloadName} compact />
-                <SmallButton onClick={() => void handleShare()} disabled={share.kind === 'working'}>
-                  {share.kind === 'working'
-                    ? 'Linking…'
-                    : share.kind === 'done'
-                      ? 'Link copied'
-                      : share.kind === 'error'
-                        ? 'Could not copy'
-                        : 'Share link'}
-                </SmallButton>
+                <PgnActions
+                  pgn={convertedPgn}
+                  fileName={downloadName}
+                  compact
+                  onShared={setLongLink}
+                />
                 {lichessUrl && (
                   <a
                     href={lichessUrl}
@@ -347,7 +320,7 @@ export default function GameTabs({
               </p>
             )}
           </div>
-          {share.kind === 'done' && share.long && (
+          {longLink && (
             <p className="mt-1.5 shrink-0 text-xs text-ink-mute">
               That link is long enough that some chat and mail clients may break it. Sending it
               as an attachment, or through a study, is safer for a game this size.

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { clearSession, loadSession, saveSession, signIn } from '../lib/lichess/oauth'
 import type { LichessSession } from '../lib/lichess/oauth'
 import { fetchAccount, LichessApiError, streamStudies } from '../lib/lichess/studies'
@@ -200,32 +200,49 @@ export default function LibraryPage({
   const selected = studyId ? (cache.get(studyId) ?? null) : null
   const meta = studies.find((study) => study.id === studyId) ?? null
 
-  // Download the chosen study when there is no copy, or Lichess says the copy
-  // is behind. An unchanged study costs nothing at all.
+  /**
+   * Download the chosen study when there is no copy, or Lichess says the copy
+   * is behind. An unchanged study costs nothing at all.
+   *
+   * `fetched` records what has already been asked for, and it is deliberately
+   * not cleared when the download lands. Refresh does two things — it drops the
+   * open study's copy and re-lists — and each re-runs this effect, with a gap
+   * where the listing has been blanked and `meta` is null. Cancelling on that
+   * gap threw the first download away and started a second; clearing the guard
+   * on completion was no better, because `selected` is React state and lags the
+   * write, so a run in between saw a stale "not cached" and asked again.
+   * Measured, one Refresh fetched the same study three times. A key that
+   * survives the landing is the only version that answers all of it: nothing is
+   * cancelled, a late arrival is still the study it was asked for, and a second
+   * request for the same study at the same `updatedAt` never goes out.
+   *
+   * Refresh clears it, because "ask again for exactly this" is what Refresh is
+   * for. A failure clears it too, so the next render may retry rather than
+   * leaving the study unreachable until the page is reloaded.
+   */
+  const fetched = useRef<string | null>(null)
+
   useEffect(() => {
     if (!session || !meta) return
     if (staleStudyIds([meta], selected ? [selected] : []).length === 0) return
 
-    let live = true
+    const key = `${meta.id}@${meta.updatedAt}`
+    if (fetched.current === key) return
+    fetched.current = key
     setLoadingGames(true)
+
     client
       .fetchStudy(session.token, meta.id)
       .then((pgn) => {
-        if (!live) return
         const study = parseStudy(meta, pgn, Date.now())
         void saveCachedStudy(study)
         setCache((current) => new Map(current).set(study.id, study))
       })
       .catch((e) => {
-        if (live) handleFailure(e)
+        if (fetched.current === key) fetched.current = null
+        handleFailure(e)
       })
-      .finally(() => {
-        if (live) setLoadingGames(false)
-      })
-
-    return () => {
-      live = false
-    }
+      .finally(() => setLoadingGames(false))
   }, [session, meta, selected, client, handleFailure])
 
   /**
@@ -328,6 +345,27 @@ export default function LibraryPage({
           onClick={() => {
             setListed(false)
             setError(null)
+            // Drop the open study's copy rather than re-validating it.
+            //
+            // The automatic path compares Lichess's `updatedAt` against the
+            // cached one, and that is right for noticing a study has moved on
+            // — but it is not what Refresh means. Two reasons it would fail
+            // here. Renaming a chapter reaches `updatedAt` through
+            // `setStudyUpdated`, which lila debounces by five seconds
+            // (StudyApi.scala), so coming straight back and pressing Refresh
+            // can read a timestamp that has not caught up yet. And a reader
+            // pressing Refresh is saying the copy on screen is wrong, whatever
+            // any timestamp claims. Forgetting it makes the download
+            // unconditional.
+            if (studyId) {
+              fetched.current = null
+              void forgetCachedStudy(studyId)
+              setCache((current) => {
+                const next = new Map(current)
+                next.delete(studyId)
+                return next
+              })
+            }
           }}
           disabled={streaming}
         >

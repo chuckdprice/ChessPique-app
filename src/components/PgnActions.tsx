@@ -229,34 +229,34 @@ export default function PgnActions({
   const face =
     'inline-flex items-center rounded-lg bg-felt font-medium text-buff shadow-sm transition-colors hover:bg-felt-deep'
   const button = `${face} gap-1.5 ${size}`
-  // Square, so a lone icon is centred rather than sitting in a label's slot.
-  const iconOnly = `${face} justify-center ${compact ? 'size-6' : 'size-11'}`
 
   return (
     /* No shrink-0: it stopped the row being squeezed to the available width,
        so flex-wrap never engaged and the last button ran off a phone screen. */
     <div className="flex flex-wrap items-center gap-2">
-      {/* Copy and Download carry their icon alone: the pair is a convention
-          anyone reads at a glance, and the words were the widest part of a row
-          that has to wrap onto a phone. Their labels live in the tooltip and
-          in the screen-reader name. */}
-      <button
-        type="button"
-        onClick={copy}
-        title={copied ? 'Copied' : 'Copy the PGN to the clipboard'}
-        aria-label={copied ? 'Copied' : 'Copy the PGN to the clipboard'}
-        className={iconOnly}
-      >
-        {copied ? <CheckIcon /> : <CopyIcon />}
-      </button>
+      {/* Download leads: taking the file is the plainer of the two, and the
+          one a reader who has just converted a game is most often after. Both
+          say "PGN" — the icons are what tell them apart, and the tooltip and
+          the screen-reader name still say which is which in full. */}
       <button
         type="button"
         onClick={download}
         title={`Download ${fileName}`}
         aria-label={`Download ${fileName}`}
-        className={iconOnly}
+        className={button}
       >
         <DownloadIcon />
+        PGN
+      </button>
+      <button
+        type="button"
+        onClick={copy}
+        title={copied ? 'Copied' : 'Copy the PGN to the clipboard'}
+        aria-label={copied ? 'Copied' : 'Copy the PGN to the clipboard'}
+        className={button}
+      >
+        {copied ? <CheckIcon /> : <CopyIcon />}
+        PGN
       </button>
       {/* Before the two analysis links: those hand the game to another site,
           this hands it to a person, and the copy-shaped pair above it are the

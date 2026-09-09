@@ -4,7 +4,7 @@ A static web app for reading, editing and preparing chess games. Everything runs
 browser: the engines, the conversion and the editing all happen on your own machine, and no
 game you open is ever uploaded.
 
-It does four things:
+It does five things:
 
 - **Reviews** a game with Stockfish — an evaluation bar, per-move classification, accuracy by
   phase, and a "played like" rating estimate — and, beside that, what a human of a given
@@ -13,6 +13,8 @@ It does four things:
   here rather than only a game you played.
 - **Prepares** an opening from the Lichess opening databases, including one opponent's own
   games from the position on the board.
+- **Keeps** a library of games in your own Lichess studies — folders, tags and search over
+  them — and hands one to a friend as a link that carries the whole game.
 - **Converts** the PGN files exported by the [ChessNoteR](https://chessnoter.com) e-notation
   device, which is where the app started and still how most games get in.
 
@@ -26,35 +28,42 @@ continuation. That is what makes an opening repertoire editable here: alternativ
 the move they answer, any of them can be promoted to the mainline, and the whole tree is read
 from and written back to PGN without loss.
 
-A game does not have to come from a file: **New game** on the menu starts an empty board, and
+A game does not have to come from a file: **New Analysis** starts an empty board, and
 the moves you play on it become the game, ready to export. Everything else works the same way
 on it — the engine review, the opening book, comments and variations.
 
-The two main pages are shown as chevron tabs across the top — **PGN File → Game Analysis** —
-sized so a 1440×900 desktop window needs no scrolling on either step. The button at the top
-left opens a menu reaching both of them, plus **New game**, **Appearance**, **Settings** and
-the help.
+The app opens on four ways in, and once any of them lands the analysis fills the screen:
 
-- **PGN File**: two panes. The left holds the game coming in, under two tabs — *Original PGN*
-  (a prominent drop zone, the time-control override, the paste box and Convert) and
-  *PGN Header Editor* (the tags, whose edits flow live into everything downstream). The right
-  holds the `%clk` output with the switches for what goes into it above, and beneath it the
-  ways out: copy, download, open on Lichess or Chess.com, or save into a Lichess study.
-- **Game Analysis**: board, engine, move list, and charts in one screen.
-- **Settings**: two sections, matching the two menus on the analysis page. *Engine* is how
-  Stockfish searches — search time, number of lines, memory — the same values as the gear on
-  the engine panel. *Board* is what gets drawn on the board — the arrow numbers, and whether
-  Maia runs — the same values as the menu at the end of the move-navigation row. Both menus
-  stay as the shortcut for while you are looking at a position, and both close when you click
-  anywhere else.
-- **New game**: an empty board, seeded with the Seven Tag Roster and today's date so the file
-  is valid from its first move. It asks before replacing a game that has moves in it.
+- **New Analysis** — an empty board, seeded with the Seven Tag Roster and today's date so the
+  file is valid from its first move.
+- **Upload or Drop a .pgn File** — converts as soon as it lands. The whole page is the drop
+  target.
+- **Paste a PGN Game** — from Lichess, Chess.com or a ChessNoteR export, with the time-control
+  override beside it.
+- **Open from Lichess Study** — your library.
+
+The button at the top left opens the menu, which carries those same four in the same order,
+plus **Open Recent Study…** and **Open Recent Game…** (the last ten of each, as submenus),
+**Game Analysis** to come back to the board, **Appearance**, **Settings** and the help.
+
+**Game Analysis** is board, engine, move list and charts in one screen. Beside the board, under
+four icon tabs — hover for the name — is everything about the game that is not the board
+itself: *Move List*, *PGN Header* (its tags and its `#tags`), *Original PGN* (the text it was
+read from, still editable and re-convertible) and *Converted PGN* (the `%clk` output, the
+switches for what goes into it, and the ways out: copy, download, a share link, Lichess,
+Chess.com, or save into a study).
+
+**Settings** has three sections. *Engine* is how Stockfish searches — search time, number of
+lines, memory — the same values as the gear on the engine panel. *Board* is which engines run
+and what they draw, the same values as the menu at the end of the move-navigation row. *Backup*
+saves and restores what only this browser knows. Both menus stay as the shortcut for while you
+are looking at a position, and both close when you click anywhere else.
 
 ### What goes into the converted PGN
 
 Every converted game is tagged `[Annotator "https://chesspique.vercel.app/"]`, so a file that
 gets passed around says where it was made, and `ECO` / `Opening` whenever the opening is known
-(see [Opening names](#opening-names)). All three are shown read-only in the *PGN Header Editor*
+(see [Opening names](#opening-names)). All three are shown read-only in the *PGN Header* tab
 whether or not the source file carried them — the opening as one `ECO: Name` field, since it
 comes from the moves rather than from anything typed.
 
@@ -314,10 +323,67 @@ engine time again. Two limits are inherent to the approach and worth stating pla
   as a rough indicator, not a measurement. Accuracy and move classification are on much firmer
   ground.
 
+## Your library
+
+Games are kept in your own **Lichess studies**: a study is a folder, a chapter is a game. That
+choice costs no server, syncs between devices for free, backs itself up on somebody else's
+infrastructure, and gives every game a public URL — and it means the games are yours, in your
+account, rather than held here.
+
+What the study API can and cannot do shapes the whole feature, so it is worth knowing:
+
+- **There is no endpoint that lists a study's chapters.** The only way to learn what a study
+  holds is to export all of it, which is why the library keeps a local copy of each study and
+  re-downloads only when Lichess says it has changed.
+- **There is no rename.** A chapter's name is fixed when it is imported.
+- **There is no study delete on the API at all** — `POST /study/{id}/delete` is the web route,
+  cookie-authenticated and without CORS, so a browser cannot reach it. Deleting a study links
+  out to lichess.org.
+
+**Refresh** re-lists your studies and re-downloads the open one. It bypasses the browser's own
+cache to do it: Lichess serves a study export with a `Last-Modified` and no `Cache-Control`,
+which lets a browser invent its own freshness — measured, a repeat fetch came back in 1ms
+without leaving the machine, so Refresh was returning chapter names their owner had already
+replaced.
+
+**Folders** are this app's own idea, kept in this browser: Lichess has nowhere to put one. A
+folder is a list you make and file studies into, empty ones included, with everything else
+**Unfiled**. Rename takes its members along; deleting one unfiles its studies and touches
+nothing on Lichess.
+
+**Tags** — `#karpov`, `#dcc-2026`, `#rook-endgame` — are lowercase letters, digits and hyphens,
+edited beside the PGN tags and stored in the chapter's own root comment. That is forced rather
+than chosen: Lichess strips every `[%...]` command it does not maintain and discards every PGN
+header outside a fixed roster, and prose is the only thing that survives. Being prose is also
+why they travel with a shared link, need no storage here, and can be read and edited on
+lichess.org — and why they are public on a public study. The game list filters on them, and two
+tags narrow rather than widen.
+
+**Saving** writes over the chapter you opened this session and otherwise adds a new one. The
+API offers no version to check against — `POST .../moves` is a blind overwrite — so which
+chapter you opened is the whole of what stands between Save and somebody else's work.
+
+## Sharing a game
+
+**Share link** on the *Converted PGN* tab copies a link that carries the entire game in its
+fragment: `…/#/g/<base64url(gzip(pgn))>`. A 43-move game comes out at about 1300 characters,
+inside the ~2000 where chat clients start breaking links.
+
+The link *is* the game rather than a pointer to it, so it cannot break when you edit or delete
+the chapter it came from, and it works from a private or unlisted study that a Lichess link
+could not be read out of. The fragment is never sent to a server, so a shared game never
+reaches this site's logs — and it needs no rewrite rule, which matters on a static host where
+`/g/abc` would simply 404. Evals travel with it too, which a game sent through a study loses.
+
+**View in Study** sits beside it for a game that came from a chapter, and goes to Lichess. It
+is deliberately not the default: it only works for a reader when the study is public, and it
+breaks when the chapter moves.
+
 ## Saving to a Lichess study
 
-*Export PGN → Lichess Study* adds the converted game to one of your own studies as a new
-chapter, using the [Studies API](https://lichess.org/api#tag/studies).
+**Study** on the *Converted PGN* tab adds the game to one of your own studies as a new chapter,
+using the [Studies API](https://lichess.org/api#tag/studies). It is the same sign-in the library
+uses, so doing either once covers both.
 
 Sign-in is **OAuth 2 with PKCE**, entirely in the browser. There is no server here to hold a
 client secret, which is the case PKCE exists for: the app generates a random verifier per
@@ -378,10 +444,10 @@ book position it reached. The data is ~420 kB, so it loads on demand rather than
 
 ## The PGN boxes
 
-Both PGN boxes take the height left in their column, with a floor of ten lines of their own
-monospace: the column has almost no height to give on a phone or a tablet, where the boxes were
-coming out about four lines tall. In practice that is 10 lines on a phone held sideways, 12
-upright and 19 on a tablet, and a desktop window is filled as before.
+*Original PGN* and *Converted PGN* are two tabs of the pane beside the board, and each box takes
+the height left in that pane. **Analyze PGN** on the first reads the box again and replaces the
+game on the board — the same door the start page uses, reached from beside the board so that an
+edited tag or a corrected clock does not cost a trip back to the beginning.
 
 ## Appearance
 
@@ -433,17 +499,32 @@ this repository, which is public.
 ## What is kept in your browser
 
 Nothing is ever uploaded, so everything ChessPique remembers is remembered here, in
-`localStorage`, under four keys:
+`localStorage`:
 
 | Key | Holds |
 | --- | --- |
 | `chesspique.appearance` | theme, board colours, piece set |
 | `chesspique.engine` | Stockfish's search settings, and what the board draws |
 | `chesspique.explorer` | opening explorer database, filters, and the players looked up |
+| `chesspique.folders` | your folders, and which study is in each |
+| `chesspique.recent-games` | the last ten games opened |
+| `chesspique.recent-studies` | the last ten studies opened |
 | `chesspique.lichess` | the Lichess sign-in, until it expires or you sign out |
 
-Games are not among them: a game lives in the tab until you export it. Clearing site data for
-this site resets the app to a first visit and signs you out of Lichess, and nothing else.
+Each study you open is also cached in **IndexedDB** (`chesspique.library`) so that opening a
+folder costs one download rather than one per visit. That cache is derived and never a master
+copy: throwing it away costs a re-download and nothing else, and a record written by an older
+version of the app is discarded rather than read.
+
+The game on the board is not among any of it — a game lives in the tab until you export or save
+it. Clearing site data resets the app to a first visit and signs you out of Lichess.
+
+**Backup**, in Settings, writes the six keys above that are not the sign-in into a JSON file,
+and reads one back. Your games are not in it and do not need to be: they are chapters in your
+Lichess studies, their `#tags` are inside their own PGNs, and the study cache rebuilds itself.
+The sign-in is left out deliberately — it is a live access token, and a backup is a file people
+mail to themselves. The same list of keys guards the way back in, so a hand-edited backup
+cannot plant a token under a name the app trusts.
 
 These keys were `chessnoter.*` until the app was renamed on 30 August 2026. The first read
 under each new name adopts whatever the old one held and removes the old key, so a rename

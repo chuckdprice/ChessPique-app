@@ -79,7 +79,9 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
             <p>
               <strong>ChessPique</strong> is somewhere to keep, read and prepare chess games in
               the browser. Nothing you load is uploaded anywhere: the engines, the conversion
-              and the editing all run on this machine.
+              and the editing all run on this machine. The games you keep are the exception, and
+              they go to your own Lichess account rather than to this site — see{' '}
+              <em>Your library</em> below.
             </p>
             <p>
               It began as a converter, and still is one.{' '}
@@ -108,7 +110,7 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               joins the game, keep several answers to the same position, write a note against any
               of them, and decide which is the main line. That is what makes it usable for an
               opening repertoire and not only for a game you played — and a game need not come
-              from a file at all, since <Ui>New game</Ui> starts an empty board.
+              from a file at all, since <Ui>New Analysis</Ui> starts an empty board.
             </p>
             <p>
               And it reads the Lichess opening databases from the position on the board, one
@@ -116,10 +118,21 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               face.
             </p>
             <p>
-              What it remembers, it remembers here: the theme and board, how the engine
-              searches, what the board draws, the explorer's filters and the players you have
-              looked up, and your Lichess sign-in until it expires. Games are not among them —
-              a game lives in the tab until you export it, so keep the PGN.
+              What it remembers, it remembers in this browser: the theme and board, how the
+              engine searches, what the board draws, the explorer's filters and the players you
+              have looked up, your folders, the last ten games and studies you opened, and your
+              Lichess sign-in until it expires. Clearing this site's data resets all of it.
+            </p>
+            <p>
+              Your games are the exception, and they are not here at all — a game you save goes
+              into a Lichess study in your own account, where clearing this browser cannot reach
+              it. A game merely <em>loaded</em> lives in the tab until you save or export it, so
+              keep the PGN until you have.
+            </p>
+            <p>
+              <Ui>Settings → Backup</Ui> writes the rest into a file and reads one back, for a
+              browser that gets cleared. It leaves out the sign-in on purpose: that is a live
+              access token, and a backup is a file people mail to themselves.
             </p>
           </Section>
 
@@ -161,8 +174,9 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               download and the file name all follow along.
             </p>
             <p>
-              <Ui>Orig PGN</Ui> — the text the game was read from, still editable.{' '}
-              <Ui>Re-convert</Ui> reads it again and replaces the game on the board. If the clock
+              <Ui>Original PGN</Ui> — the text the game was read from, still editable, with its
+              file name at the top.{' '}
+              <Ui>Analyze PGN</Ui> reads it again and replaces the game on the board. If the clock
               times come out wrong, or you see an error about the starting clock, set the starting
               time and any delay or increment under <Ui>Time control override</Ui> on the start
               page and convert again — normally the PGN's own TimeControl tag is used and you can
@@ -327,6 +341,87 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               and the line it would have played instead is added to the game as a variation of
               that move. It walks like any other line — click it, arrow through it, promote it
               if you decide it was right — and it goes into the exported PGN with the rest.
+            </p>
+          </Section>
+
+          <Section title="Your library">
+            <p>
+              Games are kept in your own <strong>Lichess studies</strong> — a study is a folder, a
+              chapter is a game. Nothing is stored on this site: the games are in your account,
+              which is what makes them reach every device you sign in on, and what makes them
+              yours rather than this app's. <Ui>Open Study</Ui> on the menu is the way in.
+            </p>
+            <p>
+              Pick a study and its games are listed. Opening one loads it into the board; the
+              menu's <Ui>Open Recent Game…</Ui> then goes straight back to it later, and{' '}
+              <Ui>Open Recent Study…</Ui> back to the study you were picking from. Both remember
+              the last ten.
+            </p>
+            <p>
+              <Ui>Refresh</Ui> asks Lichess again. It is worth pressing after renaming or adding
+              chapters on lichess.org — and it does really ask, going around the browser's own
+              cache, which will otherwise answer for a study it fetched days ago without saying
+              so.
+            </p>
+            <p>
+              <Ui>Save</Ui> writes over the chapter you opened this session; anything else is
+              added as a new chapter. That is deliberate: Lichess offers no way to check that a
+              chapter still holds what you started from, so the only safe overwrite is one you
+              opened yourself. A game saved as new becomes the one that Save then updates.
+            </p>
+            <p>
+              <Ui>New study…</Ui> makes one on Lichess. <Ui>Private</Ui> is the default — a
+              library of your own games is not a thing to publish by accident — and the choice
+              cannot be read back afterwards, so it is worth making deliberately. Renaming or
+              deleting a study happens on lichess.org: its API has no delete a browser can reach,
+              which is why <Ui>Manage on Lichess</Ui> is a link rather than a button.
+            </p>
+          </Section>
+
+          <Section title="Folders and tags">
+            <p>
+              <strong>Folders</strong> group studies and are this app's own idea — Lichess has
+              nowhere to keep one, so they live in this browser. Make one with{' '}
+              <Ui>+ New folder</Ui>, then file studies into it with the <Ui>In folder</Ui> box
+              under whichever study is selected. Anything unfiled is still there under{' '}
+              <Ui>Unfiled</Ui>. Renaming a folder takes its studies along; deleting one unfiles
+              them and touches nothing on Lichess.
+            </p>
+            <p>
+              <strong>Tags</strong> label a game — <code>#karpov</code>, <code>#dcc-2026</code>,{' '}
+              <code>#rook-endgame</code> — and are edited in the <Ui>PGN Header</Ui> tab beside
+              the board. Lowercase letters, digits and hyphens, no spaces; typing a space or
+              Enter commits one, and the box suggests tags already in your library so the same
+              idea does not end up spelled two ways. The game list filters on them, and two tags
+              narrow rather than widen.
+            </p>
+            <p>
+              They are stored inside the game's own PGN, in the comment before its first move.
+              That is the one place a label survives: Lichess discards custom PGN tags and strips
+              comment commands it does not itself use. The upshots are worth knowing — a tag
+              travels with a shared link, it needs nothing kept in this browser, it can be read
+              and edited on lichess.org, and on a <em>public</em> study it is public.
+            </p>
+          </Section>
+
+          <Section title="Sharing a game">
+            <p>
+              <Ui>Share link</Ui> on the <Ui>Converted PGN</Ui> tab copies a link that carries the
+              whole game inside it. Whoever opens it gets the game — moves, clocks, comments,
+              variations and evaluations — without a Lichess account, without signing in, and
+              without anything being stored on this site. They can then save it into a study of
+              their own.
+            </p>
+            <p>
+              Because the game is <em>in</em> the link rather than pointed at by it, the link
+              cannot break when you edit or delete the chapter it came from, and it works from a
+              private study. The cost is length: a long game makes a long link, and some chat and
+              mail programs break one past about two thousand characters. The app says so when a
+              link comes out that long.
+            </p>
+            <p>
+              <Ui>View in Study</Ui> beside it opens the chapter on Lichess instead. That one only
+              works for someone else if the study is public.
             </p>
           </Section>
 

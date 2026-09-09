@@ -17,6 +17,15 @@ import TagEditor from './TagEditor'
 
 type Tab = 'moves' | 'headers' | 'source' | 'converted'
 
+/**
+ * The one action-button face in this pane, matching PgnActions' compact size.
+ *
+ * Both tabs end in a row of buttons and they have to read as the same row in
+ * two places; three near-identical class strings had already started to drift.
+ */
+const ACTION =
+  'inline-flex items-center gap-1.5 rounded-lg bg-felt px-2.5 py-1 text-xs font-medium text-buff shadow-sm transition-colors hover:bg-felt-deep disabled:cursor-not-allowed disabled:opacity-40'
+
 /** Line icons for the two study buttons, drawn to match PgnActions' set. */
 const Stroked = ({ children }: { children: React.ReactNode }) => (
   <svg
@@ -44,6 +53,30 @@ const SaveIcon = () => (
   <Stroked>
     <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
     <path d="M17 21v-8H7v8M7 3v5h8" />
+  </Stroked>
+)
+
+/** The copy glyph PgnActions uses, so the two Copy buttons match. */
+const CopyIcon = () => (
+  <Stroked>
+    <path d="M5 15V5a2 2 0 0 1 2-2h8" />
+    <rect x="9" y="7" width="12" height="14" rx="2" />
+  </Stroked>
+)
+
+const CheckIcon = () => (
+  <Stroked>
+    <path d="M20 6 9 17l-5-5" />
+  </Stroked>
+)
+
+/**
+ * The bar chart the left-nav uses for Game Analysis, because this button does
+ * the same thing from a different door.
+ */
+const AnalyzeIcon = () => (
+  <Stroked>
+    <path d="M4 20h16M7 20v-6M12 20V8M17 20v-9" />
   </Stroked>
 )
 
@@ -75,7 +108,7 @@ const TABS: TabDef<Tab>[] = [
   },
   {
     id: 'source',
-    label: 'Orig PGN',
+    label: 'Original PGN',
     // A document with a turned corner.
     icon: <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Zm0 0v5h5" />,
   },
@@ -233,7 +266,16 @@ export default function GameTabs({
 
       {tab === 'source' && (
         <div className="flex h-full flex-col px-3">
-          <p className="mb-1.5 shrink-0 truncate text-xs text-ink-mute">
+          {/* The file's name is the one thing here that says *which* game this
+              is, so it is given the weight of a heading. "Pasted or typed" is
+              not a name and stays quiet — bolding it would make the absence of
+              a file look like the presence of one. */}
+          <p
+            className={`mb-1.5 shrink-0 truncate ${
+              sourceFileName ? 'text-sm font-semibold text-ink' : 'text-xs text-ink-mute'
+            }`}
+            title={sourceFileName ?? undefined}
+          >
             {sourceFileName ?? 'Pasted or typed'}
           </p>
           <textarea
@@ -255,22 +297,37 @@ export default function GameTabs({
               {convertError}
             </p>
           )}
-          <div className="mt-2 flex shrink-0 items-center justify-end gap-2">
-            <SmallButton
+          {/* Left, like the Converted PGN row: the two rows are the same row in
+              two tabs, and one of them drifting to the right made switching
+              between them feel like moving between two different panes. */}
+          <div className="mt-2 flex shrink-0 flex-wrap items-center gap-2">
+            <button
+              type="button"
               onClick={() => void (async () => {
                 if (await copyText(sourceText)) setSourceCopied(true)
               })()}
               disabled={sourceText.trim() === ''}
+              title={sourceCopied ? 'Copied' : 'Copy the original PGN to the clipboard'}
+              aria-label={sourceCopied ? 'Copied' : 'Copy the original PGN to the clipboard'}
+              className={ACTION}
             >
-              {sourceCopied ? 'Copied' : 'Copy'}
-            </SmallButton>
-            {/* Re-converting replaces the game on the board with whatever this
-                box now says — the same door the start page uses, reached from
-                beside the board so an edited tag or a fixed clock does not cost
-                a trip back to the beginning. */}
-            <SmallButton primary onClick={() => onConvert(sourceText, {})} disabled={sourceText.trim() === ''}>
-              Re-convert
-            </SmallButton>
+              {sourceCopied ? <CheckIcon /> : <CopyIcon />}
+              PGN
+            </button>
+            {/* Reading this box again replaces the game on the board — the same
+                door the start page uses, reached from beside the board so an
+                edited tag or a fixed clock does not cost a trip back to the
+                beginning. */}
+            <button
+              type="button"
+              onClick={() => onConvert(sourceText, {})}
+              disabled={sourceText.trim() === ''}
+              title="Convert the clocks and review this PGN again, replacing the game on the board"
+              className={ACTION}
+            >
+              <AnalyzeIcon />
+              Analyze PGN
+            </button>
           </div>
         </div>
       )}
@@ -303,7 +360,7 @@ export default function GameTabs({
                     target="_blank"
                     rel="noopener noreferrer"
                     title="Open this game's chapter on Lichess in a new tab"
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-felt px-2.5 py-1 text-xs font-medium text-buff shadow-sm transition-colors hover:bg-felt-deep"
+                    className={ACTION}
                   >
                     <EyeIcon />
                     View in Study
@@ -336,7 +393,9 @@ export default function GameTabs({
                       }
                     })()
                   }}
-                  className="flex items-center gap-1.5 rounded-lg bg-felt px-2.5 py-1 text-xs font-medium text-buff shadow-sm transition-colors hover:bg-felt-deep"
+                  title="Save this game to one of your Lichess studies as a new chapter"
+                  aria-label="Save this game to one of your Lichess studies as a new chapter"
+                  className={ACTION}
                 >
                   <SaveIcon />
                   {authBusy ? 'Waiting…' : 'Study'}
@@ -367,36 +426,5 @@ export default function GameTabs({
         />
       )}
     </TabPane>
-  )
-}
-
-function SmallButton({
-  children,
-  onClick,
-  disabled,
-  primary = false,
-}: {
-  children: React.ReactNode
-  onClick: () => void
-  disabled?: boolean
-  primary?: boolean
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      // py-[3px] on the outlined one, not py-1: its 1px border adds 2px that
-      // the filled buttons beside it do not have, and this row has to come out
-      // at one height — 24px, the same as every button in the Converted PGN
-      // row, which is what makes the two tabs look like one pane.
-      className={`rounded-lg px-2.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
-        primary
-          ? 'bg-felt py-1 text-buff shadow-sm hover:bg-felt-deep'
-          : 'border border-rule py-[3px] text-ink hover:bg-buff-soft'
-      }`}
-    >
-      {children}
-    </button>
   )
 }

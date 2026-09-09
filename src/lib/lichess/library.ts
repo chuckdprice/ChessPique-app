@@ -56,10 +56,27 @@ export class LibraryClient {
     return next
   }
 
-  /** Every chapter of a study, as one PGN file. */
+  /**
+   * Every chapter of a study, as one PGN file.
+   *
+   * `no-store`, and it is load-bearing rather than defensive. Measured against
+   * lichess.org on 9 September 2026: this endpoint answers with a
+   * `Last-Modified` and **no** `Cache-Control`, `ETag` or `Expires`, which is
+   * exactly the case where a browser is free to invent its own freshness — the
+   * usual heuristic being a tenth of the response's age, so a study last
+   * modified months ago is treated as fresh for days. The request went out, the
+   * browser answered it from disk, and Refresh returned chapter names their
+   * owner had already replaced. Lichess anticipates this: `Cache-Control` is in
+   * the `Access-Control-Allow-Headers` it sends back. The listing needs no such
+   * thing — it carries no validator at all, so no heuristic can apply to it.
+   */
   fetchStudy(token: string, studyId: string): Promise<string> {
     return this.run(async () => {
-      const response = await this.request(`/api/study/${enc(studyId)}.pgn?clocks=true&comments=true`, token)
+      const response = await this.request(
+        `/api/study/${enc(studyId)}.pgn?clocks=true&comments=true`,
+        token,
+        { cache: 'no-store' },
+      )
       return response.text()
     })
   }
@@ -68,7 +85,7 @@ export class LibraryClient {
   fetchChapter(token: string, studyId: string, chapterId: string): Promise<string> {
     return this.run(async () => {
       const path = `/api/study/${enc(studyId)}/${enc(chapterId)}.pgn?clocks=true&comments=true`
-      const response = await this.request(path, token)
+      const response = await this.request(path, token, { cache: 'no-store' })
       return response.text()
     })
   }

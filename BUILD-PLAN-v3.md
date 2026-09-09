@@ -365,6 +365,10 @@ Each is useful alone and none of them changes the spine.
 
 ## Traps
 
+- The study export is served with `Last-Modified` and no `Cache-Control`, so a
+  browser will answer it from its own cache for days. Both export calls set
+  `cache: 'no-store'`. A stubbed `fetch` cannot see this — the bug reached the
+  user through a test suite that never touched HTTP.
 - Any new localStorage key goes through `readStored`; a key added with a plain
   `getItem` loses its history at the next rename.
 - Tags in a public study are public. `#weak-opponent` is visible to anyone who

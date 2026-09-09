@@ -6,6 +6,7 @@ interface Call {
   method: string
   headers: Record<string, string>
   body: string | null
+  cache: RequestCache | undefined
 }
 
 /** A fetch that records what it was asked and answers from a script. */
@@ -21,6 +22,7 @@ function recorder(
       method: init.method ?? 'GET',
       headers: { ...(init.headers as Record<string, string> | undefined) },
       body: body == null ? null : String(body),
+      cache: init.cache,
     })
     const scripted = responses[Math.min(i, responses.length - 1)]
     i += 1
@@ -41,6 +43,20 @@ describe('LibraryClient', () => {
       'https://lichess.org/api/study/abcd1234.pgn?clocks=true&comments=true',
     )
     expect(calls[0].headers.Authorization).toBe('Bearer tok')
+  })
+
+  it('asks the browser not to answer an export from its own cache', async () => {
+    // Lichess sends Last-Modified and no Cache-Control on these, which lets a
+    // browser invent its own freshness — a tenth of the response's age, so a
+    // study last modified months ago counts as fresh for days. Refresh went out
+    // and came back with chapter names their owner had already replaced. This
+    // is the one line that stops that, so it is worth a test of its own.
+    const { calls, fetch } = recorder()
+    const client = new LibraryClient(fetch)
+    await client.fetchStudy('tok', 'abcd1234')
+    await client.fetchChapter('tok', 'abcd1234', 'wxyz5678')
+
+    expect(calls.map((c) => c.cache)).toEqual(['no-store', 'no-store'])
   })
 
   it('exports one chapter by id', async () => {

@@ -356,13 +356,6 @@ body {
   .app-header p {
     display: none;
   }
-  .app-steps {
-    padding-top: 0.15rem;
-  }
-  .app-steps nav button {
-    padding-top: 0.3rem;
-    padding-bottom: 0.3rem;
-  }
   .app-banner {
     padding-top: 0.1rem;
     padding-bottom: 0.1rem;

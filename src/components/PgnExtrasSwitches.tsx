@@ -64,7 +64,11 @@ function Toggle({
       aria-checked={checked}
       title={hint}
       onClick={() => onChange(!checked)}
-      className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
+      // py-[3px], not py-1.5: this row sits directly above the action buttons and
+      // has to come out at their height — 24px — or the pane reads as two rows
+      // of controls at two different scales. The border adds the 2px that the
+      // filled buttons below do not carry.
+      className={`flex items-center gap-2 rounded-lg border px-2.5 py-[3px] text-xs font-medium transition-colors ${
         checked ? 'border-felt bg-felt text-buff' : 'border-rule text-ink-mute hover:bg-buff-soft'
       }`}
     >
@@ -115,7 +119,7 @@ export default function PgnExtrasSwitches({
           runs for a minute or so and the evals appear only when it lands. */}
       {extras.evals && !hasEvals && (
         <p className="mt-1.5 text-xs text-ink-mute">
-          Evals are added once the engine review on the Game Analysis page finishes.
+          Evals are added once the engine review finishes.
         </p>
       )}
     </div>

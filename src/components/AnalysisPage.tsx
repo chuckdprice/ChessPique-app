@@ -8,6 +8,8 @@ import type { ChartRow } from '../lib/gameModel'
 import { capturedMaterial, clockAtPly } from '../lib/gameModel'
 import type { MoveTree } from '../lib/moveTree'
 import type { Opening } from '../lib/openings'
+import type { ConvertOptions } from '../lib/convert'
+import type { PgnExtras } from './PgnExtrasSwitches'
 import AnalysisTabs from './AnalysisTabs'
 import BoardBoundary from './BoardBoundary'
 import BoardMenu from './BoardMenu'
@@ -18,7 +20,7 @@ import type { EngineArrow } from './EnginePanel'
 import type { MaiaMove } from '../lib/maia/decode'
 import EvalBar from './EvalBar'
 import FileWarnings from './FileWarnings'
-import MoveTable from './MoveTable'
+import GameTabs from './GameTabs'
 import ReviewError from './ReviewError'
 
 interface AnalysisPageProps {
@@ -81,6 +83,30 @@ interface AnalysisPageProps {
   evalLabels: EvalLabel[]
   /** Piece set id from the appearance settings. */
   pieceSet: string
+
+  /* Everything below belongs to the pane beside the board — the PGN behind the
+     game, which used to be a page of its own reached through a step bar. */
+  headers: Array<{ name: string; value: string }>
+  onHeaderChange: (index: number, value: string) => void
+  onHeaderAdd: (name: string) => void
+  onHeaderRemove: (index: number) => void
+  generatedHeaders: Array<{ name: string; value: string }>
+  sourceText: string
+  onSourceTextChange: (text: string) => void
+  sourceFileName: string | null
+  onSourceFileNameChange: (name: string | null) => void
+  onConvert: (text: string, options: ConvertOptions) => void
+  convertError: string | null
+  convertedPgn: string | null
+  downloadName: string
+  extras: PgnExtras
+  onExtraChange: (id: keyof PgnExtras, on: boolean) => void
+  /** The chapter this game came from on Lichess, when it came from one. */
+  lichessUrl: string | null
+  /** The game's own labels, and every label already in use. */
+  gameTags: string[]
+  onGameTagsChange: (tags: string[]) => void
+  knownTags: string[]
 }
 
 /**
@@ -135,6 +161,25 @@ export default function AnalysisPage({
   overlayArrows,
   evalLabels,
   pieceSet,
+  headers,
+  onHeaderChange,
+  onHeaderAdd,
+  onHeaderRemove,
+  generatedHeaders,
+  sourceText,
+  onSourceTextChange,
+  sourceFileName,
+  onSourceFileNameChange,
+  onConvert,
+  convertError,
+  convertedPgn,
+  downloadName,
+  extras,
+  onExtraChange,
+  lichessUrl,
+  gameTags,
+  onGameTagsChange,
+  knownTags,
 }: AnalysisPageProps) {
   const [orientation, setOrientation] = useState<'white' | 'black'>('white')
   // Lives here rather than in App because this is where the two ends meet: the
@@ -237,7 +282,7 @@ export default function AnalysisPage({
             onMaiaMoves={onMaiaMoves}
             playedLike={playedLike}
           />
-          <MoveTable
+          <GameTabs
             tree={tree}
             currentId={currentId}
             onNavigate={onNavigate}
@@ -250,6 +295,27 @@ export default function AnalysisPage({
             onBranchIndexChange={onBranchIndexChange}
             onBranchChoose={onBranchChoose}
             onBranchClose={onBranchClose}
+            headers={headers}
+            onHeaderChange={onHeaderChange}
+            onHeaderAdd={onHeaderAdd}
+            onHeaderRemove={onHeaderRemove}
+            generatedHeaders={generatedHeaders}
+            opening={opening}
+            sourceText={sourceText}
+            onSourceTextChange={onSourceTextChange}
+            sourceFileName={sourceFileName}
+            onSourceFileNameChange={onSourceFileNameChange}
+            onConvert={onConvert}
+            convertError={convertError}
+            convertedPgn={convertedPgn}
+            downloadName={downloadName}
+            extras={extras}
+            onExtraChange={onExtraChange}
+            hasEvals={analysis != null}
+            lichessUrl={lichessUrl}
+            gameTags={gameTags}
+            onGameTagsChange={onGameTagsChange}
+            knownTags={knownTags}
           />
         </div>
 

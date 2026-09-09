@@ -1,11 +1,18 @@
 import { useEffect, useState } from 'react'
 import { copyText } from '../lib/clipboard'
+import { encodeGame, shareLink, SHARE_LINK_WARN_CHARS } from '../lib/share'
 
 interface PgnActionsProps {
   /** The converted PGN, already rebuilt from the current tag values. */
   pgn: string
   fileName: string
   compact?: boolean
+  /**
+   * Told when a share link has been copied, and whether it came out long
+   * enough that something between here and the reader may break it. The caller
+   * owns the note, because it belongs under this row rather than in it.
+   */
+  onShared?: (long: boolean) => void
 }
 
 /**
@@ -46,7 +53,7 @@ const MAX_URL_CHARS = 8000
 const ICON_PROPS = {
   'aria-hidden': true,
   viewBox: '0 0 24 24',
-  className: 'size-4 shrink-0',
+  className: 'size-3.5 shrink-0',
   fill: 'none',
   stroke: 'currentColor',
   strokeWidth: 1.8,
@@ -85,7 +92,7 @@ const DownloadIcon = () => (
 const BRAND_ICON_PROPS = {
   'aria-hidden': true,
   viewBox: '0 0 24 24',
-  className: 'size-4 shrink-0',
+  className: 'size-3.5 shrink-0',
   fill: 'currentColor',
 }
 
@@ -102,9 +109,15 @@ const ChessComIcon = () => (
 )
 
 /** Copy, download, and hand-off-to-an-analysis-site buttons for the PGN. */
-export default function PgnActions({ pgn, fileName, compact = false }: PgnActionsProps) {
+export default function PgnActions({
+  pgn,
+  fileName,
+  compact = false,
+  onShared,
+}: PgnActionsProps) {
   const [copied, setCopied] = useState(false)
   const [lichess, setLichess] = useState<'idle' | 'importing' | 'error'>('idle')
+  const [share, setShare] = useState<'idle' | 'working' | 'done' | 'error'>('idle')
 
   useEffect(() => {
     if (!copied) return
@@ -118,6 +131,14 @@ export default function PgnActions({ pgn, fileName, compact = false }: PgnAction
     return () => clearTimeout(timer)
   }, [lichess])
 
+
+  // The share confirmation goes back to reading "Share" on its own, the way
+  // Copy's tick does.
+  useEffect(() => {
+    if (share !== 'done' && share !== 'error') return
+    const timer = setTimeout(() => setShare('idle'), 4000)
+    return () => clearTimeout(timer)
+  }, [share])
   const download = () => {
     const blob = new Blob([pgn], { type: 'application/x-chess-pgn' })
     const url = URL.createObjectURL(blob)
@@ -180,38 +201,81 @@ export default function PgnActions({ pgn, fileName, compact = false }: PgnAction
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
-  const size = compact ? 'px-3 py-1.5 text-sm' : 'px-4 py-2.5'
+  // Compact is the size inside the game pane's tabs, where every control in
+  // the row — Copy, Download, the two analysis links and Lichess Study — has to
+  // agree on one height or the row reads as three different rows.
+  /**
+   * Put a link carrying the whole game on the clipboard.
+   *
+   * It belongs in this row rather than beside it: these are the ways out of the
+   * app with this PGN, and a share link is one of them. What travels is what
+   * the Include switches say — evals included, which a game sent through a
+   * Lichess study loses, since Lichess strips every command it does not
+   * maintain itself.
+   */
+  const shareGame = async () => {
+    setShare('working')
+    try {
+      const link = shareLink(await encodeGame(pgn), window.location)
+      if (!(await copyText(link))) throw new Error('clipboard refused')
+      setShare('done')
+      onShared?.(link.length > SHARE_LINK_WARN_CHARS)
+    } catch {
+      setShare('error')
+    }
+  }
+
+  const size = compact ? 'px-2.5 py-1 text-xs' : 'px-4 py-2.5'
   const face =
     'inline-flex items-center rounded-lg bg-felt font-medium text-buff shadow-sm transition-colors hover:bg-felt-deep'
   const button = `${face} gap-1.5 ${size}`
-  // Square, so a lone icon is centred rather than sitting in a label's slot.
-  const iconOnly = `${face} justify-center ${compact ? 'size-8' : 'size-11'}`
 
   return (
     /* No shrink-0: it stopped the row being squeezed to the available width,
        so flex-wrap never engaged and the last button ran off a phone screen. */
     <div className="flex flex-wrap items-center gap-2">
-      {/* Copy and Download carry their icon alone: the pair is a convention
-          anyone reads at a glance, and the words were the widest part of a row
-          that has to wrap onto a phone. Their labels live in the tooltip and
-          in the screen-reader name. */}
-      <button
-        type="button"
-        onClick={copy}
-        title={copied ? 'Copied' : 'Copy the PGN to the clipboard'}
-        aria-label={copied ? 'Copied' : 'Copy the PGN to the clipboard'}
-        className={iconOnly}
-      >
-        {copied ? <CheckIcon /> : <CopyIcon />}
-      </button>
+      {/* Download leads: taking the file is the plainer of the two, and the
+          one a reader who has just converted a game is most often after. Both
+          say "PGN" — the icons are what tell them apart, and the tooltip and
+          the screen-reader name still say which is which in full. */}
       <button
         type="button"
         onClick={download}
         title={`Download ${fileName}`}
         aria-label={`Download ${fileName}`}
-        className={iconOnly}
+        className={button}
       >
         <DownloadIcon />
+        PGN
+      </button>
+      <button
+        type="button"
+        onClick={copy}
+        title={copied ? 'Copied' : 'Copy the PGN to the clipboard'}
+        aria-label={copied ? 'Copied' : 'Copy the PGN to the clipboard'}
+        className={button}
+      >
+        {copied ? <CheckIcon /> : <CopyIcon />}
+        PGN
+      </button>
+      {/* Before the two analysis links: those hand the game to another site,
+          this hands it to a person, and the copy-shaped pair above it are the
+          other two ways of taking it away yourself. */}
+      <button
+        type="button"
+        onClick={() => void shareGame()}
+        disabled={share === 'working'}
+        title="Copy a link that opens this game in ChessPique"
+        className={`${button} disabled:cursor-not-allowed disabled:opacity-70`}
+      >
+        {share === 'done' ? <CheckIcon /> : <CopyIcon />}
+        {share === 'working'
+          ? 'Linking…'
+          : share === 'done'
+            ? 'Link copied'
+            : share === 'error'
+              ? 'Copy failed'
+              : 'Share link'}
       </button>
       <button
         type="button"

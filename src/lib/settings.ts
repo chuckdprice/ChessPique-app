@@ -20,6 +20,23 @@ export interface EngineSettings {
   multiPv: number
   /** Hash table size in MB. */
   hashMb: number
+  /**
+   * Run Stockfish at all, and show its list of candidate moves.
+   *
+   * The twin of `maia`: the Move Evals pane holds two engines answering two
+   * questions, and either can be turned off without the other. Both off leaves
+   * the pane with nothing in it, which is a choice the reader is allowed to
+   * make.
+   */
+  stockfish: boolean
+  /**
+   * Draw Stockfish's candidate arrows on the board.
+   *
+   * Separate from `stockfish` because the list and the arrows are read
+   * differently: a board carrying five blue arrows is busy, and a reader who
+   * wants the numbers without the clutter had no way to say so.
+   */
+  arrows: boolean
   /** Print each candidate's score at the head of its arrow on the board. */
   arrowEvals: boolean
   /**
@@ -29,6 +46,14 @@ export interface EngineSettings {
    * path still falls back to Stockfish alone.
    */
   maia: boolean
+  /**
+   * Draw Maia's candidate arrows on the board.
+   *
+   * The twin of `arrows`: each engine's list and each engine's arrows are
+   * switched apart, because wanting the numbers without the clutter is a
+   * different wish from not wanting the engine at all.
+   */
+  maiaArrows: boolean
   /**
    * Print Maia's probability at the head of its arrow. Separate from
    * `arrowEvals` because it answers a different question — how likely, not how
@@ -115,8 +140,11 @@ export const DEFAULT_ENGINE: EngineSettings = {
   searchTimeSec: 8,
   multiPv: 3,
   hashMb: 128,
+  stockfish: true,
+  arrows: true,
   arrowEvals: true,
   maia: true,
+  maiaArrows: true,
   maiaArrowEvals: true,
   maiaRating: null,
 }
@@ -187,8 +215,11 @@ export function loadEngineSettings(): EngineSettings {
   e.hashMb = Math.min(512, Math.max(16, Math.round(e.hashMb)))
   // A setting saved before this one existed merges the default in as any other
   // missing key would, but a file hand-edited to a string would not.
+  e.stockfish = e.stockfish !== false
+  e.arrows = e.arrows !== false
   e.arrowEvals = e.arrowEvals !== false
   e.maia = e.maia !== false
+  e.maiaArrows = e.maiaArrows !== false
   e.maiaArrowEvals = e.maiaArrowEvals !== false
   e.maiaRating =
     typeof e.maiaRating === 'number' && Number.isFinite(e.maiaRating)

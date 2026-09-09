@@ -5,13 +5,32 @@ import BrandMark from './components/BrandMark'
 import ConfirmDialog from './components/ConfirmDialog'
 import HelpDialog from './components/HelpDialog'
 import NavDrawer, { NavToggle } from './components/NavDrawer'
-import PgnFilePage from './components/PgnFilePage'
+import PageBoundary from './components/PageBoundary'
 import SettingsPage from './components/SettingsPage'
-import StepNav from './components/StepNav'
+import LibraryPage from './components/LibraryPage'
+import StartPage from './components/StartPage'
+import type { StartMode } from './components/StartPage'
 import type { EvalLabel, OverlayArrow } from './components/BoardViewer'
 import type { EngineArrow } from './components/EnginePanel'
 import type { MaiaMove } from './lib/maia/decode'
 import type { Page } from './lib/pages'
+import { LibraryClient, tagDiff } from './lib/lichess/library'
+import { importPgn, LichessApiError } from './lib/lichess/studies'
+import { clearSession, loadSession } from './lib/lichess/oauth'
+import { summarize, tagsOf } from './lib/multiPgn'
+import { gameOf, loadCachedStudies } from './lib/gameLibrary'
+import type { GameOrigin, LibraryGame } from './lib/gameLibrary'
+import {
+  loadRecentGames,
+  loadRecentStudies,
+  rememberGame,
+  rememberStudy,
+  saveRecentGames,
+  withoutGame,
+} from './lib/recents'
+import type { RecentGame, RecentStudy } from './lib/recents'
+import { decodeGame, payloadInHash } from './lib/share'
+import { parseTags, writeTags } from './lib/tags'
 import type { PgnExtras } from './components/PgnExtrasSwitches'
 import {
   convertPgn,
@@ -53,6 +72,7 @@ import {
   mainlineUcis,
   nextId,
   nodeAtMainlinePly,
+  nodeOf,
   previousId,
   parseMoveTree,
   promote,
@@ -156,6 +176,20 @@ function withEngineLines(tree: MoveTree, analysis: GameAnalysis): MoveTree {
   return next
 }
 
+/**
+ * Take the shared game out of the address bar.
+ *
+ * The fragment is left alone while the game it carries is the game on the
+ * board, so a reader can reload the link and get it back. The moment something
+ * else is loaded the two have parted company, and a fragment still naming the
+ * old game would hand it back on the next refresh — over whatever the reader
+ * had moved on to.
+ */
+function clearShareHash(): void {
+  if (!payloadInHash(window.location.hash)) return
+  history.replaceState(null, '', window.location.pathname + window.location.search)
+}
+
 /** Nothing conversion worked out, for a game that was not converted at all. */
 const NO_CONVERSION: ConvertResult = {
   pgn: '',
@@ -196,8 +230,40 @@ export default function App() {
    * are looking at is the node itself.
    */
   const [currentId, setCurrentId] = useState<string>('n0')
-  const [page, setPage] = useState<Page>('pgn')
-  // Source PGN lives here, not in PgnFilePage, so switching pages does not lose it.
+  const [page, setPage] = useState<Page>('start')
+  /** Which of the start page's choices a nav item asked for on the way in. */
+  const [startMode, setStartMode] = useState<StartMode>('menu')
+  /** A start-page choice waiting on "the game on the board will be replaced". */
+  const [confirmLeave, setConfirmLeave] = useState<StartMode | null>(null)
+  /**
+   * The recents, owned here because the menu that shows them is.
+   *
+   * They are also written here — opening a game and saving one are both this
+   * component's doing — so a single copy in App is the whole of it, and the
+   * library page no longer keeps one.
+   */
+  const [recentGames, setRecentGames] = useState<RecentGame[]>(loadRecentGames)
+  const [recentStudies, setRecentStudies] = useState<RecentStudy[]>(loadRecentStudies)
+  /** A study the nav asked the library to open on, consumed once it has. */
+  const [pendingStudyId, setPendingStudyId] = useState<string | null>(null)
+  /** Something the library should say when it opens, from a failed shortcut. */
+  const [libraryNotice, setLibraryNotice] = useState<string | null>(null)
+  /** Tags across every cached study, for the editor's suggestions. */
+  const [knownTags, setKnownTags] = useState<string[]>([])
+  /**
+   * The chapter this game came from, and may be written back over.
+   *
+   * Set only when a game is opened from a study the signed-in user owns, and
+   * cleared whenever the loaded game becomes a different game. The API offers
+   * no version to check against — `POST .../moves` is a blind overwrite — so
+   * this is the whole of what stands between Save and somebody else's work.
+   */
+  const [origin, setOrigin] = useState<GameOrigin | null>(null)
+  const [saveState, setSaveState] = useState<
+    { kind: 'saving' } | { kind: 'saved'; at: number } | { kind: 'error'; message: string } | null
+  >(null)
+  // Source PGN lives here, not in the pane that shows it, so leaving the
+  // analysis for the start page and coming back does not lose it.
   const [sourceText, setSourceText] = useState('')
   const [sourceFileName, setSourceFileName] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -248,6 +314,11 @@ export default function App() {
     comments: true,
     variations: true,
   })
+  // One client for the tab: it holds the queue that keeps this app to one
+  // request at a time, which a per-render instance would throw away.
+  const libraryClient = useRef<LibraryClient | null>(null)
+  if (!libraryClient.current) libraryClient.current = new LibraryClient()
+
   const analysisSignal = useRef<{ cancelled: boolean } | null>(null)
   /**
    * Positions the review has already searched, kept for the life of the tab.
@@ -262,6 +333,55 @@ export default function App() {
   const savedAppearance = useRef(appearance)
   useEffect(() => applyAppearance(appearance), [appearance])
 
+  /**
+   * A game handed over in the URL's fragment.
+   *
+   * Read once, at boot, before anything else has had a chance to put a game on
+   * the board. The fragment is checked rather than the query because that is
+   * where a share link carries its payload — and because the query is where
+   * Lichess returns an OAuth code, which this must not mistake for a game.
+   *
+   * A payload that will not decode is reported and the app left on its start
+   * page: a link mangled in transit is the likeliest cause, and that is worth
+   * saying rather than silently showing an empty board.
+   */
+  useEffect(() => {
+    const payload = payloadInHash(window.location.hash)
+    if (!payload) return
+    let live = true
+    decodeGame(payload)
+      .then((pgn) => {
+        if (live) handleConvert(pgn, {})
+      })
+      .catch(() => {
+        if (!live) return
+        setError(
+          'That shared link could not be read. It may have been shortened or broken in transit — ' +
+            'ask for it again, or paste the PGN itself below.',
+        )
+        setStartMode('paste')
+      })
+    return () => {
+      live = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // The suggestions come from what is already in the library, so they are read
+  // once from the cache rather than kept in a second store of their own. A save
+  // moves them, which is what `saveState` is doing in the dependencies.
+  useEffect(() => {
+    let live = true
+    void loadCachedStudies().then((studies) => {
+      if (!live) return
+      const all = studies.flatMap((study) => study.games.flatMap((g) => g.tags))
+      setKnownTags([...new Set(all)].sort())
+    })
+    return () => {
+      live = false
+    }
+  }, [saveState])
+
   // Fetch the analysis chunk once the browser is idle, while the user is still
   // pasting or picking a PGN, so Convert never waits on a network round trip.
   useEffect(() => {
@@ -274,7 +394,15 @@ export default function App() {
     return () => clearTimeout(id)
   }, [])
 
-  const handleConvert = (text: string, options: ConvertOptions) => {
+  /**
+   * Load a PGN, converting its clocks on the way in.
+   *
+   * @param from Where it came from, when it came from a study chapter the user
+   *   can write back to. Anything else — a file, a paste, a new game — passes
+   *   nothing and clears the origin, because a save then has nowhere it could
+   *   safely overwrite.
+   */
+  const handleConvert = (text: string, options: ConvertOptions, from: GameOrigin | null = null) => {
     try {
       const result = convertPgn(text, options)
       // The conversion works the clocks out along one line, because a running
@@ -302,16 +430,19 @@ export default function App() {
       setHeaders(result.headers)
       setCurrentId(tree.root)
       setError(null)
+      setOrigin(from)
+      setSaveState(null)
       setPage('analysis')
     } catch (e) {
       setGame(null)
+      setOrigin(null)
       // The tags belonged to the game that just went away, and the tag pane is
       // now always on screen — left alone they would sit there looking editable
       // while feeding a converted PGN that no longer exists.
       setHeaders([])
       const message = e instanceof Error ? e.message : String(e)
       setError(message)
-      setPage('pgn')
+      setPage('start')
     }
   }
 
@@ -448,6 +579,7 @@ export default function App() {
    * until there is a move, and the converted PGN grows as the game does.
    */
   const startNewGame = useCallback(() => {
+    clearShareHash()
     // "*" — game in progress. PGN requires a termination marker, so without
     // one the file a new game exports is invalid from its first move.
     const tree = { ...emptyTree(), result: '*' }
@@ -474,6 +606,25 @@ export default function App() {
     if (game && mainline(game.tree).length > 0) setConfirmNew(true)
     else startNewGame()
   }, [game, startNewGame])
+
+  /**
+   * Go back to the four choices, which tears the analysis down.
+   *
+   * The same "is there anything to lose" test the new-game path uses, and for
+   * the same reason: a game built by hand exists nowhere else, and a mis-click
+   * on a nav item should not be able to throw one away.
+   */
+  const handleStart = useCallback(
+    (mode: StartMode) => {
+      if (game && mainline(game.tree).length > 0) {
+        setConfirmLeave(mode)
+        return
+      }
+      setStartMode(mode)
+      setPage('start')
+    },
+    [game],
+  )
 
   /**
    * The charts and the tabs still speak in plies, because they are about the
@@ -574,6 +725,26 @@ export default function App() {
    */
   const handleCommentChange = useCallback((nodeId: string, comment: string) => {
     setGame((prev) => (prev ? { ...prev, tree: setComment(prev.tree, nodeId, comment) } : prev))
+  }, [])
+
+  /**
+   * The game's own labels, which live in the root comment beside any note.
+   *
+   * Read from the tree rather than held beside it: they are part of the game,
+   * so they travel through the same save, the same export and the same share
+   * link as everything else, and nothing has to remember to keep a second copy
+   * in step.
+   */
+  const rootComment = game ? (nodeOf(game.tree, game.tree.root)?.comment ?? null) : null
+  const gameTags = useMemo(() => parseTags(rootComment).tags, [rootComment])
+
+  const handleTagsChange = useCallback((next: string[]) => {
+    setGame((prev) => {
+      if (!prev) return prev
+      const root = nodeOf(prev.tree, prev.tree.root)
+      const { prose } = parseTags(root?.comment ?? null)
+      return { ...prev, tree: setComment(prev.tree, prev.tree.root, writeTags(prose, next)) }
+    })
   }, [])
 
   const handleExtraChange = useCallback(
@@ -727,6 +898,207 @@ export default function App() {
     return pgnWithMovetext(withExtraTags(headers, generatedHeaders), movetext)
   }, [game, headers, generatedHeaders, analysis, deeperEvals, pgnExtras])
 
+  /**
+   * The game as the library stores it, which is not the game as it downloads.
+   *
+   * The export switches on the PGN page are about what the user takes away;
+   * the library copy is the only copy, so it always carries the clocks, the
+   * comments and the variations whatever those switches say. Evals are left
+   * out deliberately rather than by oversight — Lichess strips every `[%...]`
+   * command it does not itself maintain, so an eval sent would not come back,
+   * and sending it would only make the stored game differ from what we sent.
+   * The engine's prose verdicts are kept, because prose does survive.
+   */
+  const libraryPgn = useMemo(() => {
+    if (!game) return null
+    const notes = new Map<string, string>()
+    if (analysis) {
+      mainline(game.tree).forEach((node, i) => {
+        const info = analysis.moves[i]
+        const note = info ? moveNote(info) : null
+        if (note) notes.set(node.id, note)
+      })
+    }
+    const movetext = formatTreeMovetext(game.tree, {
+      clocks: true,
+      comments: true,
+      variations: true,
+      notes,
+    })
+    return pgnWithMovetext(withExtraTags(headers, generatedHeaders), movetext)
+  }, [game, headers, generatedHeaders, analysis])
+
+  const handleOpenFromLibrary = useCallback(
+    (chapter: LibraryGame, studyId: string, studyName: string) => {
+      clearShareHash()
+      const { movetext } = splitHeadersAndMovetext(chapter.pgn)
+      handleConvert(
+        chapter.pgn,
+        {},
+        chapter.chapterId
+          ? {
+              studyId,
+              chapterId: chapter.chapterId,
+              loadedKey: mainlineUcis(parseMoveTree(movetext).tree).join(' '),
+              loadedTags: [...tagsOf(chapter.pgn)].map(([name, value]) => ({ name, value })),
+            }
+          : null,
+      )
+      // Recorded on the way in rather than on the way out: a game the reader
+      // opened is one they were working on whether or not they saved it.
+      if (chapter.chapterId) {
+        setRecentGames(
+          rememberGame({
+            studyId,
+            chapterId: chapter.chapterId,
+            studyName,
+            chapterName: chapter.chapterName ?? 'Untitled game',
+            openedAt: Date.now(),
+          }),
+        )
+        setRecentStudies(rememberStudy({ studyId, studyName, openedAt: Date.now() }))
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
+    [],
+  )
+
+  /**
+   * Open a game straight from the menu, without going by way of the library.
+   *
+   * The cached study is tried first, so the common case costs nothing; failing
+   * that, one chapter is fetched rather than its whole study, because a
+   * shortcut that downloads sixty-three other games to honour itself is not
+   * one.
+   *
+   * A chapter deleted inside a study that still exists is only ever discovered
+   * here, on the click — no listing mentions chapters. It drops itself and says
+   * so on the library page, next to the study it was in, which is more use than
+   * an error over an empty board.
+   */
+  const handleOpenRecentGame = useCallback(
+    async (entry: RecentGame) => {
+      const forget = () => {
+        const next = withoutGame(loadRecentGames(), entry.studyId, entry.chapterId)
+        saveRecentGames(next)
+        setRecentGames(next)
+      }
+
+      const cached = gameOf(
+        (await loadCachedStudies()).find((study) => study.id === entry.studyId) ?? null,
+        entry.chapterId,
+      )
+      if (cached) {
+        handleOpenFromLibrary(cached, entry.studyId, entry.studyName)
+        return
+      }
+
+      const session = loadSession()
+      if (!session) {
+        // Nothing cached and nobody signed in: the library page is where that
+        // is explained, and it is one press from being fixed.
+        setPendingStudyId(entry.studyId)
+        setPage('library')
+        return
+      }
+
+      try {
+        const pgn = await libraryClient.current!.fetchChapter(
+          session.token,
+          entry.studyId,
+          entry.chapterId,
+        )
+        const game: LibraryGame = { ...summarize(pgn), pgn }
+        if (!game.chapterId) throw new LichessApiError('That chapter is no longer there.')
+        handleOpenFromLibrary(game, entry.studyId, entry.studyName)
+      } catch (e) {
+        if (e instanceof LichessApiError && e.unauthorized) clearSession()
+        else forget()
+        setLibraryNotice(
+          `“${entry.chapterName}” could not be opened, so it has left the recent list.`,
+        )
+        setPendingStudyId(entry.studyId)
+        setPage('library')
+      }
+    },
+    [handleOpenFromLibrary],
+  )
+
+  /** Open the library on a study the menu named. */
+  const handleOpenRecentStudy = useCallback((entry: RecentStudy) => {
+    setLibraryNotice(null)
+    setPendingStudyId(entry.studyId)
+    setPage('library')
+  }, [])
+
+  /**
+   * Write the loaded game back to a study.
+   *
+   * Two calls, and they are not atomic: the moves carry the game, so they go
+   * first, and a failure to write the tags afterwards is reported rather than
+   * swallowed — it leaves new moves beside stale tags, which is worth knowing.
+   */
+  const handleSaveToLibrary = useCallback(
+    async (mode: 'update' | 'new', studyId: string, studyName: string) => {
+      const session = loadSession()
+      if (!session || !libraryPgn || !game) return
+      const client = libraryClient.current!
+      setSaveState({ kind: 'saving' })
+
+      try {
+        if (mode === 'update' && origin) {
+          const { movetext } = splitHeadersAndMovetext(libraryPgn)
+          await client.replaceMoves(session.token, origin.studyId, origin.chapterId, movetext)
+          const tags = tagDiff(origin.loadedTags, withExtraTags(headers, generatedHeaders))
+          if (tags) {
+            await client.updateTags(session.token, origin.studyId, origin.chapterId, tags)
+          }
+          setOrigin({
+            ...origin,
+            loadedKey: mainlineUcis(game.tree).join(' '),
+            loadedTags: withExtraTags(headers, generatedHeaders),
+          })
+        } else {
+          // Named from the tags rather than the display names above, which are
+          // declared further down; and the name is fixed at import — the API
+          // has no rename — so it is worth taking from the game itself.
+          const named = (tag: string, fallback: string) => {
+            const value = findHeader(headers, tag)
+            return !value || value === '?' ? fallback : value
+          }
+          const [chapter] = await importPgn(session.token, studyId, {
+            pgn: libraryPgn,
+            name: `${named('White', 'White')} – ${named('Black', 'Black')}`,
+          })
+          if (!chapter) throw new Error('Lichess did not say which chapter it made.')
+          setRecentGames(
+            rememberGame({
+              studyId,
+              chapterId: chapter.id,
+              studyName,
+              chapterName: chapter.name,
+              openedAt: Date.now(),
+            }),
+          )
+          setRecentStudies(rememberStudy({ studyId, studyName, openedAt: Date.now() }))
+          // Adopt the new chapter, or the next save makes another one, and the
+          // one after that a third.
+          setOrigin({
+            studyId,
+            chapterId: chapter.id,
+            loadedKey: mainlineUcis(game.tree).join(' '),
+            loadedTags: withExtraTags(headers, generatedHeaders),
+          })
+        }
+        setSaveState({ kind: 'saved', at: Date.now() })
+      } catch (e) {
+        if (e instanceof LichessApiError && e.unauthorized) clearSession()
+        setSaveState({ kind: 'error', message: e instanceof Error ? e.message : String(e) })
+      }
+    },
+    [libraryPgn, game, origin, headers, generatedHeaders],
+  )
+
   const downloadName = useMemo(() => {
     // "?" is how PGN spells an unfilled tag, and a game started here begins
     // with a roster full of them. Left alone they were stripped as illegal
@@ -768,7 +1140,9 @@ export default function App() {
   // Read out of the settings object here so the memo below depends on the flag
   // itself: the object is replaced by any engine setting changing, and the
   // arrows have no business being rebuilt because the hash size moved.
-  const showArrowEvals = engineSettings.arrowEvals
+  // The scores are the engine's, so they belong to the engine's switch: with
+  // Stockfish off there is no list for a number on the board to agree with.
+  const showArrowEvals = engineSettings.stockfish && engineSettings.arrowEvals
   const showMaiaArrowEvals = engineSettings.maia && engineSettings.maiaArrowEvals
 
   /**
@@ -827,6 +1201,12 @@ export default function App() {
     // In arrow order, so the percentages claim squares in the same order the
     // scores did.
     const engineUcis: string[] = []
+    // Nothing to draw when the engine is switched off, and nothing when its
+    // arrows alone are: the list and the arrows are read differently, so they
+    // are two switches. The candidates still reach `engineUcis` — the played
+    // move's badge and Maia's percentages are looked up against them — which is
+    // why this gates the drawing rather than the loop.
+    const drawEngineArrows = engineSettings.stockfish && engineSettings.arrows
     engineMoves.slice(0, ENGINE_ARROW_ALPHA.length).forEach((line, i) => {
       // A line the engine has not given a move for yet holds its place, so the
       // arrows below it keep the rank — and the shade — of their own line.
@@ -837,6 +1217,7 @@ export default function App() {
       if (seen.has(key)) return
       seen.add(key)
       engineUcis.push(line.uci)
+      if (!drawEngineArrows) return
       const color = `rgba(${ENGINE_ARROW_RGB}, ${ENGINE_ARROW_ALPHA[i]})`
       list.push({ startSquare: from, endSquare: to, color })
       // Labels are built here rather than beside the board so that a candidate
@@ -891,17 +1272,23 @@ export default function App() {
 
     for (const uci of engineUcis) addPercent(uci, uci.slice(2, 4))
 
+    // The percentages still go on whatever arrows there are — the engine's, and
+    // the played move's — when Maia's own arrows are switched off. It is the
+    // arrows that are being turned off, not what Maia knows.
+    const drawMaiaArrows = engineSettings.maia && engineSettings.maiaArrows
     maiaTop.forEach((move, i) => {
       const from = move.uci.slice(0, 2)
       const to = move.uci.slice(2, 4)
-      overlay.push({
-        from,
-        to,
-        color: MAIA_ARROW,
-        // Opacity rather than an alpha in the colour: Maia's is a theme
-        // variable, and a var cannot carry one.
-        opacity: ENGINE_ARROW_ALPHA[i] ?? 0.3,
-      })
+      if (drawMaiaArrows) {
+        overlay.push({
+          from,
+          to,
+          color: MAIA_ARROW,
+          // Opacity rather than an alpha in the colour: Maia's is a theme
+          // variable, and a var cannot carry one.
+          opacity: ENGINE_ARROW_ALPHA[i] ?? 0.3,
+        })
+      }
       addPercent(move.uci, to)
     })
 
@@ -931,6 +1318,10 @@ export default function App() {
     engineMoves,
     maiaMoves,
     engineSettings.multiPv,
+    engineSettings.stockfish,
+    engineSettings.arrows,
+    engineSettings.maia,
+    engineSettings.maiaArrows,
     game,
     currentId,
     showArrowEvals,
@@ -1017,38 +1408,51 @@ export default function App() {
         </div>
       </header>
 
-      <div className="app-steps mx-auto w-full max-w-[1600px] shrink-0 px-4 pt-2 sm:px-6">
-        <StepNav page={page} onPageChange={setPage} gameLoaded={!!game} />
-      </div>
-
       {/* --board-size lives in index.css: a short viewport needs a different
           height budget, and a media query cannot reach an inline style. */}
       <main className="app-main mx-auto flex w-full min-h-0 max-w-[1600px] flex-1 flex-col px-4 py-2 sm:px-6">
-        {page === 'pgn' && (
-          <PgnFilePage
-            onConvert={handleConvert}
+        {/* Inside main, not around the whole app: the header and the menu are
+            the way out of a page that has failed, so they must not be inside
+            the thing that failed. Keyed by page, so leaving a broken one and
+            coming back is a fresh attempt. */}
+        <PageBoundary resetKey={page}>
+        {page === 'start' && (
+          <StartPage
+            mode={startMode}
+            onModeChange={setStartMode}
+            onConvert={(text, options) => {
+              clearShareHash()
+              handleConvert(text, options)
+            }}
+            onNewGame={handleNewGame}
+            onOpenStudy={() => setPage('library')}
             error={error}
             text={sourceText}
             onTextChange={setSourceText}
             sourceFileName={sourceFileName}
             onSourceFileNameChange={setSourceFileName}
-            convertedPgn={convertedPgn}
-            downloadName={downloadName}
-            headers={headers}
-            onHeaderChange={handleHeaderChange}
-            onHeaderAdd={handleHeaderAdd}
-            onHeaderRemove={handleHeaderRemove}
-            generatedHeaders={generatedHeaders}
-            extras={pgnExtras}
-            onExtraChange={handleExtraChange}
-            opening={opening}
-            hasEvals={analysis != null}
+          />
+        )}
+
+        {page === 'library' && (
+          <LibraryPage
+            client={libraryClient.current}
+            selectStudyId={pendingStudyId}
+            onStudySelected={() => setPendingStudyId(null)}
+            notice={libraryNotice}
+            openChapterId={origin?.chapterId ?? null}
+            onOpen={handleOpenFromLibrary}
+            gameName={game ? `${whiteName} – ${blackName}` : null}
+            canUpdate={!!origin}
+            onSave={handleSaveToLibrary}
+            saveState={saveState}
           />
         )}
 
         {page === 'settings' && (
           <SettingsPage engine={engineSettings} onEngineChange={handleEngineSettingsSave} />
         )}
+
 
         {page === 'analysis' && game && (
           <Suspense
@@ -1110,9 +1514,31 @@ export default function App() {
               overlayArrows={overlayArrows}
               evalLabels={evalLabels}
               pieceSet={appearance.pieces}
+              headers={headers}
+              onHeaderChange={handleHeaderChange}
+              onHeaderAdd={handleHeaderAdd}
+              onHeaderRemove={handleHeaderRemove}
+              generatedHeaders={generatedHeaders}
+              sourceText={sourceText}
+              onSourceTextChange={setSourceText}
+              sourceFileName={sourceFileName}
+              onSourceFileNameChange={setSourceFileName}
+              onConvert={handleConvert}
+              convertError={error}
+              convertedPgn={convertedPgn}
+              downloadName={downloadName}
+              extras={pgnExtras}
+              onExtraChange={handleExtraChange}
+              gameTags={gameTags}
+              onGameTagsChange={handleTagsChange}
+              knownTags={knownTags}
+              lichessUrl={
+                origin ? `https://lichess.org/study/${origin.studyId}/${origin.chapterId}` : null
+              }
             />
           </Suspense>
         )}
+        </PageBoundary>
       </main>
 
       {navOpen && (
@@ -1121,6 +1547,12 @@ export default function App() {
           onNavigate={setPage}
           onClose={() => setNavOpen(false)}
           onNewGame={handleNewGame}
+          onUpload={() => handleStart('upload')}
+          onPaste={() => handleStart('paste')}
+          recentStudies={recentStudies}
+          recentGames={recentGames}
+          onOpenRecentStudy={handleOpenRecentStudy}
+          onOpenRecentGame={(entry) => void handleOpenRecentGame(entry)}
           gameLoaded={!!game}
           onAppearance={handleAppearanceOpen}
           onHelp={() => setHelpOpen(true)}
@@ -1150,8 +1582,8 @@ export default function App() {
           body={
             <>
               The game on the board will be replaced, along with any variations and notes you
-              have added to it. If it came from a PGN, that text is still on the{' '}
-              <span className="font-medium text-ink">PGN File</span> page and can be converted
+              have added to it. If it came from a PGN, that text is still in the{' '}
+              <span className="font-medium text-ink">Orig PGN</span> tab and can be converted
               again — anything built here by hand cannot.
             </>
           }
@@ -1161,6 +1593,26 @@ export default function App() {
             startNewGame()
           }}
           onCancel={() => setConfirmNew(false)}
+        />
+      )}
+
+      {confirmLeave && (
+        <ConfirmDialog
+          title="Leave this game?"
+          body={
+            <>
+              The board will be cleared, along with any variations and notes you have added. A
+              game opened from a study can be opened again; anything built here by hand cannot.
+            </>
+          }
+          confirmLabel="Leave game"
+          onConfirm={() => {
+            const mode = confirmLeave
+            setConfirmLeave(null)
+            setStartMode(mode)
+            setPage('start')
+          }}
+          onCancel={() => setConfirmLeave(null)}
         />
       )}
 

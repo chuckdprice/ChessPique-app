@@ -28,8 +28,20 @@ export interface ImportedChapter {
   url: string
 }
 
-async function call(path: string, token: string, init: RequestInit = {}): Promise<Response> {
-  const response = await fetch(`https://lichess.org${path}`, {
+/**
+ * One call to the Lichess API, with the token attached and its errors mapped.
+ *
+ * Exported because the library layer needs exactly this and nothing more; it
+ * takes its own `fetch` so its tests can run without a network, which is why
+ * the caller supplies one rather than this file reaching for the global.
+ */
+export async function lichessRequest(
+  path: string,
+  token: string,
+  init: RequestInit = {},
+  doFetch: typeof fetch = (...args) => fetch(...args),
+): Promise<Response> {
+  const response = await doFetch(`https://lichess.org${path}`, {
     ...init,
     headers: { ...init.headers, Authorization: `Bearer ${token}` },
   })
@@ -53,7 +65,7 @@ async function call(path: string, token: string, init: RequestInit = {}): Promis
 
 /** The signed-in user, needed because studies are listed by username. */
 export async function fetchAccount(token: string): Promise<{ username: string }> {
-  const response = await call('/api/account', token)
+  const response = await lichessRequest('/api/account', token)
   const account = (await response.json()) as { username?: string; id?: string }
   const username = account.username ?? account.id
   if (!username) throw new LichessApiError('Lichess did not say who is signed in.')
@@ -89,7 +101,7 @@ export async function streamStudies(
   onBatch: (studies: StudyMetadata[]) => void,
   signal?: AbortSignal,
 ): Promise<void> {
-  const response = await call(`/api/study/by/${encodeURIComponent(username)}`, token, {
+  const response = await lichessRequest(`/api/study/by/${encodeURIComponent(username)}`, token, {
     headers: { Accept: 'application/x-ndjson' },
     signal,
   })
@@ -128,15 +140,21 @@ export async function importPgn(
   token: string,
   studyId: string,
   options: { pgn: string; name: string; orientation?: 'white' | 'black' },
+  doFetch?: typeof fetch,
 ): Promise<ImportedChapter[]> {
   const body = new URLSearchParams({ pgn: options.pgn, name: options.name })
   if (options.orientation) body.set('orientation', options.orientation)
 
-  const response = await call(`/api/study/${encodeURIComponent(studyId)}/import-pgn`, token, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
-  })
+  const response = await lichessRequest(
+    `/api/study/${encodeURIComponent(studyId)}/import-pgn`,
+    token,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body,
+    },
+    doFetch,
+  )
   const result = (await response.json()) as { chapters?: Array<{ id: string; name: string }> }
   return (result.chapters ?? []).map((chapter) => ({
     ...chapter,

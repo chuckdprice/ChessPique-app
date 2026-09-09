@@ -6,12 +6,12 @@ import { PIECE_CODES, pieceSrc } from '../lib/appearance'
 import { formatClockDisplay } from '../lib/convert'
 import { hasMoveMarker } from '../lib/engine/analysis'
 import type { GameAnalysis } from '../lib/engine/analysis'
-import { checkedKingSquare, moveTargets } from '../lib/gameModel'
+import { checkedKingSquare, matedKingSquare, moveTargets } from '../lib/gameModel'
 import type { CapturedKind } from '../lib/gameModel'
 import { isMainline, lineEndId, nextId, previousId } from '../lib/moveTree'
 import type { MoveTree } from '../lib/moveTree'
 import CapturedPieces from './CapturedPieces'
-import ClassBadge from './ClassBadge'
+import ClassBadge, { MateBadge } from './ClassBadge'
 
 export interface PlayerPlate {
   name: string
@@ -395,6 +395,13 @@ export default function BoardViewer({
   const badgeSquare = showBadge && highlight ? highlight[1] : null
   const badgePos = badgeSquare ? squareCorner(badgeSquare, orientation) : null
 
+  // A mated king carries a marker of its own, on top of the glow every checked
+  // king gets. Read from the position rather than from the move that arrived
+  // here, so it is right in a variation and in a game loaded at its final
+  // position, neither of which has an analysed move to ask.
+  const matedKing = matedKingSquare(fen)
+  const matePos = matedKing ? squareCorner(matedKing, orientation) : null
+
   const squareStyles: Record<string, React.CSSProperties> = {}
   const checkedKing = checkedKingSquare(fen)
   if (checkedKing) {
@@ -572,6 +579,19 @@ export default function BoardViewer({
           }}
         >
           <ClassBadge classification={moveAnalysis.classification} size={20} />
+        </div>
+      )}
+
+      {matePos && (
+        <div
+          className="pointer-events-none absolute z-10"
+          style={{
+            left: `${matePos.left}%`,
+            top: `${matePos.top}%`,
+            transform: 'translate(-70%, -30%)',
+          }}
+        >
+          <MateBadge size={20} />
         </div>
       )}
     </div>

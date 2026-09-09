@@ -43,6 +43,8 @@ measurement, not folklore:
 | `computer` hover — React's `onPointerEnter` never fires from it | dispatch `pointerover` then `pointerenter` (`pointerType: 'mouse'`, `bubbles: true`) on the element |
 | `computer` hover *leaving* an element — the pointer teleports, so no `mouseout` and no `onMouseLeave` | dispatch `mouseout` with a `relatedTarget` outside; `onMouseMove` itself does fire from two hovers in a row |
 | Viewport size — `innerWidth`/`innerHeight` and `clientWidth`/`clientHeight` all read **0** while the pane is backgrounded | take the size from an element's rect, or treat 0 as "unknown" |
+| `resize_window` fires **neither** `window.resize` nor `ResizeObserver` — the layout changes silently, so anything that re-measures on a resize looks broken | dispatch `new Event('resize')` on `window` yourself, or force a re-render, then measure |
+| `ResizeObserver` — delivered with the frame, so a hidden pane gets nothing, not even the initial callback `observe()` promises | don't rely on it alone; pair it with a `resize` listener and a measure on every render |
 
 `getBoundingClientRect` and DOM attribute reads *are* reliable. So are
 screenshots. `computer` clicks and scrolls land even when the call reports a
@@ -104,6 +106,19 @@ the harness's drag tool (mouse events) cannot move a piece. Drive it with a
   the corrected rule is off by a mean 7.8s and the old one by 35.7s, always low.
   `converted_game.pgn` is a golden file of *this* app's output, so don't
   "restore" it to the Python script's numbers.
+- **The Lichess study export is cached by the browser, and it must not be.**
+  `GET /api/study/{id}.pgn` answers with a `Last-Modified` and **no**
+  `Cache-Control`, `ETag` or `Expires` — the case where a browser is entitled
+  to invent its own freshness, conventionally a tenth of the response's age. A
+  study last modified months ago is therefore "fresh" for days: Refresh sent
+  the request, the browser answered it from disk, and the app showed chapter
+  names their owner had replaced. Measured from the running app on 9 September
+  2026, four consecutive default-cache fetches took 1ms each and four with
+  `cache: 'no-store'` took 468-785ms — the first four never left the machine.
+  `LibraryClient` sets `no-store` on both export calls and there is a test on
+  it. The *listing* needs none: it carries no validator at all, so no heuristic
+  can apply. Note that a stubbed `fetch` can never catch this, which is why it
+  survived a round of testing that looked thorough.
 - **Don't run `npx prettier`.** There is no config, so it applies its own
   defaults — semicolons and double quotes — and reformats an entire file against
   the house style (no semicolons, single quotes). It produced a 220-line diff

@@ -1,5 +1,6 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import type { RefObject } from 'react'
 import { Chess } from 'chess.js'
 import { Engine, ENGINE_NAME, formatScore } from '../lib/engine/uci'
 import type { AnalyzeUpdate, Score } from '../lib/engine/uci'
@@ -90,6 +91,160 @@ function pvTokens(fen: string, sans: string[]): string[] {
 /** Format a PV as numbered SAN from the given position, e.g. "9... e4 10. Ne1 h5". */
 function numberedLine(fen: string, sans: string[]): string {
   return pvTokens(fen, sans).join(' ')
+}
+
+/**
+ * One of the engine's lines, with a way to read the end of it.
+ *
+ * The column beside the board is narrow and a line at depth 20 is not, so a
+ * line was clipped with an ellipsis — which said there was more and gave no way
+ * to reach it. The ellipsis is replaced by a twisty that wraps the line onto as
+ * many rows as it needs.
+ *
+ * It appears only on a line that is actually cut off. Every line is long enough
+ * to truncate in a narrow window and none of them are in a wide one, so the
+ * question can only be answered by measuring, and the answer changes when the
+ * window is resized or the pane is given more room.
+ */
+function EngineLine({
+  fen,
+  depth,
+  score,
+  pvSan,
+  firstTokenRef,
+  onPreview,
+}: {
+  fen: string
+  depth: number
+  score: Score
+  pvSan: string[]
+  /** Set on the first line only: its first move pins the hover preview. */
+  firstTokenRef?: RefObject<HTMLSpanElement | null>
+  onPreview: (el: HTMLElement, sans: string[], upTo: number) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [clipped, setClipped] = useState(false)
+  const textRef = useRef<HTMLSpanElement>(null)
+
+  // Closing on a new position, so that stepping through a game does not walk a
+  // pane whose height keeps changing under the move list. Everything else in
+  // this panel reserves its height for the same reason.
+  useEffect(() => setOpen(false), [fen])
+
+  // No dependency array: this has to run after *every* render, which is what
+  // catches the case the observer below cannot. Setting a boolean to the value
+  // it already holds is a no-op in React, so it settles rather than looping.
+  useLayoutEffect(() => {
+    // Only while closed: open, the text wraps and fits by definition, and
+    // measuring then would decide the line was short and take the twisty away
+    // with the line still expanded.
+    if (open) return
+    const el = textRef.current
+    if (!el) return
+
+    let retry: number | undefined
+    const check = () => {
+      // A width of zero is a pane that has stopped painting rather than a line
+      // that fits. Measured then, every line looks short. But *dropping* the
+      // sample is not enough on its own: if that is the only notification this
+      // row gets — which is what a window resize delivers, once — the stale
+      // answer stands for ever, and a line that now fits keeps a twisty that
+      // expands nothing. So the sample is retried rather than forgotten.
+      if (el.clientWidth === 0) {
+        retry = window.setTimeout(check, 100)
+        return
+      }
+      setClipped(el.scrollWidth > el.clientWidth + 1)
+    }
+    check()
+
+    // Both, and the window event is not the belt-and-braces one. A
+    // ResizeObserver is delivered as part of the frame lifecycle, so a document
+    // that is not painting — a background tab, and the harness's browser pane
+    // whenever it is hidden — never gets the callback at all: measured here, a
+    // fresh observer did not even fire the initial delivery `observe()`
+    // promises. `resize` is a plain event and arrives regardless, and a window
+    // resize is exactly the case that leaves a line's answer stale.
+    window.addEventListener('resize', check)
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(check)
+    observer?.observe(el)
+    return () => {
+      window.removeEventListener('resize', check)
+      observer?.disconnect()
+      window.clearTimeout(retry)
+    }
+  })
+
+  const tokens = pvTokens(fen, pvSan)
+
+  return (
+    <li
+      className="flex items-baseline gap-1 py-0.5 font-score text-xs"
+      title={`depth ${depth}: ${numberedLine(fen, pvSan)}`}
+    >
+      {/* The slot is always there, twisty or not, so the scores below it stay
+          in one column whichever lines happen to be long. */}
+      <span className="flex w-3 shrink-0 justify-center self-start pt-[3px]">
+        {(clipped || open) && (
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            aria-expanded={open}
+            title={open ? 'Show less of this line' : 'Show the whole line'}
+            aria-label={open ? 'Show less of this line' : 'Show the whole line'}
+            className="text-ink-mute transition-colors hover:text-ink"
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              className={`size-2.5 transition-transform ${open ? 'rotate-90' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="m9 6 6 6-6 6" />
+            </svg>
+          </button>
+        )}
+      </span>
+
+      <span className="w-10 shrink-0 self-start font-semibold tabular-nums">
+        {formatScore(score)}
+      </span>
+
+      <span
+        ref={textRef}
+        // min-w-0 so the flex child may be narrower than its content, which is
+        // what lets it truncate at all; when open it wraps instead, and the
+        // hanging indent keeps the continuation clear of the score column.
+        className={`min-w-0 flex-1 text-ink-mute ${open ? 'whitespace-normal break-words' : 'truncate'}`}
+      >
+        {tokens.map((token, i) => (
+          // The separating space is outside the move so that the hover
+          // highlight is the width of the move and not a space wider.
+          <Fragment key={i}>
+            {i > 0 && ' '}
+            <span
+              // The first move of the first line is what pins the preview's
+              // left edge, so it is the one element the preview needs to find.
+              ref={firstTokenRef && i === 0 ? firstTokenRef : undefined}
+              className="cursor-help rounded-sm hover:bg-buff-soft hover:text-ink"
+              // Pointer rather than mouse events, so that a tap does not open a
+              // board a phone has no way to close: a touch fires mouseenter
+              // too, and nothing fires the leave.
+              onPointerEnter={(e) => {
+                if (e.pointerType === 'mouse') onPreview(e.currentTarget, pvSan, i)
+              }}
+            >
+              {token}
+            </span>
+          </Fragment>
+        ))}
+      </span>
+    </li>
+  )
 }
 
 /**
@@ -461,7 +616,10 @@ export default function EnginePanel({
           the engine stopped. One control rather than a twisty beside a toggle
           that could disagree with it — and with both engines off, a closed pane
           costs nothing but its own title. */}
-      <div className="flex items-center gap-3 px-4 py-1.5">
+      {/* The same felt bar the tab panes carry, so the three panes on this page
+          read as one family rather than as a plain card that happens to sit
+          above two tabbed ones. */}
+      <div className="flex items-center gap-3 rounded-t-xl bg-felt px-4 py-1 text-buff">
         <button
           type="button"
           aria-expanded={enabled}
@@ -474,9 +632,7 @@ export default function EnginePanel({
           <svg
             aria-hidden="true"
             viewBox="0 0 24 24"
-            className={`size-3.5 shrink-0 text-ink-mute transition-transform ${
-              enabled ? 'rotate-90' : ''
-            }`}
+            className={`size-3.5 shrink-0 transition-transform ${enabled ? 'rotate-90' : ''}`}
             fill="none"
             stroke="currentColor"
             strokeWidth="2.5"
@@ -533,6 +689,12 @@ export default function EnginePanel({
             />
           )}
 
+          {/* Off means off: the list, its depth badge and the gear that governs
+              its search all belong to Stockfish, so they go together. The same
+              settings stay reachable from the Settings page, and the engine
+              itself keeps running when Maia is on — Maia's colours are scored
+              against Stockfish, so its search is not optional for them. */}
+          {settings.stockfish && (
           <div className="min-w-0 flex-1">
             {/* Level with Maia's heading, and the same height whether or not
                 Maia is showing, so the two lists start on one line. */}
@@ -616,46 +778,20 @@ export default function EnginePanel({
                   )
                 }
                 return (
-                  <li
+                  <EngineLine
                     key={`line-${slot}`}
-                    className="flex items-baseline gap-2 py-0.5 font-score text-xs"
-                    title={`depth ${line.depth}: ${numberedLine(fen, line.pvSan)}`}
-                  >
-                    <span className="w-10 shrink-0 font-semibold tabular-nums">
-                      {formatScore(line.score)}
-                    </span>
-                    <span className="truncate text-ink-mute">
-                      {pvTokens(fen, line.pvSan).map((token, i) => (
-                        // The separating space is outside the move so that the
-                        // hover highlight is the width of the move and not a
-                        // space wider.
-                        <Fragment key={i}>
-                          {i > 0 && ' '}
-                          <span
-                            // The first move of the first line is what pins the
-                            // preview's left edge, so it is the one element the
-                            // preview needs to find.
-                            ref={slot === 0 && i === 0 ? firstTokenRef : undefined}
-                            className="cursor-help rounded-sm hover:bg-buff-soft hover:text-ink"
-                            // Pointer rather than mouse events, so that a tap
-                            // does not open a board a phone has no way to close:
-                            // a touch fires mouseenter too, and nothing fires
-                            // the leave.
-                            onPointerEnter={(e) => {
-                              if (e.pointerType === 'mouse')
-                                showPreview(e.currentTarget, line.pvSan, i)
-                            }}
-                          >
-                            {token}
-                          </span>
-                        </Fragment>
-                      ))}
-                    </span>
-                  </li>
+                    fen={fen}
+                    depth={line.depth}
+                    score={line.score}
+                    pvSan={line.pvSan}
+                    firstTokenRef={slot === 0 ? firstTokenRef : undefined}
+                    onPreview={showPreview}
+                  />
                 )
               })}
             </ul>
           </div>
+          )}
           </div>
         </div>
       )}

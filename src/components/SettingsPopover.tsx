@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ReactNode, RefObject } from 'react'
 
@@ -12,8 +12,6 @@ interface SettingsPopoverProps {
 
 const PANEL_WIDTH = 288
 const PANEL_GAP = 8
-/** Below this, hanging downwards is worse than flipping above the button. */
-const MIN_PANEL_HEIGHT = 260
 
 /**
  * A settings panel hung off a button in the page chrome.
@@ -36,14 +34,36 @@ export default function SettingsPopover({
   const panelRef = useRef<HTMLDivElement>(null)
   const [place, setPlace] = useState<{
     left: number
-    top?: number
-    bottom?: number
+    top: number
     maxHeight?: number
   }>()
 
-  useLayoutEffect(() => {
+  /**
+   * Where it fits, measured rather than guessed.
+   *
+   * The old rule compared the room below the button against a constant and
+   * flipped above when it lost. That works only while every panel is about the
+   * same height: the board menu grew to six switches in two groups, cleared the
+   * constant with room to spare, and still ran off the bottom of the window —
+   * which is exactly what a rule that never looks at the panel cannot see. So
+   * the panel is rendered hidden first, its real height read off it, and the
+   * placement worked out from that: below if it fits, above if that fits
+   * better, and otherwise pushed up the window as far as it needs to go.
+   */
+  const measure = useCallback(() => {
+    const put = (next: { left: number; top: number; maxHeight?: number }) =>
+      setPlace((current) =>
+        current &&
+        current.left === next.left &&
+        current.top === next.top &&
+        current.maxHeight === next.maxHeight
+          ? current
+          : next,
+      )
+
     const rect = anchor.current?.getBoundingClientRect()
-    if (!rect) return
+    const panel = panelRef.current
+    if (!rect || !panel) return
     // A viewport of no size is a pane that has stopped painting, not a small
     // one; with nothing to clamp against, the button's own edge is the honest
     // answer. The same guard as showPreview, for the same reason.
@@ -54,22 +74,59 @@ export default function SettingsPopover({
         ? Math.max(PANEL_GAP, Math.min(rect.right - PANEL_WIDTH, vw - PANEL_WIDTH - PANEL_GAP))
         : rect.right - PANEL_WIDTH
 
-    // Below the button unless there is more room above it. The chart pane's
-    // gear sits at the bottom of the page, where hanging downwards left the
-    // panel 160px tall and scrolling — the same panel opens upward there with
-    // the whole page to use.
-    const below = vh > 0 ? vh - rect.bottom - PANEL_GAP : Infinity
-    const above = rect.top - PANEL_GAP
-    if (vh > 0 && below < MIN_PANEL_HEIGHT && above > below) {
-      setPlace({ left, bottom: vh - rect.top + PANEL_GAP, maxHeight: Math.max(120, above) })
+    if (vh <= 0) {
+      put({ left, top: rect.bottom + PANEL_GAP })
       return
     }
-    setPlace({
+
+    // scrollHeight, not offsetHeight: a previous placement may have capped this
+    // panel with a maxHeight, and measuring the capped box would make the cap
+    // permanent.
+    const height = panel.scrollHeight
+    const below = vh - rect.bottom - PANEL_GAP
+    const above = rect.top - PANEL_GAP
+
+    if (height <= below) {
+      put({ left, top: rect.bottom + PANEL_GAP })
+      return
+    }
+    if (height <= above) {
+      put({ left, top: rect.top - PANEL_GAP - height })
+      return
+    }
+    // Taller than either side: sit it as low as it can go while still ending
+    // inside the window, and only then allow it to scroll.
+    const maxHeight = vh - PANEL_GAP * 2
+    put({
       left,
-      top: rect.bottom + PANEL_GAP,
-      maxHeight: vh > 0 ? Math.max(MIN_PANEL_HEIGHT, below) : undefined,
+      top: Math.max(
+        PANEL_GAP,
+        Math.min(rect.bottom + PANEL_GAP, vh - PANEL_GAP - Math.min(height, maxHeight)),
+      ),
+      maxHeight,
     })
   }, [anchor])
+
+  /**
+   * Re-measure when the panel's own height changes.
+   *
+   * Which it does while it is open: a switch turned off takes the two nested
+   * under it away, and a panel placed for the taller version then floats. A
+   * dependency on `children` would do this too and would also re-run on every
+   * render of the parent — placing, re-rendering, placing again.
+   */
+  useLayoutEffect(() => {
+    measure()
+    const panel = panelRef.current
+    if (!panel || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => measure())
+    observer.observe(panel)
+    window.addEventListener('resize', measure)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', measure)
+    }
+  }, [measure])
 
   useEffect(() => {
     const onPointerDown = (e: PointerEvent) => {
@@ -92,19 +149,19 @@ export default function SettingsPopover({
     }
   }, [anchor, onClose])
 
-  if (!place) return null
-
   return createPortal(
     <div
       ref={panelRef}
       role="dialog"
       aria-label={title}
       style={{
-        left: place.left,
-        top: place.top,
-        bottom: place.bottom,
+        left: place?.left ?? 0,
+        top: place?.top ?? 0,
         width: PANEL_WIDTH,
-        maxHeight: place.maxHeight,
+        maxHeight: place?.maxHeight,
+        // The measuring pass: laid out at full height so it can be measured,
+        // and kept off the screen until there is somewhere to put it.
+        visibility: place ? undefined : 'hidden',
       }}
       className="fixed z-50 overflow-y-auto rounded-xl border border-rule bg-card p-4 shadow-lg"
     >

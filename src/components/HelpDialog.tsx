@@ -79,7 +79,9 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
             <p>
               <strong>ChessPique</strong> is somewhere to keep, read and prepare chess games in
               the browser. Nothing you load is uploaded anywhere: the engines, the conversion
-              and the editing all run on this machine.
+              and the editing all run on this machine. The games you keep are the exception, and
+              they go to your own Lichess account rather than to this site — see{' '}
+              <em>Your library</em> below.
             </p>
             <p>
               It began as a converter, and still is one.{' '}
@@ -108,7 +110,7 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               joins the game, keep several answers to the same position, write a note against any
               of them, and decide which is the main line. That is what makes it usable for an
               opening repertoire and not only for a game you played — and a game need not come
-              from a file at all, since <Ui>New game</Ui> starts an empty board.
+              from a file at all, since <Ui>New Analysis</Ui> starts an empty board.
             </p>
             <p>
               And it reads the Lichess opening databases from the position on the board, one
@@ -116,49 +118,73 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               face.
             </p>
             <p>
-              What it remembers, it remembers here: the theme and board, how the engine
-              searches, what the board draws, the explorer's filters and the players you have
-              looked up, and your Lichess sign-in until it expires. Games are not among them —
-              a game lives in the tab until you export it, so keep the PGN.
+              What it remembers, it remembers in this browser: the theme and board, how the
+              engine searches, what the board draws, the explorer's filters and the players you
+              have looked up, your folders, the last ten games and studies you opened, and your
+              Lichess sign-in until it expires. Clearing this site's data resets all of it.
+            </p>
+            <p>
+              Your games are the exception, and they are not here at all — a game you save goes
+              into a Lichess study in your own account, where clearing this browser cannot reach
+              it. A game merely <em>loaded</em> lives in the tab until you save or export it, so
+              keep the PGN until you have.
+            </p>
+            <p>
+              <Ui>Settings → Backup</Ui> writes the rest into a file and reads one back, for a
+              browser that gets cleared. It leaves out the sign-in on purpose: that is a live
+              access token, and a backup is a file people mail to themselves.
             </p>
           </Section>
 
           <Section title="Getting around">
             <p>
-              The button at the top left opens the menu. It reaches both pages —{' '}
-              <Ui>PGN File</Ui> and <Ui>Game Analysis</Ui>, the same two the bar under the header
-              shows — plus <Ui>Appearance</Ui> for the theme, board and pieces,{' '}
-              <Ui>Settings</Ui> for how the engine searches, and this help. <Key>Esc</Key> closes
-              it, as does a click anywhere outside it.
+              The app opens on four ways in: <Ui>New Analysis</Ui> for an empty board,{' '}
+              <Ui>Upload or Drop a .pgn File</Ui>, <Ui>Paste a PGN Game</Ui>, and{' '}
+              <Ui>Open from Lichess Study</Ui>. Take any of them and the analysis fills the
+              screen from then on.
             </p>
             <p>
-              <Ui>New game</Ui> on that menu starts an empty board with no moves, for building a
-              game or a repertoire by hand rather than importing one. It fills in the standard
-              tags for you — edit them on the <Ui>PGN Header Editor</Ui> — and the converted PGN
-              grows as you play. It asks first if the game already on the board has moves in it.
+              The button at the top left opens the menu, which carries those same four in the
+              same order, plus <Ui>Game Analysis</Ui> to come back to the board,{' '}
+              <Ui>Appearance</Ui> for the theme, board and pieces, <Ui>Settings</Ui> for how the
+              engine searches, and this help. <Key>Esc</Key> closes it, as does a click anywhere
+              outside it.
+            </p>
+            <p>
+              <Ui>New Analysis</Ui> starts an empty board with no moves, for building a game or a
+              repertoire by hand rather than importing one. It fills in the standard tags for you
+              — edit them in the <Ui>PGN Header</Ui> tab — and the converted PGN grows as you
+              play. It asks first if the game already on the board has moves in it, as do{' '}
+              <Ui>Upload PGN</Ui> and <Ui>Paste PGN</Ui>, which go back to those four choices.
             </p>
           </Section>
 
-          <Section title="Step 1 — PGN File">
+          <Section title="The game pane">
             <p>
-              The page is two panes. On the left, where the game comes in, under two tabs; on the
-              right, the file it turns into and the ways of taking it elsewhere.
+              Beside the board, under four icon tabs — hover one for its name. They are all about
+              the one game on the board: the moves, the tags, the PGN it came from and the PGN it
+              turns into.
             </p>
             <p>
-              <Ui>Original PGN</Ui> — paste your game in, or use{' '}
-              <Ui>Upload or drop a .pgn file</Ui>, which converts it straight away. Otherwise
-              press <Ui>Analyze Game</Ui>. If the clock times come out wrong, or you see an
-              error about the starting clock, set the starting time and any delay or increment in
-              the box under that button, then convert again — normally the PGN's own TimeControl
-              tag is used and you can leave it alone.
+              <Ui>Move List</Ui> — the game, variations and all, with the engine's verdicts
+              against the moves that earned one.
             </p>
             <p>
-              <Ui>PGN Header Editor</Ui> — the game's tags, on the second tab. Edit any of them
-              and the converted text, the download, and the file name all follow along.
+              <Ui>PGN Header</Ui> — the game's tags. Edit any of them and the converted text, the
+              download and the file name all follow along.
             </p>
             <p>
-              <Ui>Converted PGN</Ui> — the finished text on the right, with switches above it for
-              what goes in. All four start on. <Ui>Clocks</Ui> writes the converted times as{' '}
+              <Ui>Original PGN</Ui> — the text the game was read from, still editable, with its
+              file name at the top.{' '}
+              <Ui>Analyze PGN</Ui> reads it again and replaces the game on the board. If the clock
+              times come out wrong, or you see an error about the starting clock, set the starting
+              time and any delay or increment under <Ui>Time control override</Ui> on the start
+              page and convert again — normally the PGN's own TimeControl tag is used and you can
+              leave it alone.
+            </p>
+            <p>
+              <Ui>Converted PGN</Ui> — the finished text, with switches above it for what goes
+              in. All four start on. <Ui>Clocks</Ui> writes the converted times as{' '}
               <code>{'{[%clk 0:29:50]}'}</code> — the point of the whole exercise, but you can
               have the moves without them. <Ui>Evals</Ui> writes Stockfish's score on every move
               as <code>{'{[%eval 0.38]}'}</code>. <Ui>Comments</Ui> keeps any notes your source
@@ -166,8 +192,8 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               <code>{'{Inaccuracy. Bb5 was best.}'}</code>. <Ui>Variations</Ui> writes every
               bracketed line — the game's own variations, and the one the engine preferred after
               a weak move: <code>(5. Bb5 Nd7 6. Bxc6 bxc6)</code>. Off, the file is the mainline
-              alone. Evals, the engine's verdicts and its suggested lines all wait on the review
-              from step 2.
+              alone. Evals, the engine's verdicts and its suggested lines all wait on the engine
+              review.
             </p>
             <p>
               Under the text: <Ui>Copy</Ui> and <Ui>Download</Ui> take the file;{' '}
@@ -193,7 +219,7 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
             </p>
           </Section>
 
-          <Section title="Step 2 — Game Analysis">
+          <Section title="The board">
             <p>
               Stockfish reviews the whole game automatically; the banner above the board tracks its
               progress, and the charts fill in as it finishes. Everything else is usable while it
@@ -227,10 +253,13 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               heading is Stockfish's own settings: search time, number of lines and memory.
             </p>
             <p>
-              What gets <em>drawn</em> is the other menu — the one at the right-hand end of the
-              row of buttons under the board. It carries the arrow numbers and whether the human
-              moves run at all. Both menus close when you click anywhere else, and{' '}
-              <Ui>Settings</Ui> on the main menu offers the same two groups in one page.
+              Which engines run, and what gets <em>drawn</em>, is the other menu — the one at the
+              right-hand end of the row of buttons under the board. <Ui>Stockfish Engine</Ui> and{' '}
+              <Ui>Human moves (Maia 3)</Ui> each switch their own column on and off, and either
+              can run without the other. Under Stockfish, <Ui>Display arrows</Ui> keeps the list
+              while clearing the blue arrows off the board, which is worth having when the board
+              is busy. Both menus close when you click anywhere else, and <Ui>Settings</Ui> on the
+              main menu offers the same two groups in one page.
             </p>
             <p>
               Leaving the engine running on a move lets it search deeper than the whole-game
@@ -269,7 +298,7 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               different rating, anywhere from 600 to 2600. It starts at whatever the review
               reckons the player to move has been playing at, so it follows the game, and asking
               what a 1200 would play here against an 1800 is one of the more instructive things it
-              does. Turn it on under the gear; the first time costs a one-off model download,
+              does. Turn it on in the board menu; the first time costs a one-off model download,
               after which it is kept in the browser. Nothing is ever uploaded, and if it fails or
               you are offline the panel is simply Stockfish alone.
             </p>
@@ -312,6 +341,87 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
               and the line it would have played instead is added to the game as a variation of
               that move. It walks like any other line — click it, arrow through it, promote it
               if you decide it was right — and it goes into the exported PGN with the rest.
+            </p>
+          </Section>
+
+          <Section title="Your library">
+            <p>
+              Games are kept in your own <strong>Lichess studies</strong> — a study is a folder, a
+              chapter is a game. Nothing is stored on this site: the games are in your account,
+              which is what makes them reach every device you sign in on, and what makes them
+              yours rather than this app's. <Ui>Open Study</Ui> on the menu is the way in.
+            </p>
+            <p>
+              Pick a study and its games are listed. Opening one loads it into the board; the
+              menu's <Ui>Open Recent Game…</Ui> then goes straight back to it later, and{' '}
+              <Ui>Open Recent Study…</Ui> back to the study you were picking from. Both remember
+              the last ten.
+            </p>
+            <p>
+              <Ui>Refresh</Ui> asks Lichess again. It is worth pressing after renaming or adding
+              chapters on lichess.org — and it does really ask, going around the browser's own
+              cache, which will otherwise answer for a study it fetched days ago without saying
+              so.
+            </p>
+            <p>
+              <Ui>Save</Ui> writes over the chapter you opened this session; anything else is
+              added as a new chapter. That is deliberate: Lichess offers no way to check that a
+              chapter still holds what you started from, so the only safe overwrite is one you
+              opened yourself. A game saved as new becomes the one that Save then updates.
+            </p>
+            <p>
+              <Ui>New study…</Ui> makes one on Lichess. <Ui>Private</Ui> is the default — a
+              library of your own games is not a thing to publish by accident — and the choice
+              cannot be read back afterwards, so it is worth making deliberately. Renaming or
+              deleting a study happens on lichess.org: its API has no delete a browser can reach,
+              which is why <Ui>Manage on Lichess</Ui> is a link rather than a button.
+            </p>
+          </Section>
+
+          <Section title="Folders and tags">
+            <p>
+              <strong>Folders</strong> group studies and are this app's own idea — Lichess has
+              nowhere to keep one, so they live in this browser. Make one with{' '}
+              <Ui>+ New folder</Ui>, then file studies into it with the <Ui>In folder</Ui> box
+              under whichever study is selected. Anything unfiled is still there under{' '}
+              <Ui>Unfiled</Ui>. Renaming a folder takes its studies along; deleting one unfiles
+              them and touches nothing on Lichess.
+            </p>
+            <p>
+              <strong>Tags</strong> label a game — <code>#karpov</code>, <code>#dcc-2026</code>,{' '}
+              <code>#rook-endgame</code> — and are edited in the <Ui>PGN Header</Ui> tab beside
+              the board. Lowercase letters, digits and hyphens, no spaces; typing a space or
+              Enter commits one, and the box suggests tags already in your library so the same
+              idea does not end up spelled two ways. The game list filters on them, and two tags
+              narrow rather than widen.
+            </p>
+            <p>
+              They are stored inside the game's own PGN, in the comment before its first move.
+              That is the one place a label survives: Lichess discards custom PGN tags and strips
+              comment commands it does not itself use. The upshots are worth knowing — a tag
+              travels with a shared link, it needs nothing kept in this browser, it can be read
+              and edited on lichess.org, and on a <em>public</em> study it is public.
+            </p>
+          </Section>
+
+          <Section title="Sharing a game">
+            <p>
+              <Ui>Share link</Ui> on the <Ui>Converted PGN</Ui> tab copies a link that carries the
+              whole game inside it. Whoever opens it gets the game — moves, clocks, comments,
+              variations and evaluations — without a Lichess account, without signing in, and
+              without anything being stored on this site. They can then save it into a study of
+              their own.
+            </p>
+            <p>
+              Because the game is <em>in</em> the link rather than pointed at by it, the link
+              cannot break when you edit or delete the chapter it came from, and it works from a
+              private study. The cost is length: a long game makes a long link, and some chat and
+              mail programs break one past about two thousand characters. The app says so when a
+              link comes out that long.
+            </p>
+            <p>
+              <Ui>View in Study</Ui> beside it opens the chapter on Lichess instead. That one only
+              works for someone else if the study is public.
             </p>
           </Section>
 

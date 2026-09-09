@@ -5,6 +5,7 @@ import {
   capturedMaterial,
   carryPieceIdentities,
   checkedKingSquare,
+  matedKingSquare,
   moveTargets,
   piecesOf,
   plyForClockClick,
@@ -143,6 +144,33 @@ describe('checkedKingSquare', () => {
 
   it('survives a position it cannot read', () => {
     expect(checkedKingSquare('not a fen')).toBe(null)
+  })
+})
+
+describe('matedKingSquare', () => {
+  it('finds the king that has been mated', () => {
+    // Scholar's mate again: the same position the checked test uses, so the
+    // difference between the two functions is the thing being asserted.
+    expect(
+      matedKingSquare('r1bqkb1r/pppp1Qpp/2n2n2/4p3/2B1P3/8/PPPP1PPP/RNB1K1NR b KQkq - 0 4'),
+    ).toBe('e8')
+    // Back-rank mate, the other way round: it is White's king that is mated.
+    expect(matedKingSquare('6k1/8/8/8/8/8/5PPP/r5K1 w - - 0 1')).toBe('g1')
+  })
+
+  it('says nothing for a check that is not mate', () => {
+    // The whole point of the second function: this one glows, it does not
+    // earn a marker.
+    expect(checkedKingSquare('4k3/8/8/8/8/8/8/4R1K1 b - - 0 1')).toBe('e8')
+    expect(matedKingSquare('4k3/8/8/8/8/8/8/4R1K1 b - - 0 1')).toBe(null)
+  })
+
+  it('says nothing for stalemate, which ends the game without a mate', () => {
+    expect(matedKingSquare('7k/5Q2/6K1/8/8/8/8/8 b - - 0 1')).toBe(null)
+  })
+
+  it('survives a position it cannot read', () => {
+    expect(matedKingSquare('not a fen')).toBe(null)
   })
 })
 

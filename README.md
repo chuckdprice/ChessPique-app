@@ -122,7 +122,7 @@ On the analysis page you can:
 - Read the engine's verdict under every inaccuracy, mistake, and blunder in the move list. The
   line it would have played instead is added to the game as a variation of that move, so it can
   be walked with the arrow keys, promoted, or deleted like any other
-- Review the game with Stockfish 18: an eval bar beside the board, per-move classification
+- Review the game with Stockfish 19: an eval bar beside the board, per-move classification
   (Best, Inaccuracy → Blunder; Good and Excellent stay unmarked) in the move list, on the board
   and as dots on the evaluation graph, and five analysis views shown as icons that name
   themselves on hover. They sit in two panels side by side, each with its own tabs, so two are
@@ -164,9 +164,16 @@ never uploaded anywhere.
 
 ## Engine analysis
 
-The app bundles the **single-threaded lite build of Stockfish 18 (WASM)**, copied into
+The app bundles the **single-threaded lite build of Stockfish 19 (WASM)**, copied into
 `public/stockfish/` by `scripts/copy-stockfish.mjs` on `npm install`. Single-threaded means no
 `SharedArrayBuffer`, so no COOP/COEP headers are needed and it deploys as a plain static site.
+
+The NNUE network is **compiled into the `.wasm`**, not fetched beside it — the build calls
+Stockfish's `load_internal` against a memory buffer, so there is no `EvalFile` to host and no
+second request to fail. Upgrading the engine is therefore one dependency bump: the net comes
+with it. The lite build of 19 carries `nn-61e7af4bb97d` and is **1.79 MB**, down from 7.30 MB
+for 18 — a change worth knowing about, because the engine is the largest thing the app loads
+before it can review anything.
 
 When a game loads, every position **on the mainline** is evaluated with a **depth-20 search**
 (capped at 2.5 s per position, typically ~0.6 s) to produce:
@@ -486,7 +493,9 @@ project, and only sets under a permissive or attribution license are included:
 
 | Component | Author | License |
 | --- | --- | --- |
-| Stockfish 18 (lite, single-threaded) | The Stockfish developers | GPLv3 |
+| Stockfish 19 (lite, single-threaded) | The Stockfish developers | GPLv3 |
+| [stockfish.js](https://github.com/nmrugg/stockfish.js) (the WASM port) | nmrugg / Chess.com | GPLv3 |
+| NNUE network `nn-61e7af4bb97d` | Chris Bao (sscg13), via the Stockfish project | GPLv3 |
 | [Maia-3](https://github.com/CSSLab/maia3) (`maia3_simplified.onnx`) | UofT Computational Social Science Lab | **AGPL-3.0** |
 | [onnxruntime-web](https://github.com/microsoft/onnxruntime) | Microsoft | MIT |
 

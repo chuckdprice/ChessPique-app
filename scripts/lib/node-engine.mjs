@@ -1,6 +1,20 @@
 // Minimal UCI client for running the same Stockfish build from Node, used by
 // the calibration and benchmark scripts. Mirrors src/lib/engine/uci.ts.
+import { createRequire } from 'node:module'
 import initEngine from 'stockfish'
+
+/**
+ * Which build the calibration samples were produced with.
+ *
+ * Read off the installed package rather than written down. `createEngine` asks
+ * for "lite-single" by name and gets whatever version is installed, so a
+ * hardcoded stamp beside it says nothing and goes stale silently — it sat at
+ * stockfish-18 through the upgrade to 19, which would have mislabelled every
+ * sample of a re-run.
+ */
+export const ENGINE_BUILD = `stockfish-${
+  createRequire(import.meta.url)('stockfish/package.json').version.split('.')[0]
+}-lite-single`
 
 export async function createEngine({ hashMb = 64 } = {}) {
   const engine = await initEngine('lite-single')

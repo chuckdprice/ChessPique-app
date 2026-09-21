@@ -9,7 +9,7 @@ const srcDir = join(root, 'node_modules', 'stockfish', 'bin')
 const destDir = join(root, 'public', 'stockfish')
 
 // Single-threaded lite NNUE build: no SharedArrayBuffer / COOP-COEP needed.
-const files = ['stockfish-18-lite-single.js', 'stockfish-18-lite-single.wasm']
+const files = ['stockfish-19-lite-single.js', 'stockfish-19-lite-single.wasm']
 
 if (!existsSync(srcDir)) {
   console.error('copy-stockfish: node_modules/stockfish/bin not found — run npm install first.')

@@ -7,8 +7,8 @@ import { Chess } from 'chess.js'
  * move in the analyzed position.
  */
 
-export const ENGINE_WORKER_PATH = '/stockfish/stockfish-18-lite-single.js'
-export const ENGINE_NAME = 'SF18'
+export const ENGINE_WORKER_PATH = '/stockfish/stockfish-19-lite-single.js'
+export const ENGINE_NAME = 'SF19'
 
 /** Centipawns (cp) or moves-to-mate (mate); exactly one is set. White POV. */
 export interface Score {

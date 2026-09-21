@@ -20,7 +20,7 @@ export default function ReviewRing({ progress }: ReviewRingProps) {
   const pct = total > 0 ? (done / total) * 100 : null
   const label =
     pct != null
-      ? `Reviewing with Stockfish 18 (d${REVIEW_DEPTH}) — ${done} of ${total} positions, ${Math.round(pct)}%`
+      ? `Reviewing with Stockfish 19 (d${REVIEW_DEPTH}) — ${done} of ${total} positions, ${Math.round(pct)}%`
       : 'Starting the engine review…'
 
   return (

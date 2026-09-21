@@ -10,7 +10,7 @@
 // then fit with scripts/fit-rating-curve.mjs.
 import { readFileSync, writeFileSync } from 'node:fs'
 import { Chess } from 'chess.js'
-import { createEngine } from './lib/node-engine.mjs'
+import { createEngine, ENGINE_BUILD } from './lib/node-engine.mjs'
 
 // Keep in sync with src/lib/engine/analysis.ts.
 const REVIEW_DEPTH = 20
@@ -118,7 +118,7 @@ for (const [gi, pgn] of games.entries()) {
         engine: {
           depth: REVIEW_DEPTH,
           movetimeCapMs: REVIEW_MOVETIME_CAP_MS,
-          build: 'stockfish-18-lite-single',
+          build: ENGINE_BUILD,
         },
         samples,
       },

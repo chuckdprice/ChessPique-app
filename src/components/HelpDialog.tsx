@@ -246,7 +246,7 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
             </p>
             <p>
               Twist open <Ui>Move Evals</Ui> for a live engine on the current position; twisting
-              it shut stops it again. <Ui>SF18: Engine Moves</Ui> lists its best lines, drawn on
+              it shut stops it again. <Ui>SF19: Engine Moves</Ui> lists its best lines, drawn on
               the board as blue arrows shaded from best to worst, with the move actually played
               in orange — and with its evaluation at the arrow's head too, which is worth most
               exactly when the move played was not one the engine listed. The gear beside that

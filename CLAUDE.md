@@ -119,6 +119,26 @@ the harness's drag tool (mouse events) cannot move a piece. Drive it with a
   it. The *listing* needs none: it carries no validator at all, so no heuristic
   can apply. Note that a stubbed `fetch` can never catch this, which is why it
   survived a round of testing that looked thorough.
+- **The "played like" curve survived Stockfish 19 — don't re-fit it without
+  reading this.** `PLAYED_LIKE_A/B` in `analysis.ts` were fitted against
+  Stockfish 18, so the upgrade to 19 on 21 September 2026 looked like it
+  invalidated them. Measured instead of assumed: 39 fresh Lichess rapid games
+  evaluated with 19 at the same depth, then the shipped curve and a re-fit
+  compared on the *same* 65 player-samples — MAE **260** shipped against **258**
+  re-fitted, and at both extremes the shipped one is the better of the two. Two
+  Elo is not a reason to move a constant, so nothing changed. The band medians
+  did rise (2000-2199: 2.5 → 3.1, 1800-1999: 2.3 → 3.4), which is what a
+  stronger engine does to human moves; it is simply swamped by how weak a
+  single game is as a rating signal (R² ≈ 0.31, and that is the honest ceiling).
+  Two traps in the numbers: the new report's MAE 258 against the old report's
+  331 is **not** an improvement — different sample, and it has no 2200+ band, so
+  the narrower rating range shrinks MAE and attenuates R² by itself. And that
+  missing band is why the run cannot speak for the high end at all:
+  `fetch-calibration-games.mjs` samples whichever rapid arenas are *live*, and
+  the ones running that day topped out at 2200. Re-run it when high-rated
+  arenas are up if the top of the curve ever matters. The pipeline is
+  `fetch-calibration-games.mjs` → `calibrate-rating.mjs` (shard it; the engine is
+  single-threaded and it is ~0.7 s per ply) → `fit-rating-curve.mjs`.
 - **Don't run `npx prettier`.** There is no config, so it applies its own
   defaults — semicolons and double quotes — and reformats an entire file against
   the house style (no semicolons, single quotes). It produced a 220-line diff

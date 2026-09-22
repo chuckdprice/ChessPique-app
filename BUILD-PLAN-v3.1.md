@@ -220,9 +220,12 @@ Slice 1 needs none of these.
    records that the question is already live because of Maia, that this makes
    it harder to keep ignoring, and that it is Chuck's to answer or to put to
    upstream.
-2. **Which net.** Recommend `sf_19_smallnet` + `nn-61e7af4bb97d.nnue`: 1.63 MB
-   together against the 1.70 MB we ship today, so the payload barely moves. The
-   big net is 75.3 MB, which is Maia's 46 MB again and worse.
+2. **Which net.** Recommend `sf_19_smallnet` + `nn-61e7af4bb97d.nnue` — which is
+   the net the shipped `lite-single` build already embeds, so this is the same
+   engine and the same weights in a different wrapper. 1.60 MB together against
+   1.70 MB today, and the only real change is that 1.11 MB of it arrives as a
+   separate cached download instead of inside the wasm. The big net is 75.3 MB,
+   which is Maia's 46 MB again and worse.
 3. **Whether a slower review is acceptable at all.** This is the feature's whole
    shape. If a minute-long review becoming seventy seconds is not worth nine
    points of classification accuracy, stop here — nothing later in this plan
@@ -312,10 +315,16 @@ Two backends behind the existing surface:
 The fallback is not politeness. It is what keeps the app working if the headers
 have to come off in a hurry, and what keeps `npm test` honest in Node.
 
-`ENGINE_NAME` reads `SF19` for both and stays true, but the two backends do not
-play the same chess: `lite-single` embeds its own net in a 1.70 MB wasm,
-`sf_19_smallnet` loads `nn-61e7af4bb97d.nnue` externally. Different nets mean
-different evals even at one thread.
+`ENGINE_NAME` reads `SF19` for both and stays true, and — corrected on
+22 September 2026, after an earlier draft of this plan claimed otherwise — the two
+backends play **the same** chess at one thread. `strings` on the shipped
+`stockfish-19-lite-single.wasm` finds `nn-61e7af4bb97d.nnue`, the very net
+`sf_19_smallnet` fetches separately. Same Stockfish 19, same net; the difference
+is packaging (1.70 MB with the net baked in, against 0.49 MB plus a 1.11 MB
+download) and the ability to spawn threads. So the swap is not the eval change
+the earlier draft budgeted for — which makes the one-thread comparison below a
+cheap check rather than an expected difference, and moves the whole
+re-calibration case onto threading.
 
 ### New: the net, fetched and cached
 
@@ -387,9 +396,10 @@ the same build the browser does.
 
 ## Slice 4 — re-calibration, and it is mandatory now
 
-Not conditional, as an earlier draft had it. Two things change at once — the net
-is different and the search is qualitatively different — and Slice 0 measured
-classifications moving on 195 moves. `analysis.ts` says it in as many words:
+Not conditional, as an earlier draft had it — but for one reason, not two. The
+net does **not** change: `lite-single` already embeds `nn-61e7af4bb97d.nnue`.
+What changes is the search, qualitatively, and Slice 0 measured classifications
+moving on 195 moves because of it. `analysis.ts` says it in as many words:
 `REVIEW_DEPTH` and `REVIEW_MOVETIME_CAP_MS` "are the settings the 'played like'
 curve was calibrated against — changing them invalidates that fit." The search
 character is now one of those settings.
@@ -425,9 +435,11 @@ plan keeps finding — and unlike depth, the user can change it.
   is calibrated against one setting. Either pin the review's thread count
   separately from the panel's, or accept that the rating estimate drifts with a
   slider — the first is probably right and this plan does not decide it.
-- **The engine swap changes evals on its own,** because the nets differ. Do not
-  attribute a classification change to threading without having measured the
-  swap at one thread first.
+- **The engine swap should be near-neutral at one thread, and that is a
+  prediction to test rather than assume.** Both builds are Stockfish 19 on
+  `nn-61e7af4bb97d`, so a large classification difference at one thread means
+  something else is going on — a build flag, a wrong net, a bug in the worker —
+  and is worth chasing before threads are switched on.
 - **Never benchmark this on a busy machine, and never time the first run.**
   Both produced wrong answers during Slice 0, in opposite directions.
 - **Never score a threaded search against a threaded reference.** It flatters

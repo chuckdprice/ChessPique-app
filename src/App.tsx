@@ -4,6 +4,7 @@ import AppearanceDialog from './components/AppearanceDialog'
 import BrandMark from './components/BrandMark'
 import ConfirmDialog from './components/ConfirmDialog'
 import HelpDialog from './components/HelpDialog'
+import LicensesDialog from './components/LicensesDialog'
 import NavDrawer, { NavToggle } from './components/NavDrawer'
 import PageBoundary from './components/PageBoundary'
 import SettingsPage from './components/SettingsPage'
@@ -268,6 +269,7 @@ export default function App() {
   const [sourceFileName, setSourceFileName] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [helpOpen, setHelpOpen] = useState(false)
+  const [licensesOpen, setLicensesOpen] = useState(false)
   const [navOpen, setNavOpen] = useState(false)
   // Asking before a new game throws the current one away.
   const [confirmNew, setConfirmNew] = useState(false)
@@ -756,7 +758,8 @@ export default function App() {
   // or while something is open over it — an arrow key belongs to whatever has
   // the user's attention, not to the board behind it.
   useEffect(() => {
-    if (!game || page !== 'analysis' || helpOpen || navOpen || appearanceOpen) return
+    if (!game || page !== 'analysis' || helpOpen || licensesOpen || navOpen || appearanceOpen)
+      return
     const { tree } = game
     // Forward follows the line the board is on rather than the mainline, so
     // arrowing through a variation stays in it.
@@ -817,7 +820,16 @@ export default function App() {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [game, page, helpOpen, navOpen, appearanceOpen, handleStepForward, handleBranchChoose])
+  }, [
+    game,
+    page,
+    helpOpen,
+    licensesOpen,
+    navOpen,
+    appearanceOpen,
+    handleStepForward,
+    handleBranchChoose,
+  ])
 
   /**
    * The mainline as a flat list, which is what the charts, the clocks and the
@@ -1556,6 +1568,7 @@ export default function App() {
           gameLoaded={!!game}
           onAppearance={handleAppearanceOpen}
           onHelp={() => setHelpOpen(true)}
+          onLicenses={() => setLicensesOpen(true)}
         />
       )}
 
@@ -1616,7 +1629,10 @@ export default function App() {
         />
       )}
 
-      {helpOpen && <HelpDialog onClose={() => setHelpOpen(false)} />}
+      {helpOpen && (
+        <HelpDialog onClose={() => setHelpOpen(false)} onLicenses={() => setLicensesOpen(true)} />
+      )}
+      {licensesOpen && <LicensesDialog onClose={() => setLicensesOpen(false)} />}
     </div>
   )
 }

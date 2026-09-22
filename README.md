@@ -502,8 +502,19 @@ project, and only sets under a permissive or attribution license are included:
 Maia-3 is the one dependency here under a network-copyleft license, and it is served
 from this app's own origin rather than a third party — see
 [`public/maia3/NOTICE.md`](public/maia3/NOTICE.md) for the attribution, the source
-links and the ICLR 2026 citation. The corresponding source for this application is
-this repository, which is public.
+links and the ICLR 2026 citation.
+
+Both Stockfish and Maia-3 are copyleft, and AGPL-3.0 reaches anyone who uses the app
+over a network rather than only someone handed a copy. Those licenses ask for the
+corresponding source, which attribution does not supply — so this repository is the
+source offer, and it has to stay reachable for as long as the app is deployed. **If
+it is private, the offer does not exist.** An earlier version of this paragraph
+asserted the repository was public while it was not; the claim is only as true as
+the repository's visibility setting, so check that rather than this sentence.
+
+Help | Licenses in the app lists all of the above and links here. `src/lib/licenses.ts`
+holds the list and `licenses.test.ts` fails if a dependency is added without being
+credited — which is the failure mode a hand-maintained list has, and a silent one.
 
 ## What is kept in your browser
 

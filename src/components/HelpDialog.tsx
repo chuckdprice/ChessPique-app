@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 
 interface HelpDialogProps {
   onClose: () => void
+  onLicenses: () => void
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -26,7 +27,7 @@ function Key({ children }: { children: React.ReactNode }) {
   )
 }
 
-export default function HelpDialog({ onClose }: HelpDialogProps) {
+export default function HelpDialog({ onClose, onLicenses }: HelpDialogProps) {
   const closeRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
@@ -531,6 +532,21 @@ export default function HelpDialog({ onClose }: HelpDialogProps) {
             <p>
               Suggestions are just as welcome, including ones about wording, layout, or anything
               here that was confusing to read.
+            </p>
+          </Section>
+
+          <Section title="Licenses">
+            <p>
+              ChessPique is built out of other people's work — Stockfish, Maia-3, the Lichess
+              piece sets, and the libraries underneath all of it.{' '}
+              <button
+                type="button"
+                onClick={onLicenses}
+                className="font-medium text-ink underline underline-offset-2"
+              >
+                See the full list and its licenses
+              </button>
+              , including a link to this app's own source, which two of those licenses require.
             </p>
           </Section>
         </div>

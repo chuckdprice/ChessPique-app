@@ -22,6 +22,7 @@ interface NavDrawerProps {
   /** Appearance stays a modal; the nav is only how it is reached now. */
   onAppearance: () => void
   onHelp: () => void
+  onLicenses: () => void
 }
 
 /** One nav glyph, drawn to the same weight as the header's buttons. */
@@ -54,6 +55,7 @@ const ICON = {
   settings:
     'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm7.4-3a7.4 7.4 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-2-1.2L14.5 2h-4l-.4 2.6a7.4 7.4 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6a7.4 7.4 0 0 0 0 2.4l-2 1.6 2 3.4 2.4-1a7.4 7.4 0 0 0 2 1.2l.4 2.6h4l.4-2.6a7.4 7.4 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.06-.4.1-.8.1-1.2Z',
   help: 'M9.6 9.2a2.5 2.5 0 1 1 3.3 2.4c-.6.2-.9.7-.9 1.3v.4',
+  licenses: 'M12 5.5 8 4 4 5.5v12L8 16l4 1.5 4-1.5 4 1.5v-12L16 4l-4 1.5Zm0 0v12',
 } as const
 
 const HELP_EXTRA = (
@@ -235,6 +237,7 @@ export default function NavDrawer({
   gameLoaded,
   onAppearance,
   onHelp,
+  onLicenses,
 }: NavDrawerProps) {
   const firstRef = useRef<HTMLButtonElement>(null)
 
@@ -357,6 +360,12 @@ export default function NavDrawer({
             label="Help"
             icon={<Icon d={ICON.help} fills={HELP_EXTRA} />}
             onSelect={onHelp}
+            onClose={onClose}
+          />
+          <Item
+            label="Licenses"
+            icon={<Icon d={ICON.licenses} />}
+            onSelect={onLicenses}
             onClose={onClose}
           />
         </nav>

@@ -9,8 +9,10 @@ University of Toronto. It is served here unmodified.
 - **Inference code:** <https://github.com/CSSLab/maia3>
 - **This ONNX export:** <https://github.com/CSSLab/maia-platform-frontend> (`public/maia3`)
 - **License: AGPL-3.0.** The full text is at <https://www.gnu.org/licenses/agpl-3.0.txt>.
-  The corresponding source for this application is at
-  <https://github.com/chuckdprice/ChessNoteR-app>.
+  The corresponding source for this application is not published; it is available on
+  request through the Lichess inbox linked from Help | Licenses in the app. (This line
+  used to name a repository, under the app's pre-rename name, that no signed-out
+  visitor could open.)
 
 Maia-3 is a human move-prediction model, not an evaluation engine: it answers "what
 would a player of this rating play here", and the app pairs it with Stockfish, which

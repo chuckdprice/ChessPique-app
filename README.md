@@ -506,15 +506,21 @@ links and the ICLR 2026 citation.
 
 Both Stockfish and Maia-3 are copyleft, and AGPL-3.0 reaches anyone who uses the app
 over a network rather than only someone handed a copy. Those licenses ask for the
-corresponding source, which attribution does not supply — so this repository is the
-source offer, and it has to stay reachable for as long as the app is deployed. **If
-it is private, the offer does not exist.** An earlier version of this paragraph
-asserted the repository was public while it was not; the claim is only as true as
-the repository's visibility setting, so check that rather than this sentence.
+corresponding source, which attribution does not supply.
 
-Help | Licenses in the app lists all of the above and links here. `src/lib/licenses.ts`
-holds the list and `licenses.test.ts` fails if a dependency is added without being
-credited — which is the failure mode a hand-maintained list has, and a silent one.
+The source is not published, so the app makes a written offer instead: Help | Licenses
+says the source is available on request and points at the Lichess inbox already used
+for bug reports. That is weaker than what AGPL-3.0 §13 asks for — source served from a
+network server — and it is what can honestly be said while the repository is private.
+An earlier version of this paragraph asserted the repository was public when it was
+not, and the app briefly repeated the claim; do not restore either without checking
+that a signed-out visitor can actually reach the code.
+
+`src/lib/licenses.ts` holds the list behind that screen and `licenses.test.ts` fails if
+a dependency is added without being credited — which is the failure mode a
+hand-maintained list has, and a silent one. It also fails if the offer is turned back
+into a repository link, so publishing the repository means changing the copy in
+`LicensesDialog` too, not only the constant.
 
 ## What is kept in your browser
 

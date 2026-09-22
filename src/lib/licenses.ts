@@ -12,7 +12,7 @@
  * its author, which is what this screen does. Copyleft licences are not: GPL
  * asks that the corresponding source be available to anyone the work is
  * distributed to, and AGPL asks the same of anyone who merely interacts with it
- * over a network. Attribution does not satisfy either. The source link does.
+ * over a network. Attribution does not satisfy either.
  */
 
 export interface LicenseRow {
@@ -122,10 +122,20 @@ export const GROUPS: LicenseGroup[] = [
 ]
 
 /**
- * Where this app's own source is, which is the part a credit cannot replace.
+ * How to ask for the source, which is the part a credit cannot replace.
  *
  * Both Stockfish and Maia are copyleft, and Maia's AGPL reaches anyone who uses
  * the app over a network rather than only someone handed a copy. Naming them is
- * not compliance; this link is.
+ * not compliance.
+ *
+ * This is a written offer rather than a public repository, and the difference
+ * is worth stating plainly: AGPL-3.0 §13 asks for source served "from a network
+ * server", which an offer to send it on request does not fully meet. It is
+ * what the app can honestly say today. Publishing the repository would replace
+ * this constant with a link and settle the question — until then, do not write
+ * a sentence here claiming source that a reader cannot actually reach.
+ *
+ * The route is the Lichess inbox the app already uses for bug reports. There is
+ * no server here to receive anything else: the app is entirely static.
  */
-export const SOURCE_URL = 'https://github.com/chuckdprice/ChessPique-app'
+export const SOURCE_REQUEST_URL = 'https://lichess.org/@/DragonBeard'

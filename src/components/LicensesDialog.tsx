@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { GROUPS, isCopyleft, SOURCE_URL } from '../lib/licenses'
+import { GROUPS, isCopyleft, SOURCE_REQUEST_URL } from '../lib/licenses'
 
 interface LicensesDialogProps {
   onClose: () => void
@@ -11,8 +11,13 @@ interface LicensesDialogProps {
  * The copyleft rows are marked rather than listed apart, because grouping by
  * licence would separate Stockfish from the network it runs and Maia from the
  * runtime that loads it — the reader is looking for a component, not a licence.
- * The source link sits above the tables instead of under them: for GPL and AGPL
- * it is the part that does the work, and a credit alone would not.
+ * The source offer sits above the tables instead of under them: for GPL and
+ * AGPL it is the part that does the work, and a credit alone would not.
+ *
+ * It offers to send the source rather than linking to it, because there is no
+ * public repository to link to. Saying "the source is on GitHub" beside a URL
+ * that answers 404 would be worse than saying nothing, which is what the
+ * previous wording did.
  */
 export default function LicensesDialog({ onClose }: LicensesDialogProps) {
   const closeRef = useRef<HTMLButtonElement>(null)
@@ -65,17 +70,20 @@ export default function LicensesDialog({ onClose }: LicensesDialogProps) {
             <p>
               Stockfish and Maia-3 are under copyleft licences, and Maia-3's{' '}
               <span className="font-medium text-ink">AGPL-3.0</span> covers anyone using this app
-              over a network, not only someone handed a copy. Those licences ask for source rather
-              than for credit, so:{' '}
+              over a network, not only someone handed a copy. Those licences ask for the
+              corresponding source rather than for credit.
+            </p>
+            <p className="mt-2">
+              ChessPique's source is not published at the moment, so it is available on request:{' '}
               <a
-                href={SOURCE_URL}
+                href={SOURCE_REQUEST_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-medium text-ink underline underline-offset-2"
               >
-                the complete source for ChessPique is on GitHub
-              </a>
-              .
+                message me on Lichess
+              </a>{' '}
+              and I will send you a copy. Sending a message needs a Lichess account of your own.
             </p>
           </div>
 

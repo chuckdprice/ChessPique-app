@@ -139,6 +139,51 @@ the harness's drag tool (mouse events) cannot move a piece. Drive it with a
   arenas are up if the top of the curve ever matters. The pipeline is
   `fetch-calibration-games.mjs` → `calibrate-rating.mjs` (shard it; the engine is
   single-threaded and it is ~0.7 s per ply) → `fit-rating-curve.mjs`.
+- **Threads help, and not for the reason anyone expects: they make the review
+  slower and more accurate.** Stockfish can run multi-threaded in a browser
+  given `COOP: same-origin` + `COEP: require-corp` (how lichess.org does it) and
+  a build that uses `SharedArrayBuffer`. Measured on 22 September 2026 over 195
+  moves of three real games, against a depth-26 *single-threaded* reference:
+  classifications agree with the reference 75.4% of the time at depth 20 on one
+  thread and **84.1%** on ten (McNemar 11/28, p = 0.0095), for **18% more wall
+  clock**. Raising the depth instead does not do it — depth 22 on one thread
+  reaches 77.9% for twice the time, and against today that is not significant
+  (p = 0.46). Time to depth never improves at any search length: 9.76x the node
+  rate buys 1.16x, because Lazy SMP spends the nodes on move ordering rather
+  than depth. So the trade is about 49s → 58s per game for ~9 points of
+  classification accuracy, and there is no depth setting that buys the same
+  thing. `BUILD-PLAN-v3.1.md` has the whole measurement and the slices; it is
+  unbuilt, and the open question in front of it is the AGPL declaration on
+  `@lichess-org/stockfish-web`.
+- **Never score a threaded search against a threaded reference.** It flatters
+  its own kind. The same four configurations scored against a depth-26 *ten
+  thread* reference put `d22 t=10` on top with an awl error of 0.194 and a
+  rating error of 0; under a single-threaded reference that row is 0.467 and 33.
+  Best-move agreement is the clearest tell — threads score +1.1 against a
+  threaded reference and −2.6 against a single-threaded one, a swing that tracks
+  the reference's character rather than correctness, which is why that column is
+  useless here. The reference is single-threaded and depth-limited, which also
+  makes it reproducible.
+- **The Stockfish worker is loaded from `public/` as a static asset, and that is
+  not legacy.** Anyone modernising it into a bundled `import` will hit three
+  walls in a row, all measured against `@lichess-org/stockfish-web`: Vite's dep
+  optimizer rewrites the module into `node_modules/.vite/deps/` so its
+  `locateFile` fetches the SPA's `index.html` and dies on the wasm magic word
+  (`3c 21 64 6f` is `<!do`); `vite:import-analysis` refuses a literal `import()`
+  of anything under `/public` and runs *before* `@vite-ignore` is honoured; and
+  `vite build` fails outright with "Module format iife does not support
+  top-level await". A hand-written worker beside the engine avoids all three —
+  and it is also faster, because the dep-optimised module measured 225k nps
+  against 1.16M for the same engine in a worker.
+- **Never time the first run, and never share the machine.** Whichever engine
+  configuration runs first is slowest while wasm tiers up: one run had threads
+  making the review 14% *faster*, and with a discarded warm-up sweep ahead of it
+  the same comparison showed them 18% slower. Separately, an agreement run with
+  the browser pane searching alongside came out backwards. Both produced
+  confident wrong numbers. A contended or cold engine measurement is not a noisy
+  measurement, it is a wrong one — and the browser pane is not where to take a
+  figure at all: its single-threaded numbers came in 3x low while its ten-thread
+  ones matched Node exactly.
 - **Don't run `npx prettier`.** There is no config, so it applies its own
   defaults — semicolons and double quotes — and reformats an entire file against
   the house style (no semicolons, single quotes). It produced a 220-line diff

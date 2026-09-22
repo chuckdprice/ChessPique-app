@@ -40,8 +40,26 @@ const build = Number.isFinite(committedAt)
   : '0'
 const appVersion = `${major}.${minor}.${build}`
 
+/**
+ * Cross-origin isolation, which is the whole of what this gives the page:
+ * `SharedArrayBuffer`, and therefore the ability to run Stockfish on more than
+ * one thread. Nothing uses it yet — that is deliberate, so this can be shipped
+ * and reverted on its own.
+ *
+ * Production gets these from `vercel.json`. Dev and `vite preview` need them
+ * here too, or every local check is made against a page that cannot do the
+ * thing being checked — the same shape of mistake as the Maia model download,
+ * which no local test could reach.
+ */
+const ISOLATION = {
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Cross-Origin-Embedder-Policy': 'require-corp',
+}
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  server: { headers: ISOLATION },
+  preview: { headers: ISOLATION },
   define: {
     __APP_VERSION__: JSON.stringify(appVersion),
   },

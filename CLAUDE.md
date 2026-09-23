@@ -480,6 +480,28 @@ Deployed at <https://chesspique.vercel.app> from `main` (auto-deploy on push).
 The version in the header is `major.minor` from `package.json` plus a build
 number derived from the commit's timestamp, so it changes on every commit.
 
+**The repository is public**, as of 23 September 2026, and it has to stay that
+way: it is the source offer that Stockfish's GPL and Maia's AGPL ask for, and
+Help | Licenses links to it. If it ever goes private, the copy in
+`LicensesDialog`, the README and `public/maia3/NOTICE.md` all have to change
+back together — the app said it was public once while it was not.
+
+**v3.1 shipped on 23 September 2026.** `v3.1.0` on the release commit,
+`v3.0-final` on the last v3.0, which is what a rollback goes back to.
+
+What v3.1 changed, in one line: the site is cross-origin isolated, so the engine
+*can* use threads — and the panel's gear has a slider for them while the review
+deliberately stays on one. The entries under "Things that will bite" are the
+part worth reading first, particularly the one about what repeating a
+measurement took back. The piece with the widest blast radius is `vercel.json`:
+two headers on every response, and deleting that file is the fast rollback if
+isolation ever misbehaves.
+
+**v3.0 shipped on 21 September 2026**, bracketed by `v3.0.0` and `v2.5-final`.
+A library of games backed by Lichess studies — studies are the folders, chapters
+are the games. Its build plan is `BUILD-PLAN-v3.md`; `BUILD-PLAN-v3.1.md` is the
+one after it.
+
 **v2.5 gave the app a name of its own: it is called ChessPique.** It began as a
 converter for ChessNoteR's `%emt` clocks and was named after them, and it has
 grown into a reviewer, a repertoire editor and an opening-preparation tool.

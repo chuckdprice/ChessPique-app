@@ -251,7 +251,17 @@ export default function HelpDialog({ onClose, onLicenses }: HelpDialogProps) {
               the board as blue arrows shaded from best to worst, with the move actually played
               in orange — and with its evaluation at the arrow's head too, which is worth most
               exactly when the move played was not one the engine listed. The gear beside that
-              heading is Stockfish's own settings: search time, number of lines and memory.
+              heading is Stockfish's own settings: search time, number of lines, threads and
+              memory.
+            </p>
+            <p>
+              <Ui>Threads</Ui> is worth a word, because it does not do what the name suggests.
+              More of them do not make the search <em>finish sooner</em> — they make it a{' '}
+              <em>better</em> search in the same time, because the extra cores go into looking
+              harder rather than looking further ahead. Expect the depth number to move very
+              little. It applies to this live panel only: the game review deliberately stays on
+              one thread, so that reviewing the same game twice gives you the same answer. The
+              slider is greyed out if your browser cannot run engine threads at all.
             </p>
             <p>
               Which engines run, and what gets <em>drawn</em>, is the other menu — the one at the

@@ -54,7 +54,7 @@ switches for what goes into it, and the ways out: copy, download, a share link, 
 Chess.com, or save into a study).
 
 **Settings** has three sections. *Engine* is how Stockfish searches — search time, number of
-lines, memory — the same values as the gear on the engine panel. *Board* is which engines run
+lines, threads, memory — the same values as the gear on the engine panel. *Board* is which engines run
 and what they draw, the same values as the menu at the end of the move-navigation row. *Backup*
 saves and restores what only this browser knows. Both menus stay as the shortcut for while you
 are looking at a position, and both close when you click anywhere else.
@@ -150,7 +150,7 @@ On the analysis page you can:
   mainline** makes it the game's own line all the way back to the first move, **Demote** moves
   it down, and **Delete from here** removes that move and everything after it
 - Turn on the live engine panel for a continuously updating evaluation of the current
-  position, with configurable search time, number of lines, and memory
+  position, with configurable search time, number of lines, threads, and memory
 - Write a note against any move on the *Comments* tab — including a move in a variation, which
   is how a repertoire's lines get their names. The move list follows as you type, and the text
   is what the converted PGN carries in braces
@@ -164,16 +164,30 @@ never uploaded anywhere.
 
 ## Engine analysis
 
-The app bundles the **single-threaded lite build of Stockfish 19 (WASM)**, copied into
-`public/stockfish/` by `scripts/copy-stockfish.mjs` on `npm install`. Single-threaded means no
-`SharedArrayBuffer`, so no COOP/COEP headers are needed and it deploys as a plain static site.
+The app bundles **two builds of Stockfish 19**, both copied into `public/stockfish/` by
+`scripts/copy-stockfish.mjs` on `npm install`, and picks between them when the page loads:
 
-The NNUE network is **compiled into the `.wasm`**, not fetched beside it — the build calls
-Stockfish's `load_internal` against a memory buffer, so there is no `EvalFile` to host and no
-second request to fail. Upgrading the engine is therefore one dependency bump: the net comes
-with it. The lite build of 19 carries `nn-61e7af4bb97d` and is **1.79 MB**, down from 7.30 MB
-for 18 — a change worth knowing about, because the engine is the largest thing the app loads
-before it can review anything.
+| | when | threads | the net |
+| --- | --- | --- | --- |
+| `sf_19_smallnet` (from `@lichess-org/stockfish-web`) | the page is cross-origin isolated | yes | fetched from `/nnue`, 1.11 MB, cached in IndexedDB |
+| `stockfish-19-lite-single` (from `stockfish`) | anywhere else, and as a fallback | no | compiled into the `.wasm` |
+
+They are the same engine on the same network, `nn-61e7af4bb97d` — the lite build embeds it, the
+other fetches it. The difference is that one can use more than one core and the other cannot,
+which is what the site's `COOP: same-origin` and `COEP: require-corp` headers buy: without
+cross-origin isolation a browser will not hand a page `SharedArrayBuffer`, and WebAssembly
+threads are built on it.
+
+The threaded build is loaded through `public/stockfish/sf-worker.js`, a small worker written by
+hand rather than imported, because Vite cannot bundle that engine — see the note in the file.
+If it fails to start, the app falls back to the single-threaded build rather than leaving you
+without an engine.
+
+**Threads are for the live panel, not the review.** The gear on the engine panel has a Threads
+slider; the review's count is fixed at one in `analysis.ts`, deliberately. More threads make a
+search stronger but not faster, and they make it less repeatable — reviewing the same game
+twice would disagree with itself on roughly a sixth of its moves instead of a tenth. The
+reasoning and the measurements are in `BUILD-PLAN-v3.1.md`.
 
 When a game loads, every position **on the mainline** is evaluated with a **depth-20 search**
 (capped at 2.5 s per position, typically ~0.6 s) to produce:
@@ -493,8 +507,9 @@ project, and only sets under a permissive or attribution license are included:
 
 | Component | Author | License |
 | --- | --- | --- |
-| Stockfish 19 (lite, single-threaded) | The Stockfish developers | GPLv3 |
-| [stockfish.js](https://github.com/nmrugg/stockfish.js) (the WASM port) | nmrugg / Chess.com | GPLv3 |
+| Stockfish 19 | The Stockfish developers | GPLv3 |
+| [stockfish.js](https://github.com/nmrugg/stockfish.js) (the single-threaded WASM port) | nmrugg / Chess.com | GPLv3 |
+| [@lichess-org/stockfish-web](https://github.com/lichess-org/stockfish-web) (the threaded one) | Lichess | AGPL-3.0 |
 | NNUE network `nn-61e7af4bb97d` | Chris Bao (sscg13), via the Stockfish project | GPLv3 |
 | [Maia-3](https://github.com/CSSLab/maia3) (`maia3_simplified.onnx`) | UofT Computational Social Science Lab | **AGPL-3.0** |
 | [onnxruntime-web](https://github.com/microsoft/onnxruntime) | Microsoft | MIT |

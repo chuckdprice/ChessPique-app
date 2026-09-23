@@ -486,6 +486,17 @@ Help | Licenses links to it. If it ever goes private, the copy in
 `LicensesDialog`, the README and `public/maia3/NOTICE.md` all have to change
 back together — the app said it was public once while it was not.
 
+**`main` refuses force-pushes and deletion, and nobody can bypass that — Chuck
+included.** A repository ruleset, "Protect main", added on 23 September 2026
+alongside disabling GitHub Actions (there are no workflows; off means a
+stranger's pull request can never run code in the repo). Ordinary pushes are
+untouched. The consequence for a session: a commit that has been pushed is
+final, so never amend or rebase one — a correction is a new commit on top. A
+rejected `git push --force` is this rule working, not an outage; if history
+genuinely has to be rewritten, that is Chuck's call, made by switching the
+ruleset off under Settings → Rules → Rulesets. Only Chuck's account has write
+access; forks and pull requests cannot change the code without his merge.
+
 **v3.1 shipped on 23 September 2026.** `v3.1.0` on the release commit,
 `v3.0-final` on the last v3.0, which is what a rollback goes back to.
 

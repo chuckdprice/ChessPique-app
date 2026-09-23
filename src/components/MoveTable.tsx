@@ -66,17 +66,23 @@ export default function MoveTable({
   const CONTEXT_ROWS = 2
 
   /**
-   * Keep the current move in view by scrolling the list itself.
+   * Keep the current move in view by scrolling the list's own pane.
    *
    * scrollIntoView would be shorter, but it scrolls whichever ancestor happens
    * to be scrollable — on a phone that is the page, so stepping through the
-   * game dragged the board off the top of the screen. Setting scrollTop can
-   * only ever move this list, and does nothing when it is not scrollable.
+   * game dragged the board off the top of the screen. Setting scrollTop on
+   * `scrollerOf` can only ever move the list's own pane.
    */
   useEffect(() => {
-    const list = listRef.current
+    const list = listRef.current && scrollerOf(listRef.current)
     const current = currentRef.current
-    if (!list || !current) return
+    if (!list) return
+    // The starting position has no move to show, but the top of the game is
+    // where it is — otherwise Home left the list parked wherever it last was.
+    if (!current) {
+      list.scrollTop = 0
+      return
+    }
 
     // Rects, not offsetTop: the move sits inside a table cell, so its
     // offsetParent is that cell rather than this list and offsetTop measures
@@ -457,4 +463,23 @@ function isOnMainline(tree: MoveTree, node: MoveNode): boolean {
     id = at.parent
   }
   return true
+}
+
+/**
+ * The element that actually scrolls the list: the list itself as a card, the
+ * tab pane around it when `bare`. Aiming at the list alone is what broke when
+ * the move list moved into a tab — its own div stopped scrolling, every
+ * scrollTop write became a no-op, and nothing said so.
+ *
+ * The walk stops short of the page on purpose. On a phone the page is the
+ * nearest scroller once the panes stack, and moving it is the exact thing the
+ * comment on the effect above exists to prevent.
+ */
+function scrollerOf(el: HTMLElement): HTMLElement | null {
+  for (let at: HTMLElement | null = el; at; at = at.parentElement) {
+    if (at === document.body || at === document.documentElement) return null
+    const overflowY = getComputedStyle(at).overflowY
+    if (overflowY === 'auto' || overflowY === 'scroll') return at
+  }
+  return null
 }

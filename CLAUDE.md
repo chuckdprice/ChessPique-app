@@ -139,24 +139,42 @@ the harness's drag tool (mouse events) cannot move a piece. Drive it with a
   arenas are up if the top of the curve ever matters. The pipeline is
   `fetch-calibration-games.mjs` → `calibrate-rating.mjs` (shard it; the engine is
   single-threaded and it is ~0.7 s per ply) → `fit-rating-curve.mjs`.
-- **Threads help, and not for the reason anyone expects: they make the review
-  slower and more accurate.** Stockfish can run multi-threaded in a browser
-  given `COOP: same-origin` + `COEP: require-corp` (how lichess.org does it) and
-  a build that uses `SharedArrayBuffer`. Measured on 22 September 2026 over 195
-  moves of three real games, against a depth-26 *single-threaded* reference:
-  classifications agree with the reference 75.4% of the time at depth 20 on one
-  thread and **84.1%** on ten (McNemar 11/28, p = 0.0095), for **18% more wall
-  clock**. Raising the depth instead does not do it — depth 22 on one thread
-  reaches 77.9% for twice the time, and against today that is not significant
-  (p = 0.46). Time to depth never improves at any search length: 9.76x the node
-  rate buys 1.16x, because Lazy SMP spends the nodes on move ordering rather
-  than depth. So the trade is about 49s → 58s per game for ~9 points of
-  classification accuracy, and there is no depth setting that buys the same
-  thing. `BUILD-PLAN-v3.1.md` has the whole measurement and the slices. Slices 1
-  and 2 are built — the page is cross-origin isolated and the engine behind it
-  is `@lichess-org/stockfish-web`, still pinned to one thread. The AGPL question
-  that gated it is settled: the repository is public, so the copyleft licences
-  have their source. What is left is the slider and the calibration.
+- **Threads make the review more accurate and less reproducible, and the app
+  chose reproducibility.** Stockfish runs multi-threaded in a browser given
+  `COOP: same-origin` + `COEP: require-corp` and a build that uses
+  `SharedArrayBuffer`; slices 1-3 shipped all of that, so the panel has a
+  threads slider. `REVIEW_THREADS` in `analysis.ts` stays at **1** by decision
+  on 23 September 2026, not by omission.
+
+  Measured over 195 moves of three games against a depth-26 single-threaded
+  reference, three repeats per configuration: agreement 77.8% ± 0.3 at one
+  thread, **83.1% ± 2.7 at eight**, 82.2% ± 1.6 at ten. Nine runs, complete
+  separation, exact permutation p = 0.0119 — about **+5 points**, real. The
+  cost is that two runs of the same game disagree with each other on ~34 of 195
+  classifications at eight threads against ~19 at one, because threads triple
+  the positions that hit the 2500ms cap (4-6 at one thread, 12-21 above it) and
+  a capped search is time-dependent. Chuck took the reproducible review.
+
+  **`awl` is unaffected: 0.260, 0.260, 0.267 across the three counts.** That is
+  the input to the played-like rating, so threads move classifications and not
+  the rating — which is also why no re-calibration was needed to leave things
+  as they are, and why raising `REVIEW_THREADS` later would probably not need
+  one either. Verify that rather than trusting this sentence.
+- **Three numbers this file used to assert are wrong, and the way they were got
+  wrong is the lesson.** It said +8.7 points at p = 0.0095, an 18% time penalty,
+  and an `awl` that improved with threads. None survived repetition: the first
+  was +4.9, the second is zero (168.1s against 169.4s), the third is flat.
+
+  A search with a movetime cap is **not deterministic**, even on one thread
+  where the cap bites, and Lazy SMP makes every position non-deterministic. So
+  every single-run table is one draw. McNemar pairs by position and assumes only
+  the configuration differs between columns — the *run* differs too, and feeding
+  that noise in as signal is what produced p = 0.0095 from a difference half
+  that size. Counting classifications that differ cannot separate these configs
+  at all: within one configuration it is 19-34 moves out of 195, between
+  configurations 28-39. Agreement *with a reference* can, because it is
+  directional rather than symmetric. **Repeat every configuration before
+  believing any gap between two of them.**
 - **Never score a threaded search against a threaded reference.** It flatters
   its own kind. The same four configurations scored against a depth-26 *ten
   thread* reference put `d22 t=10` on top with an awl error of 0.194 and a
@@ -191,14 +209,15 @@ the harness's drag tool (mouse events) cannot move a piece. Drive it with a
   and it is also faster, because the dep-optimised module measured 225k nps
   against 1.16M for the same engine in a worker.
 - **Never time the first run, and never share the machine.** Whichever engine
-  configuration runs first is slowest while wasm tiers up: one run had threads
-  making the review 14% *faster*, and with a discarded warm-up sweep ahead of it
-  the same comparison showed them 18% slower. Separately, an agreement run with
-  the browser pane searching alongside came out backwards. Both produced
-  confident wrong numbers. A contended or cold engine measurement is not a noisy
+  configuration runs first is slowest while wasm tiers up, so every timed sweep
+  needs a throwaway pass ahead of it. Separately, an agreement run with the
+  browser pane searching alongside came out backwards. Both produced confident
+  wrong numbers. A contended or cold engine measurement is not a noisy
   measurement, it is a wrong one — and the browser pane is not where to take a
   figure at all: its single-threaded numbers came in 3x low while its ten-thread
-  ones matched Node exactly.
+  ones matched Node exactly. (The timing differences those two mistakes seemed
+  to reveal — 14% one way, 18% the other — turned out on repetition to be zero.
+  Warm up anyway; it is the cheap half of the fix. Repeating is the other half.)
 - **Don't run `npx prettier`.** There is no config, so it applies its own
   defaults — semicolons and double quotes — and reformats an entire file against
   the house style (no semicolons, single quotes). It produced a 220-line diff

@@ -6,15 +6,40 @@
 //
 //   node scripts/calibrate-rating.mjs <gamesPgn> <outJson> [fromIndex] [toIndex]
 //
-// The engine is single-threaded, so run several disjoint shards in parallel and
-// then fit with scripts/fit-rating-curve.mjs.
+// Run several disjoint shards in parallel and fit with fit-rating-curve.mjs.
+//
+// The sharding rule changed when the engine gained threads: shards x threads
+// must not exceed the machine's cores. Oversubscribing does not merely run
+// slow, it changes the search, and a shard searched differently from the app is
+// a sample that does not describe the app. With REVIEW_THREADS at 1 this is the
+// old advice — shard as wide as you like. Above 1, divide.
 import { readFileSync, writeFileSync } from 'node:fs'
 import { Chess } from 'chess.js'
 import { createEngine, ENGINE_BUILD } from './lib/node-engine.mjs'
 
-// Keep in sync with src/lib/engine/analysis.ts.
-const REVIEW_DEPTH = 20
-const REVIEW_MOVETIME_CAP_MS = 2500
+/**
+ * The app's own review settings, read out of its source.
+ *
+ * These three are exactly what the fitted curve is a curve *of*: a shard
+ * produced at settings the app does not use is a sample that quietly describes
+ * a different engine. They were duplicated here behind a "keep in sync"
+ * comment, which is the arrangement that let a hardcoded `stockfish-18` stamp
+ * survive the upgrade to 19.
+ *
+ * Scraped rather than imported because analysis.ts imports ./uci without an
+ * extension, which node's ESM resolver will not follow. Scraping is uglier and
+ * cannot drift; the throw is what makes a rename loud instead of silent.
+ */
+function reviewConstant(name) {
+  const source = readFileSync(new URL('../src/lib/engine/analysis.ts', import.meta.url), 'utf8')
+  const match = new RegExp(`export const ${name} = (\\d+)`).exec(source)
+  if (!match) throw new Error(`calibrate-rating: ${name} not found in analysis.ts`)
+  return Number(match[1])
+}
+
+const REVIEW_DEPTH = reviewConstant('REVIEW_DEPTH')
+const REVIEW_MOVETIME_CAP_MS = reviewConstant('REVIEW_MOVETIME_CAP_MS')
+const REVIEW_THREADS = reviewConstant('REVIEW_THREADS')
 const CP_CLAMP = 1000
 
 const scoreCp = (score) => {
@@ -43,10 +68,11 @@ const to = Number(toArg ?? allGames.length)
 const games = allGames.slice(from, to)
 
 console.log(
-  `shard ${from}-${to}: ${games.length} games at depth ${REVIEW_DEPTH} (cap ${REVIEW_MOVETIME_CAP_MS}ms)`,
+  `shard ${from}-${to}: ${games.length} games at depth ${REVIEW_DEPTH} ` +
+    `(cap ${REVIEW_MOVETIME_CAP_MS}ms, ${REVIEW_THREADS} thread${REVIEW_THREADS === 1 ? '' : 's'})`,
 )
 
-const engine = await createEngine({ hashMb: 64 })
+const engine = await createEngine({ hashMb: 64, threads: REVIEW_THREADS })
 const samples = []
 const startedAt = Date.now()
 
@@ -118,6 +144,9 @@ for (const [gi, pgn] of games.entries()) {
         engine: {
           depth: REVIEW_DEPTH,
           movetimeCapMs: REVIEW_MOVETIME_CAP_MS,
+          // Recorded so a shard run at the wrong count is detectable later
+          // rather than silently pooled with the others.
+          threads: REVIEW_THREADS,
           build: ENGINE_BUILD,
         },
         samples,

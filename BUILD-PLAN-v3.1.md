@@ -1,13 +1,23 @@
 # v3.1: threads for the engine
 
-**Verdict: build it — for accuracy, not for speed.** Threads make the review
-*slower* by about 18% and materially more accurate: move classifications agree
-with a deep reference 75.4% of the time today and 84.1% with ten threads
-(p = 0.0095, paired, 195 moves). Raising the depth instead does not buy that —
-depth 22 on one thread reaches 77.9% for more than twice the time, and the
-difference from today is not significant (p = 0.46). Slice 0 measured all of
-this on 22 September 2026; its section below has the numbers and the two wrong
-turns taken on the way to them.
+**Built, and finished on 23 September 2026 — with the review deliberately left
+on one thread.** Slices 1 to 3 shipped: the site is cross-origin isolated, the
+engine is `@lichess-org/stockfish-web`, and the panel has a threads slider.
+Slice 4 closed with no code change, which was a decision rather than an
+omission.
+
+Threads do make the review more accurate — agreement with a deep reference goes
+from 77.8% ± 0.3 at one thread to 83.1% ± 2.7 at eight, measured over three
+repeats each, nine runs with complete separation, exact permutation
+p = 0.0119. About five points. They also make it markedly less reproducible:
+two runs of the same game disagree on ~34 of 195 classifications at eight
+threads against ~19 at one. Chuck took the reproducible review.
+
+**Read the retraction in the Slice 0 section before quoting anything from
+it.** Three figures in the first draft of this plan — +8.7 points at
+p = 0.0095, an 18% time penalty, and an `awl` that improved with threads — did
+not survive repetition, and the reason they did not is the most useful thing
+here.
 
 Everything here was measured against the published packages and the live sites,
 not recalled. Where something is unverified it says so.
@@ -108,7 +118,66 @@ Isolation itself was then confirmed live: `crossOriginIsolated === true`,
 `SharedArrayBuffer` present, 14 cores visible, nothing in the app broken,
 `npm run build && npm test` clean at 430 tests.
 
+## Slice 4 — the repeats, and what they took back
+
+Run on 23 September 2026, before any calibration, because `REVIEW_THREADS`
+needed a number and slice 0 had only measured two of them.
+
+198 positions, 195 moves, depth 20 with the 2500ms cap, scored against the same
+saved depth-26 single-threaded reference as everything below — three repeats of
+each configuration this time, which is the step slice 0 skipped:
+
+| threads | agreement with reference | mean abs awl err | capped positions |
+| --- | --- | --- | --- |
+| 1 | **77.8% ± 0.3** (77.9, 77.9, 77.4) | 0.260 ± 0.093 | 4, 4, 6 |
+| 8 | **83.1% ± 2.7** (80.0, 85.1, 84.1) | 0.260 ± 0.099 | 14, 12, 12 |
+| 10 | **82.2% ± 1.6** (83.6, 82.6, 80.5) | 0.267 ± 0.223 | 19, 21, 17 |
+
+Complete separation across nine runs — the worst threaded run beats the best
+single-threaded one — so the effect is real at **+4.9 points**, exact
+permutation p = 0.0119. Not the +8.7 claimed below, which compared a lucky
+threaded run against an unlucky single-threaded one.
+
+### What the repeats took back
+
+**A search with a movetime cap is not deterministic.** Even at one thread,
+where the cap bites; and Lazy SMP makes every position non-deterministic. So
+every single-run table is one draw from a distribution, and slice 0's headline
+compared two draws as though only the configuration differed.
+
+Concretely, the noise floor: two runs of the *same* configuration disagree on
+19 moves out of 195 at one thread and 34 at eight. Between *different*
+configurations it is 28 to 39. So counting differing classifications — which is
+what McNemar did — cannot separate these configurations at all. Agreement with
+a reference can, because it is directional rather than symmetric. Right
+conclusion, wrong instrument, and only repetition distinguishes those.
+
+**`awl` does not improve, and that is the finding that mattered most.** 0.260,
+0.260, 0.267 across one, eight and ten threads. It is the input to the
+played-like rating, so threads move classifications and leave the rating alone
+— which is why the calibration pipeline was never run, and why raising
+`REVIEW_THREADS` later would probably not need one either. Probably: verify it.
+
+**The 18% time penalty is zero.** 168.1s against 169.4s.
+
+### Why one thread won anyway
+
+Threads triple the number of positions that hit the 2500ms cap — 4 to 6 at one
+thread, 12 to 21 above it — and a capped search is the time-dependent one. That
+is the whole mechanism behind the extra variance, and it is why ten threads is
+no better than eight.
+
+Reviewing the same game twice and getting a different answer on 17% of its
+moves is a worse product than being five points closer to a reference nobody
+sees. If this is revisited, the thing to try first is **raising the cap along
+with the threads**: it attacks the variance at its source, and it was never
+measured.
+
 ## Slice 0 — what it measured, and what it got wrong twice
+
+**Superseded in part by Slice 4 above.** The tables here are single runs. The
++8.7 point gap and the 18% time penalty are both artifacts of that; the
+direction of the thread effect survives, its size does not.
 
 M4 Pro, 10 performance cores and 4 efficiency. Engine `sf_19_smallnet` +
 `nn-61e7af4bb97d.nnue` on **both** sides of every comparison, so the thread
@@ -394,29 +463,39 @@ A thread count set in either menu reaches the engine, `info` lines show the node
 rate rising with it, the setting survives a reload, and the Node harness runs
 the same build the browser does.
 
-## Slice 4 — re-calibration, and it is mandatory now
+## Slice 4 — re-calibration, which turned out not to be needed
 
-Not conditional, as an earlier draft had it — but for one reason, not two. The
-net does **not** change: `lite-single` already embeds `nn-61e7af4bb97d.nnue`.
-What changes is the search, qualitatively, and Slice 0 measured classifications
-moving on 195 moves because of it. `analysis.ts` says it in as many words:
-`REVIEW_DEPTH` and `REVIEW_MOVETIME_CAP_MS` "are the settings the 'played like'
-curve was calibrated against — changing them invalidates that fit." The search
-character is now one of those settings.
+**Not run, and that is the outcome rather than a gap.** An earlier draft of this
+section called a re-fit mandatory on the grounds that the net had changed and
+the search had changed qualitatively. Both premises fell:
 
-Run the pipeline — `fetch-calibration-games.mjs` → `calibrate-rating.mjs`
-(shard it; ~0.7 s per ply) → `fit-rating-curve.mjs` — and compare shipped
-against re-fit on identical samples, the way the Stockfish 19 upgrade was
-handled on 21 September 2026.
+- The net never changed. `lite-single` already embeds `nn-61e7af4bb97d`, the
+  same net the threaded build fetches.
+- The search did not change either, because `REVIEW_THREADS` stayed at 1.
 
-The same two traps apply. A new report's MAE is not comparable to an old
-report's on a different sample; and `fetch-calibration-games.mjs` samples
-whichever rapid arenas are live, so a run can silently have no 2200+ band and
-say nothing about the top of the curve.
+And the measurement that would have justified it says the input is untouched in
+any case: `awl` sits at 0.260 across one, eight and ten threads, so the quantity
+`PLAYED_LIKE_A/B` map to a rating is the same quantity it was fitted against.
 
-Decide the calibration thread count **before** running, and pin it. A review
-calibrated at ten threads and run at two is a mismatch of exactly the kind this
-plan keeps finding — and unlike depth, the user can change it.
+The pipeline is nonetheless in better shape than it was, and the changes are
+worth keeping. `calibrate-rating.mjs` used to copy `REVIEW_DEPTH` and
+`REVIEW_MOVETIME_CAP_MS` behind a "keep in sync" comment — the arrangement that
+let a hardcoded `stockfish-18` stamp survive the upgrade to 19 — and now scrapes
+all three constants out of `analysis.ts`, throwing if a name goes missing. It
+records the thread count in each shard, and `scripts/lib/node-engine.mjs` drives
+the same `@lichess-org/stockfish-web` build the browser does.
+
+**The sharding rule changed with it**: shards × threads must not exceed the
+machine's cores. Oversubscribing does not merely run slow, it changes the
+search, and a shard searched differently from the app is a sample that does not
+describe the app. At `REVIEW_THREADS = 1` this is the old advice. Above 1,
+divide.
+
+If the curve is ever re-fitted, the two traps from the Stockfish 19 run still
+apply: a new report's MAE is not comparable to an old report's on a different
+sample, and `fetch-calibration-games.mjs` samples whichever rapid arenas are
+live, so a run can silently have no 2200+ band and say nothing about the top of
+the curve.
 
 ## Traps
 

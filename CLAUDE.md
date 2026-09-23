@@ -152,9 +152,11 @@ the harness's drag tool (mouse events) cannot move a piece. Drive it with a
   rate buys 1.16x, because Lazy SMP spends the nodes on move ordering rather
   than depth. So the trade is about 49s → 58s per game for ~9 points of
   classification accuracy, and there is no depth setting that buys the same
-  thing. `BUILD-PLAN-v3.1.md` has the whole measurement and the slices; it is
-  unbuilt, and the open question in front of it is the AGPL declaration on
-  `@lichess-org/stockfish-web`.
+  thing. `BUILD-PLAN-v3.1.md` has the whole measurement and the slices. Slices 1
+  and 2 are built — the page is cross-origin isolated and the engine behind it
+  is `@lichess-org/stockfish-web`, still pinned to one thread. The AGPL question
+  that gated it is settled: the repository is public, so the copyleft licences
+  have their source. What is left is the slider and the calibration.
 - **Never score a threaded search against a threaded reference.** It flatters
   its own kind. The same four configurations scored against a depth-26 *ten
   thread* reference put `d22 t=10` on top with an awl error of 0.194 and a
@@ -164,6 +166,19 @@ the harness's drag tool (mouse events) cannot move a piece. Drive it with a
   the reference's character rather than correctness, which is why that column is
   useless here. The reference is single-threaded and depth-limited, which also
   makes it reproducible.
+- **There are two engine builds and the app picks between them at runtime.**
+  `defaultWorkerPath()` in `uci.ts` takes `sf-worker.js` when
+  `crossOriginIsolated` is true and `stockfish-19-lite-single.js` otherwise, and
+  `Engine.init` falls back to the latter if the former never answers `uci` —
+  the threaded path has a module worker, a nested pool and a 1.1 MB net fetch
+  that the lite one does not, and none of that is worth a dead engine. Both are
+  Stockfish 19 on the same net, `nn-61e7af4bb97d`, which lite-single embeds and
+  the other fetches from `/nnue`; they are still *different binaries* with
+  different compile flags and lichess's own patches, and measured over 195 moves
+  they agree on 85.6% of classifications, 97.9% of flagged-or-not, and on the
+  played-like figure for all six player-sides. That residual is ordinary depth-20
+  noise — the same two configurations agree with a depth-26 reference only 75.4%
+  of the time — so do not read a disagreement in that range as a bug.
 - **The Stockfish worker is loaded from `public/` as a static asset, and that is
   not legacy.** Anyone modernising it into a bundled `import` will hit three
   walls in a row, all measured against `@lichess-org/stockfish-web`: Vite's dep

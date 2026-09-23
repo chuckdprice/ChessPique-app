@@ -11,6 +11,7 @@
     "postinstall": "node scripts/copy-stockfish.mjs && node scripts/copy-onnxruntime.mjs"
   },
   "dependencies": {
+    "@lichess-org/stockfish-web": "^0.5.0",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "chess.js": "^1.4.0",

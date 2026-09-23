@@ -7,8 +7,37 @@ import { Chess } from 'chess.js'
  * move in the analyzed position.
  */
 
+/**
+ * The single-threaded build, which needs nothing of the page and runs anywhere
+ * — including Node, where the tests and the calibration scripts drive it.
+ */
 export const ENGINE_WORKER_PATH = '/stockfish/stockfish-19-lite-single.js'
+
+/**
+ * The threaded build, behind our own worker. Same Stockfish 19 and the same net
+ * (nn-61e7af4bb97d, which the lite build embeds and this one fetches), so at one
+ * thread the two should agree — a large disagreement means something is wrong
+ * rather than something has improved.
+ */
+export const ISOLATED_WORKER_PATH = '/stockfish/sf-worker.js'
+
 export const ENGINE_NAME = 'SF19'
+
+/**
+ * Whether this page may use `SharedArrayBuffer`, and therefore engine threads.
+ *
+ * `crossOriginIsolated` is the property the headers in vercel.json buy. It is
+ * read through a function rather than captured at module load so a test can
+ * exercise both paths, and because it is false in Node.
+ */
+export function canUseThreads(): boolean {
+  return typeof globalThis.crossOriginIsolated === 'boolean' && globalThis.crossOriginIsolated
+}
+
+/** Which worker to start with. */
+export function defaultWorkerPath(): string {
+  return canUseThreads() ? ISOLATED_WORKER_PATH : ENGINE_WORKER_PATH
+}
 
 /** Centipawns (cp) or moves-to-mate (mate); exactly one is set. White POV. */
 export interface Score {
@@ -90,7 +119,13 @@ export class Engine {
    */
   private generation = 0
 
-  constructor(private workerPath: string = ENGINE_WORKER_PATH) {}
+  /**
+   * Set once the threaded worker has failed to start and the single-threaded
+   * one has taken over, so a later `init` does not pay the timeout again.
+   */
+  private fellBack = false
+
+  constructor(private workerPath: string = defaultWorkerPath()) {}
 
   private send(cmd: string): void {
     this.worker?.postMessage(cmd)
@@ -123,16 +158,42 @@ export class Engine {
       await this.setOptions(options)
       return
     }
-    this.worker = new Worker(this.workerPath)
+    try {
+      await this.start(this.workerPath)
+    } catch (error) {
+      // The threaded build has more that can go wrong than the lite one: a
+      // module worker, a nested worker for the pool, a net fetched over the
+      // network. None of that is worth a dead engine, so a failure to reach
+      // `uciok` drops to the build that needs none of it. The cost of getting
+      // this wrong is an app that cannot analyse anything.
+      if (this.fellBack || this.workerPath === ENGINE_WORKER_PATH) throw error
+      console.error('engine: threaded build did not start, falling back', error)
+      this.fellBack = true
+      this.workerPath = ENGINE_WORKER_PATH
+      await this.start(ENGINE_WORKER_PATH)
+    }
+    await this.setOptions(options)
+    this.initialized = true
+  }
+
+  /** Bring up one worker and wait for it to answer `uci`. */
+  private async start(path: string): Promise<void> {
+    this.worker?.terminate()
+    this.worker = new Worker(path, path.endsWith('sf-worker.js') ? { type: 'module' } : undefined)
     this.worker.onmessage = (e: MessageEvent) => {
       const text = typeof e.data === 'string' ? e.data : ''
       for (const handler of this.lineHandlers) handler(text)
     }
-    const uciok = this.waitFor((l) => l === 'uciok')
+    // Longer than the default: this one may be downloading a 1.1 MB net on a
+    // cold cache before it can answer at all.
+    const uciok = this.waitFor((l) => l === 'uciok', 45000)
     this.send('uci')
     await uciok
-    await this.setOptions(options)
-    this.initialized = true
+  }
+
+  /** Which build is actually running, for the UI and for the tests. */
+  get activeWorkerPath(): string {
+    return this.workerPath
   }
 
   async setOptions(options: { hashMb?: number; multiPv?: number }): Promise<void> {

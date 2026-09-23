@@ -45,6 +45,15 @@ export function isCopyleft(license: string): boolean {
  * for what went into it should not have to guess where the line was drawn.
  */
 export const PACKAGES: LicenseRow[] = [
+  {
+    // Declares AGPL-3.0-or-later in its manifest while shipping a plain GPL-3.0
+    // LICENSE file, and GitHub reports the repo as GPL-3.0. The stricter of the
+    // three is what is listed, because guessing downwards is the one direction
+    // that could be wrong in a way that matters.
+    name: '@lichess-org/stockfish-web',
+    license: 'AGPL-3.0',
+    url: 'https://github.com/lichess-org/stockfish-web',
+  },
   { name: '@tailwindcss/vite', license: 'MIT', url: 'https://github.com/tailwindlabs/tailwindcss' },
   { name: '@types/node', license: 'MIT', url: 'https://github.com/DefinitelyTyped/DefinitelyTyped' },
   { name: '@types/react', license: 'MIT', url: 'https://github.com/DefinitelyTyped/DefinitelyTyped' },
@@ -74,6 +83,9 @@ export const ASSETS: LicenseRow[] = [
     url: 'https://github.com/official-stockfish/Stockfish',
   },
   {
+    // Served from /nnue rather than bundled. The lite build embeds this same
+    // net; the threaded build fetches it, which is the only difference between
+    // the two engines besides their ability to spawn threads.
     name: 'NNUE network nn-61e7af4bb97d',
     author: 'Chris Bao (sscg13), via the Stockfish project',
     license: 'GPL-3.0',

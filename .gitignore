@@ -1,6 +1,11 @@
 node_modules
 dist
-public/stockfish
+# Everything the postinstall script copies out of node_modules — but not the
+# worker beside them, which is source. Written as contents-plus-negation rather
+# than the bare directory: git will not descend into an excluded directory, so
+# a `!` under one would never match.
+public/stockfish/*
+!public/stockfish/sf-worker.js
 # The ONNX runtime, copied out of node_modules by postinstall like Stockfish.
 # The Maia weights next door are NOT ignored: they are self-hosted rather than
 # installed, and 46 MB in the history is the price of serving them ourselves.

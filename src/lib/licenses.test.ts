@@ -46,6 +46,7 @@ describe('copyleft', () => {
     // reconsidered — until then it is load-bearing, not decoration.
     const copyleft = [...PACKAGES, ...ASSETS].filter((r) => isCopyleft(r.license)).map((r) => r.name)
     expect(copyleft).toContain('stockfish')
+    expect(copyleft).toContain('@lichess-org/stockfish-web')
     expect(copyleft).toContain('Stockfish 19')
     expect(copyleft).toContain('Maia-3')
   })

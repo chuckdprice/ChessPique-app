@@ -120,7 +120,8 @@ export default function HelpDialog({ onClose, onLicenses }: HelpDialogProps) {
             </p>
             <p>
               What it remembers, it remembers in this browser: the theme and board, how the
-              engine searches, what the board draws, the explorer's filters and the players you
+              engine searches, what the board draws, which dots the evaluation graph shows, the
+              explorer's filters and the players you
               have looked up, your folders, the last ten games and studies you opened, and your
               Lichess sign-in until it expires. Clearing this site's data resets all of it.
             </p>
@@ -447,7 +448,9 @@ export default function HelpDialog({ onClose, onLicenses }: HelpDialogProps) {
             <p>
               <Ui>Evaluation</Ui> — how the advantage swung, with a dot on each notable move.
               Click the chart to jump to that point in the game. The opening played is named in
-              the top-left corner, matched by position so a transposition still counts.
+              the top-left corner, matched by position so a transposition still counts. The
+              checkboxes under the chart choose which dots it draws — one side's moves or both, and
+              which classifications — and they are remembered.
             </p>
             <p>
               <Ui>Move Times</Ui> — lines for time remaining, bars for time spent per move. This

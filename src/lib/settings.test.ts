@@ -4,14 +4,17 @@ import type { ThemeVar } from './appearance'
 import { legacyKey, readStored } from './storage'
 import {
   DEFAULT_APPEARANCE,
+  DEFAULT_EVAL_DOTS,
   DEFAULT_EXPLORER,
   EXPLORER_RATINGS,
   EXPLORER_SPEEDS,
   loadAppearance,
   loadEngineSettings,
+  loadEvalDots,
   loadExplorerSettings,
   maxThreads,
   saveAppearance,
+  saveEvalDots,
   withRecentPlayer,
 } from './settings'
 
@@ -228,6 +231,51 @@ describe('the stored thread count', () => {
     setEnvironment(true, 14)
     localStorage.setItem('chesspique.engine', JSON.stringify({ threads: -3 }))
     expect(loadEngineSettings().threads).toBe(1)
+  })
+})
+
+describe('the evaluation graph\'s dot filter', () => {
+  beforeEach(() => {
+    globalThis.localStorage = fakeStorage()
+  })
+  afterEach(() => {
+    localStorage.clear()
+  })
+
+  it('starts with the dots the graph drew before it had filters', () => {
+    expect(loadEvalDots()).toEqual({
+      white: true,
+      black: true,
+      classes: ['best', 'inaccuracy', 'mistake', 'blunder'],
+    })
+  })
+
+  it('round-trips a saved filter', () => {
+    saveEvalDots({ white: false, black: true, classes: ['blunder', 'mistake'] })
+    expect(loadEvalDots()).toEqual({ white: false, black: true, classes: ['mistake', 'blunder'] })
+  })
+
+  it('keeps an empty list, because a graph with no dots is a real choice', () => {
+    saveEvalDots({ white: true, black: true, classes: [] })
+    expect(loadEvalDots().classes).toEqual([])
+  })
+
+  it('drops a classification this build does not know', () => {
+    localStorage.setItem('chesspique.eval-dots', JSON.stringify({ classes: ['brilliant', 'best'] }))
+    expect(loadEvalDots().classes).toEqual(['best'])
+  })
+
+  it('falls back to the defaults for a value of the wrong shape', () => {
+    localStorage.setItem('chesspique.eval-dots', JSON.stringify({ classes: 'best', white: 0 }))
+    const e = loadEvalDots()
+    expect(e.classes).toEqual(DEFAULT_EVAL_DOTS.classes)
+    // Only an explicit false hides a side; anything else is not a choice.
+    expect(e.white).toBe(true)
+  })
+
+  it('does not hand out the default list itself to be mutated', () => {
+    loadEvalDots().classes.push('good')
+    expect(DEFAULT_EVAL_DOTS.classes).not.toContain('good')
   })
 })
 

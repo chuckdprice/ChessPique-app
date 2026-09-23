@@ -3,6 +3,8 @@
 import { BOARDS, PIECE_SETS, THEMES, boardById, themeById } from './appearance'
 import { readStored } from './storage'
 import { nearestRating } from './maia/model'
+import { CLASSIFICATIONS } from './engine/analysis'
+import type { Classification } from './engine/analysis'
 
 export interface AppearanceSettings {
   /** Theme id from THEMES — a whole palette, not just an accent. */
@@ -185,9 +187,28 @@ export const DEFAULT_EXPLORER: ExplorerSettings = {
   recentPlayers: [],
 }
 
+/** Which moves the evaluation graph marks with a dot. */
+export interface EvalDotSettings {
+  white: boolean
+  black: boolean
+  classes: Classification[]
+}
+
+/**
+ * The dots the graph drew before it had filters. Good and Excellent stay off
+ * for the reason they carry no marker in the move list: between them they are
+ * most of a game, and a dot on every point says nothing.
+ */
+export const DEFAULT_EVAL_DOTS: EvalDotSettings = {
+  white: true,
+  black: true,
+  classes: ['best', 'inaccuracy', 'mistake', 'blunder'],
+}
+
 const APPEARANCE_KEY = 'chesspique.appearance'
 const EXPLORER_KEY = 'chesspique.explorer'
 const ENGINE_KEY = 'chesspique.engine'
+const EVAL_DOTS_KEY = 'chesspique.eval-dots'
 
 function load<T>(key: string, fallback: T): T {
   try {
@@ -305,6 +326,26 @@ export function loadExplorerSettings(): ExplorerSettings {
           .filter((n): n is string => typeof n === 'string' && isUsername(n))
           .slice(0, RECENT_PLAYERS_KEPT)
       : [],
+  }
+}
+
+export function loadEvalDots(): EvalDotSettings {
+  const e = load(EVAL_DOTS_KEY, DEFAULT_EVAL_DOTS)
+  // Unlike the explorer's filters an empty list is a real answer here — a
+  // graph with no dots is just the line — so it is kept rather than reset.
+  // Filtering through CLASSIFICATIONS drops any name this build does not know
+  // and puts the rest back in the legend's order.
+  const classes = Array.isArray(e.classes)
+    ? CLASSIFICATIONS.filter((c) => (e.classes as unknown[]).includes(c))
+    : [...DEFAULT_EVAL_DOTS.classes]
+  return { white: e.white !== false, black: e.black !== false, classes }
+}
+
+export function saveEvalDots(e: EvalDotSettings): void {
+  try {
+    localStorage.setItem(EVAL_DOTS_KEY, JSON.stringify(e))
+  } catch {
+    /* ignore */
   }
 }
 

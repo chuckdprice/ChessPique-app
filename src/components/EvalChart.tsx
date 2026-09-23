@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   Area,
   AreaChart,
@@ -8,10 +9,13 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import { CLASSIFICATION_LABEL, CLASSIFICATIONS } from '../lib/engine/analysis'
 import type { Classification, GameAnalysis } from '../lib/engine/analysis'
 import { formatScore } from '../lib/engine/uci'
 import type { Move } from '../lib/convert'
 import type { Opening } from '../lib/openings'
+import { loadEvalDots, saveEvalDots } from '../lib/settings'
+import type { EvalDotSettings } from '../lib/settings'
 import { classColor } from './ClassBadge'
 
 interface EvalChartProps {
@@ -32,9 +36,6 @@ interface EvalRow {
   /** Classification of the move that reached this position, if it earns a dot. */
   dotClass: Classification | null
 }
-
-/** Classifications marked on the line — the ones worth finding at a glance. */
-const DOTTED: Classification[] = ['best', 'inaccuracy', 'mistake', 'blunder']
 
 /**
  * Recharts calls this for every point; only flagged moves get a dot, the rest
@@ -97,19 +98,71 @@ function EvalTooltip({
   )
 }
 
+/** One of the filter row's checkboxes: small, so the row fits under the plot. */
+function DotToggle({
+  checked,
+  onChange,
+  label,
+  swatch,
+}: {
+  checked: boolean
+  onChange: (checked: boolean) => void
+  label: string
+  /** The colour of the dot this box controls, drawn beside it as its legend. */
+  swatch?: string
+}) {
+  return (
+    <label className="inline-flex cursor-pointer select-none items-center gap-1 whitespace-nowrap">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="size-3 shrink-0 accent-[var(--accent)]"
+      />
+      {swatch && (
+        <span
+          aria-hidden="true"
+          className="inline-block size-2 shrink-0 rounded-full"
+          style={{ backgroundColor: swatch }}
+        />
+      )}
+      {label}
+    </label>
+  )
+}
+
 export default function EvalChart({ analysis, moves, ply, onPlyChange, opening }: EvalChartProps) {
+  // Loaded once and saved on every change: switching to another tab unmounts
+  // this chart, and filters that reset on the way back would have to be set
+  // again every time.
+  const [dots, setDots] = useState<EvalDotSettings>(loadEvalDots)
+  const updateDots = (next: EvalDotSettings) => {
+    setDots(next)
+    saveEvalDots(next)
+  }
+  const toggleClass = (c: Classification, on: boolean) =>
+    updateDots({
+      ...dots,
+      classes: CLASSIFICATIONS.filter((k) => (k === c ? on : dots.classes.includes(k))),
+    })
+
   const rows: EvalRow[] = analysis.evals.map((score, i) => {
     const pawns =
       score.mate != null ? (score.mate > 0 ? 10 : -10) : Math.max(-10, Math.min(10, (score.cp ?? 0) / 100))
     // Row i is the position after move i, so the dot lands on the move that
     // produced it; the starting position has no move behind it.
     const classification = i > 0 ? (analysis.moves[i - 1]?.classification ?? null) : null
+    // The side from the move itself rather than from the ply's parity: a game
+    // set up from a position can start with Black to move.
+    const color = moves[i - 1]?.color
+    const sideShown = color === 'w' ? dots.white : color === 'b' ? dots.black : false
     return {
       ply: i,
       ev: pawns,
       label: moveLabel(moves, i),
       scoreText: formatScore(score),
-      dotClass: classification && DOTTED.includes(classification) ? classification : null,
+      dotClass:
+        classification && sideShown && dots.classes.includes(classification) ? classification : null,
     }
   })
 
@@ -208,6 +261,38 @@ export default function EvalChart({ analysis, moves, ply, onPlyChange, opening }
           <ReferenceLine x={ply} stroke="var(--accent-bright)" strokeWidth={1.5} />
         </AreaChart>
       </ResponsiveContainer>
+      {/*
+        Under the plot rather than over it: the top-left corner already carries
+        the opening, and anything drawn inside the plot covers the line.
+        Clicking a box never reaches the chart's click handler, so filtering
+        does not move the board.
+      */}
+      <div
+        role="group"
+        aria-label="Dots on the graph"
+        className="mt-1 flex flex-wrap items-center gap-x-2.5 gap-y-1 px-2 text-[11px] text-ink-mute"
+      >
+        <DotToggle
+          label="White"
+          checked={dots.white}
+          onChange={(on) => updateDots({ ...dots, white: on })}
+        />
+        <DotToggle
+          label="Black"
+          checked={dots.black}
+          onChange={(on) => updateDots({ ...dots, black: on })}
+        />
+        <span aria-hidden="true" className="h-3 w-px bg-rule" />
+        {CLASSIFICATIONS.map((c) => (
+          <DotToggle
+            key={c}
+            label={CLASSIFICATION_LABEL[c]}
+            swatch={classColor(c)}
+            checked={dots.classes.includes(c)}
+            onChange={(on) => toggleClass(c, on)}
+          />
+        ))}
+      </div>
     </div>
   )
 }

@@ -549,6 +549,7 @@ Nothing is ever uploaded, so everything ChessPique remembers is remembered here,
 | --- | --- |
 | `chesspique.appearance` | theme, board colours, piece set |
 | `chesspique.engine` | Stockfish's search settings, and what the board draws |
+| `chesspique.eval-dots` | which sides and classifications the evaluation graph marks |
 | `chesspique.explorer` | opening explorer database, filters, and the players looked up |
 | `chesspique.folders` | your folders, and which study is in each |
 | `chesspique.recent-games` | the last ten games opened |
@@ -563,7 +564,7 @@ version of the app is discarded rather than read.
 The game on the board is not among any of it — a game lives in the tab until you export or save
 it. Clearing site data resets the app to a first visit and signs you out of Lichess.
 
-**Backup**, in Settings, writes the six keys above that are not the sign-in into a JSON file,
+**Backup**, in Settings, writes the seven keys above that are not the sign-in into a JSON file,
 and reads one back. Your games are not in it and do not need to be: they are chapters in your
 Lichess studies, their `#tags` are inside their own PGNs, and the study cache rebuilds itself.
 The sign-in is left out deliberately — it is a live access token, and a backup is a file people

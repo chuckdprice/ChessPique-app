@@ -35,6 +35,7 @@ const MARK = 'chesspique-backup'
 export const BACKED_UP_KEYS = [
   'chesspique.appearance',
   'chesspique.engine',
+  'chesspique.eval-dots',
   'chesspique.explorer',
   'chesspique.folders',
   'chesspique.recent-games',
@@ -163,6 +164,7 @@ export function describeBackup(backup: Backup): string {
   const names: Record<string, string> = {
     'chesspique.appearance': 'appearance',
     'chesspique.engine': 'engine settings',
+    'chesspique.eval-dots': 'graph filters',
     'chesspique.explorer': 'explorer filters',
     'chesspique.folders': 'folders',
     'chesspique.recent-games': 'recent games',

@@ -11,6 +11,7 @@ import {
   serializeBackup,
 } from './backup'
 import type { Backup } from './backup'
+import { loadEvalDots, saveEvalDots } from './settings'
 
 /** A localStorage stand-in that starts with something under every key. */
 function store(initial: Record<string, string> = {}) {
@@ -159,6 +160,25 @@ describe('applyBackup', () => {
 
     expect(s.map.get('chesspique.engine')).toBe('{"multiPv":5}')
     expect(result.missing).toContain('chesspique.engine')
+  })
+
+  it('restores the graph filters where the chart will read them', () => {
+    // The chart reads through loadEvalDots, not through this module, so the
+    // two have to agree on the key and the shape — this is where they meet.
+    const map = new Map<string, string>()
+    globalThis.localStorage = {
+      getItem: (k: string) => map.get(k) ?? null,
+      setItem: (k: string, v: string) => void map.set(k, v),
+      removeItem: (k: string) => void map.delete(k),
+    } as Storage
+
+    saveEvalDots({ white: false, black: true, classes: ['mistake', 'blunder'] })
+    const file = serializeBackup(buildBackup((k) => map.get(k) ?? null, AT))
+    map.clear()
+    expect(loadEvalDots().white).toBe(true)
+
+    applyBackup(parseBackup(file), (k, v) => map.set(k, v))
+    expect(loadEvalDots()).toEqual({ white: false, black: true, classes: ['mistake', 'blunder'] })
   })
 
   it('survives a full round trip through a file', () => {

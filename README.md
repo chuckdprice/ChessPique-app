@@ -508,19 +508,22 @@ Both Stockfish and Maia-3 are copyleft, and AGPL-3.0 reaches anyone who uses the
 over a network rather than only someone handed a copy. Those licenses ask for the
 corresponding source, which attribution does not supply.
 
-The source is not published, so the app makes a written offer instead: Help | Licenses
-says the source is available on request and points at the Lichess inbox already used
-for bug reports. That is weaker than what AGPL-3.0 §13 asks for — source served from a
-network server — and it is what can honestly be said while the repository is private.
-An earlier version of this paragraph asserted the repository was public when it was
-not, and the app briefly repeated the claim; do not restore either without checking
-that a signed-out visitor can actually reach the code.
+This repository is that source, and it went public on 22 September 2026 for exactly
+this reason. Help | Licenses links to it. The link is the compliance, so it has to keep
+resolving for a visitor who is not signed in to anything — if the repository is ever
+made private again, the copy in `LicensesDialog`, this paragraph and
+`public/maia3/NOTICE.md` all have to change with it.
+
+That sequence is worth knowing, because two earlier versions of this paragraph were
+wrong in opposite directions: one asserted the repository was public while it was
+private, and the app briefly repeated the claim to every visitor; the next replaced it
+with an offer to send the source on request, which was honest but weaker than AGPL-3.0
+§13 asks for. Check the repository's visibility rather than trusting any sentence here.
 
 `src/lib/licenses.ts` holds the list behind that screen and `licenses.test.ts` fails if
 a dependency is added without being credited — which is the failure mode a
-hand-maintained list has, and a silent one. It also fails if the offer is turned back
-into a repository link, so publishing the repository means changing the copy in
-`LicensesDialog` too, not only the constant.
+hand-maintained list has, and a silent one. No test can check the part that matters,
+though: whether an anonymous clone succeeds.
 
 ## What is kept in your browser
 

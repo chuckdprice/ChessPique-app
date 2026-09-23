@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { ASSETS, GROUPS, isCopyleft, PACKAGES, PIECES, SOURCE_REQUEST_URL } from './licenses'
+import { ASSETS, GROUPS, isCopyleft, PACKAGES, PIECES, SOURCE_URL } from './licenses'
 
 const pkg = JSON.parse(readFileSync('package.json', 'utf-8')) as {
   dependencies?: Record<string, string>
@@ -53,15 +53,17 @@ describe('copyleft', () => {
 
 describe('the source offer', () => {
   it('is an absolute link, because a relative one is not an offer', () => {
-    expect(SOURCE_REQUEST_URL).toMatch(/^https:\/\//)
+    expect(SOURCE_URL).toMatch(/^https:\/\//)
   })
 
-  it('does not point at a repository', () => {
-    // The offer is to send the source on request. Pointing at a repository
-    // nobody can open was the previous wording, and it asserted something
-    // untrue to every reader who tried the link. If the repository is ever
-    // published, change the copy in the dialog too — not just this constant.
-    expect(SOURCE_REQUEST_URL).not.toMatch(/github\.com/)
+  it('points at the repository', () => {
+    // This is what satisfies the copyleft licences, so it is not decoration.
+    // What no unit test can check is the part that actually matters — whether
+    // the repository answers to someone who is not signed in. It was private
+    // once while the app said otherwise; if it goes private again, the copy in
+    // LicensesDialog, the README and maia3/NOTICE.md all have to change back,
+    // not just this constant.
+    expect(SOURCE_URL).toMatch(/^https:\/\/github\.com\/[\w-]+\/[\w-]+$/)
   })
 })
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { GROUPS, isCopyleft, SOURCE_REQUEST_URL } from '../lib/licenses'
+import { GROUPS, isCopyleft, SOURCE_URL } from '../lib/licenses'
 
 interface LicensesDialogProps {
   onClose: () => void
@@ -14,10 +14,10 @@ interface LicensesDialogProps {
  * The source offer sits above the tables instead of under them: for GPL and
  * AGPL it is the part that does the work, and a credit alone would not.
  *
- * It offers to send the source rather than linking to it, because there is no
- * public repository to link to. Saying "the source is on GitHub" beside a URL
- * that answers 404 would be worse than saying nothing, which is what the
- * previous wording did.
+ * The link is the compliance, so it has to resolve for someone who is not
+ * signed in to anything. Two earlier versions of this sentence did not: one
+ * named a repository that answered 404, and one offered to send the source by
+ * message, which is weaker than AGPL-3.0 §13 asks for.
  */
 export default function LicensesDialog({ onClose }: LicensesDialogProps) {
   const closeRef = useRef<HTMLButtonElement>(null)
@@ -74,16 +74,16 @@ export default function LicensesDialog({ onClose }: LicensesDialogProps) {
               corresponding source rather than for credit.
             </p>
             <p className="mt-2">
-              ChessPique's source is not published at the moment, so it is available on request:{' '}
+              So here it is:{' '}
               <a
-                href={SOURCE_REQUEST_URL}
+                href={SOURCE_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-medium text-ink underline underline-offset-2"
               >
-                message me on Lichess
-              </a>{' '}
-              and I will send you a copy. Sending a message needs a Lichess account of your own.
+                the complete source for ChessPique
+              </a>
+              , which is everything needed to build and run the version you are using.
             </p>
           </div>
 

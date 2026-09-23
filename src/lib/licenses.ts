@@ -122,20 +122,21 @@ export const GROUPS: LicenseGroup[] = [
 ]
 
 /**
- * How to ask for the source, which is the part a credit cannot replace.
+ * Where the source is, which is the part a credit cannot replace.
  *
  * Both Stockfish and Maia are copyleft, and Maia's AGPL reaches anyone who uses
  * the app over a network rather than only someone handed a copy. Naming them is
- * not compliance.
+ * not compliance; this is.
  *
- * This is a written offer rather than a public repository, and the difference
- * is worth stating plainly: AGPL-3.0 §13 asks for source served "from a network
- * server", which an offer to send it on request does not fully meet. It is
- * what the app can honestly say today. Publishing the repository would replace
- * this constant with a link and settle the question — until then, do not write
- * a sentence here claiming source that a reader cannot actually reach.
+ * The repository went public on 22 September 2026 and this replaced a written
+ * offer to send the source on request, which was the honest thing to say while
+ * it was private and weaker than what AGPL-3.0 §13 asks for — source served
+ * from a network server. Before that it briefly named a repository nobody could
+ * open, which was worse than either.
  *
- * The route is the Lichess inbox the app already uses for bug reports. There is
- * no server here to receive anything else: the app is entirely static.
+ * So: this link has to keep resolving for an anonymous visitor. If the
+ * repository is ever made private again, the sentence in `LicensesDialog` has
+ * to change back with it, and the test below is what makes that impossible to
+ * forget quietly.
  */
-export const SOURCE_REQUEST_URL = 'https://lichess.org/@/DragonBeard'
+export const SOURCE_URL = 'https://github.com/chuckdprice/ChessPique-app'

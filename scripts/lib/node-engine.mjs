@@ -1,29 +1,57 @@
-// Minimal UCI client for running the same Stockfish build from Node, used by
-// the calibration and benchmark scripts. Mirrors src/lib/engine/uci.ts.
+// Minimal UCI client for running the browser's Stockfish from Node, used by the
+// calibration and benchmark scripts. Mirrors src/lib/engine/uci.ts.
+//
+// It drives `@lichess-org/stockfish-web` — the same build the app serves to an
+// isolated page — rather than nmrugg's lite-single, which is what the app now
+// uses only as a fallback. Calibrating with one engine and shipping another is
+// the drift ENGINE_BUILD was added to make impossible after a hardcoded
+// `stockfish-18` stamp survived the upgrade to 19.
+//
+// Node needs no cross-origin isolation to thread: SharedArrayBuffer is
+// unconditional there. So `threads` works here even though the same build needs
+// COOP/COEP in a browser.
 import { createRequire } from 'node:module'
-import initEngine from 'stockfish'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const require_ = createRequire(import.meta.url)
+const ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))))
+const PKG = join(ROOT, 'node_modules', '@lichess-org', 'stockfish-web')
+const NNUE_DIR = join(ROOT, 'public', 'nnue')
 
 /**
  * Which build the calibration samples were produced with.
  *
- * Read off the installed package rather than written down. `createEngine` asks
- * for "lite-single" by name and gets whatever version is installed, so a
- * hardcoded stamp beside it says nothing and goes stale silently — it sat at
- * stockfish-18 through the upgrade to 19, which would have mislabelled every
- * sample of a re-run.
+ * Read off the installed package rather than written down, for the reason a
+ * hardcoded stamp goes stale silently: the previous one sat at stockfish-18
+ * through the upgrade to 19 and would have mislabelled every sample of a re-run.
  */
-export const ENGINE_BUILD = `stockfish-${
-  createRequire(import.meta.url)('stockfish/package.json').version.split('.')[0]
-}-lite-single`
+export const ENGINE_BUILD = `sf_19_smallnet@${
+  require_('@lichess-org/stockfish-web/package.json').version
+}`
 
-export async function createEngine({ hashMb = 64 } = {}) {
-  const engine = await initEngine('lite-single')
+/**
+ * @param {{hashMb?: number, threads?: number, multiPv?: number}} options
+ *   `threads` defaults to 1 to match REVIEW_THREADS. A calibration run at a
+ *   different number produces a curve for that number and nothing else.
+ */
+export async function createEngine({ hashMb = 64, threads = 1, multiPv = 1 } = {}) {
+  const module = await import(join(PKG, 'sf_19_smallnet.js'))
+  const engine = await module.default({
+    locateFile: (file) => join(PKG, file),
+    printErr: () => {},
+  })
+
   const handlers = new Set()
-  engine.listener = (line) => {
+  engine.listen = (line) => {
     for (const h of handlers) h(String(line))
   }
+  engine.onError = (message) => {
+    throw new Error(`engine: ${message}`)
+  }
 
-  const send = (cmd) => engine.sendCommand(cmd)
+  const send = (cmd) => engine.uci(cmd)
   const onLine = (h) => {
     handlers.add(h)
     return () => handlers.delete(h)
@@ -52,8 +80,18 @@ export async function createEngine({ hashMb = 64 } = {}) {
   const uciok = waitFor((l) => l === 'uciok')
   send('uci')
   await uciok
+
+  // The net is not in the package; the build names the one it wants, and the
+  // app serves that same file from public/nnue.
+  for (const index of [0, 1]) {
+    const name = engine.getRecommendedNnue?.(index)
+    if (!name) continue
+    engine.setNnueBuffer(new Uint8Array(readFileSync(join(NNUE_DIR, name))), index)
+  }
+
   send(`setoption name Hash value ${hashMb}`)
-  send('setoption name MultiPV value 1')
+  send(`setoption name Threads value ${threads}`)
+  send(`setoption name MultiPV value ${multiPv}`)
   await ready()
 
   /** Search one position; returns {score:{cp|mate}, depth, bestMoveUci, nodes, nps}. */

@@ -54,6 +54,13 @@ export interface EngineLine {
   pvUci: string[]
 }
 
+export interface EngineOptions {
+  hashMb?: number
+  multiPv?: number
+  /** Search threads. Only meaningful on the isolated build; see settings.ts. */
+  threads?: number
+}
+
 export interface AnalyzeUpdate {
   depth: number
   lines: EngineLine[]
@@ -153,7 +160,7 @@ export class Engine {
     })
   }
 
-  async init(options: { hashMb?: number; multiPv?: number } = {}): Promise<void> {
+  async init(options: EngineOptions = {}): Promise<void> {
     if (this.initialized) {
       await this.setOptions(options)
       return
@@ -196,9 +203,13 @@ export class Engine {
     return this.workerPath
   }
 
-  async setOptions(options: { hashMb?: number; multiPv?: number }): Promise<void> {
+  async setOptions(options: EngineOptions): Promise<void> {
     if (options.hashMb != null) this.send(`setoption name Hash value ${options.hashMb}`)
     if (options.multiPv != null) this.send(`setoption name MultiPV value ${options.multiPv}`)
+    // Sent unconditionally when asked for, including 1: the lite build accepts
+    // `Threads 1` and ignores anything more, so there is no branch here on
+    // which engine is running.
+    if (options.threads != null) this.send(`setoption name Threads value ${options.threads}`)
     const ready = this.waitFor((l) => l === 'readyok')
     this.send('isready')
     await ready

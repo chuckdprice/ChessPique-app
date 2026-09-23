@@ -79,3 +79,21 @@ describe('the two paths', () => {
     expect(ISOLATED_WORKER_PATH).toBe('/stockfish/sf-worker.js')
   })
 })
+
+describe('the review is not user-configurable', () => {
+  it('pins its thread count to a constant', async () => {
+    // The whole reason there is a constant: PLAYED_LIKE_A/B were fitted against
+    // one set of search limits, and threads move the evaluations enough to move
+    // the estimate. A slider here would be a rating the reader could drag.
+    const { REVIEW_THREADS } = await import('./analysis')
+    expect(REVIEW_THREADS).toBe(1)
+  })
+
+  it('keeps it at 1 until the curve is re-fitted', async () => {
+    // Slice 4 of BUILD-PLAN-v3.1.md. Raising this before re-calibrating buys
+    // accuracy against the engine and loses it against the calibration, so the
+    // two have to move in the same commit — and this test is the reminder.
+    const { REVIEW_THREADS, REVIEW_DEPTH, REVIEW_MOVETIME_CAP_MS } = await import('./analysis')
+    expect([REVIEW_THREADS, REVIEW_DEPTH, REVIEW_MOVETIME_CAP_MS]).toEqual([1, 20, 2500])
+  })
+})

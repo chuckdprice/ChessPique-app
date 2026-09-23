@@ -1,4 +1,4 @@
-import { DEFAULT_ENGINE } from '../lib/settings'
+import { DEFAULT_ENGINE, maxThreads } from '../lib/settings'
 import type { EngineSettings } from '../lib/settings'
 import { SliderRow, SwitchRow, MAIA_CAPTION } from './EngineSettings'
 import BackupSettings from './BackupSettings'
@@ -34,11 +34,15 @@ function Section({
  * you are looking at a position, this is where they live.
  */
 export default function SettingsPage({ engine, onEngineChange }: SettingsPageProps) {
-  const threads = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 1 : 1
+  // Through maxThreads rather than hardwareConcurrency directly: a page that
+  // is not cross-origin isolated has no SharedArrayBuffer, so its core count
+  // is not the number of threads it can actually use.
+  const threads = maxThreads()
   const atDefaults =
     engine.searchTimeSec === DEFAULT_ENGINE.searchTimeSec &&
     engine.multiPv === DEFAULT_ENGINE.multiPv &&
     engine.hashMb === DEFAULT_ENGINE.hashMb &&
+    engine.threads === DEFAULT_ENGINE.threads &&
     engine.stockfish === DEFAULT_ENGINE.stockfish &&
     engine.arrows === DEFAULT_ENGINE.arrows &&
     engine.arrowEvals === DEFAULT_ENGINE.arrowEvals &&
@@ -98,13 +102,18 @@ export default function SettingsPage({ engine, onEngineChange }: SettingsPagePro
           />
           <SliderRow
             label="Threads"
-            display={`1 / ${threads}`}
+            display={`${engine.threads} / ${threads}`}
             min={1}
-            max={1}
+            max={Math.max(threads, 1)}
             step={1}
-            value={1}
-            disabled
-            caption="Single-threaded in browser WASM."
+            value={Math.min(engine.threads, threads)}
+            disabled={threads <= 1}
+            caption={
+              threads > 1
+                ? "More threads make the live search stronger, not faster — and they do not touch the game review, which is fixed so its rating estimate stays comparable."
+                : "Needs a cross-origin isolated page; this one is not."
+            }
+            onChange={(v) => onEngineChange({ ...engine, threads: v })}
           />
         </Section>
 

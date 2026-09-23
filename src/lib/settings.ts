@@ -21,6 +21,19 @@ export interface EngineSettings {
   /** Hash table size in MB. */
   hashMb: number
   /**
+   * Search threads for the *live panel only*.
+   *
+   * Deliberately not the review's. The review is calibrated — `PLAYED_LIKE_A/B`
+   * were fitted against one set of search limits, and threads change the
+   * evaluations enough to move the estimate — so its thread count is a constant
+   * in `analysis.ts` beside its depth, not something a slider can drift.
+   * Nothing is calibrated against the panel, so here it is free.
+   *
+   * Capped at 1 on a page that is not cross-origin isolated, where there is no
+   * SharedArrayBuffer to thread with.
+   */
+  threads: number
+  /**
    * Run Stockfish at all, and show its list of candidate moves.
    *
    * The twin of `maia`: the Move Evals pane holds two engines answering two
@@ -140,6 +153,10 @@ export const DEFAULT_ENGINE: EngineSettings = {
   searchTimeSec: 8,
   multiPv: 3,
   hashMb: 128,
+  // One, not `hardwareConcurrency`. More threads make a search stronger and the
+  // machine less responsive, and the default should not commandeer a laptop for
+  // a panel the reader may not be looking at. Raising it is one drag.
+  threads: 1,
   stockfish: true,
   arrows: true,
   arrowEvals: true,
@@ -208,11 +225,29 @@ export function saveAppearance(a: AppearanceSettings): void {
   }
 }
 
+/**
+ * The most threads worth offering: this machine's cores, or 1 where the page
+ * cannot use `SharedArrayBuffer` at all.
+ *
+ * `hardwareConcurrency` is missing in Node and reports 0 in a browser pane that
+ * has gone quiet, so anything falsy reads as one core rather than as none.
+ */
+export function maxThreads(): number {
+  if (typeof globalThis.crossOriginIsolated !== 'boolean' || !globalThis.crossOriginIsolated) {
+    return 1
+  }
+  return Math.max(1, Math.min(32, navigator?.hardwareConcurrency || 1))
+}
+
 export function loadEngineSettings(): EngineSettings {
   const e = load(ENGINE_KEY, DEFAULT_ENGINE)
   e.searchTimeSec = Math.min(30, Math.max(1, Math.round(e.searchTimeSec)))
   e.multiPv = Math.min(5, Math.max(1, Math.round(e.multiPv)))
   e.hashMb = Math.min(512, Math.max(16, Math.round(e.hashMb)))
+  // Clamped to what this machine has, so a value carried over from a bigger one
+  // — or from a browser that could thread when this one cannot — is corrected
+  // on read rather than sent to the engine.
+  e.threads = Math.min(maxThreads(), Math.max(1, Math.round(e.threads)))
   // A setting saved before this one existed merges the default in as any other
   // missing key would, but a file hand-edited to a string would not.
   e.stockfish = e.stockfish !== false

@@ -356,7 +356,11 @@ export default function EnginePanel({
     const run = async () => {
       if (!engineRef.current) engineRef.current = new Engine()
       const engine = engineRef.current
-      await engine.init({ hashMb: settings.hashMb, multiPv: settings.multiPv })
+      await engine.init({
+        hashMb: settings.hashMb,
+        multiPv: settings.multiPv,
+        threads: settings.threads,
+      })
       if (cancelled) return
       engine.stop()
       setUpdate(null)
@@ -397,7 +401,15 @@ export default function EnginePanel({
     // The three the search itself reads, not the settings object: it now also
     // carries how the board draws the answer, and a whole search was thrown
     // away and restarted every time one of those was flipped.
-  }, [enabled, gameOver, fen, settings.searchTimeSec, settings.multiPv, settings.hashMb])
+  }, [
+    enabled,
+    gameOver,
+    fen,
+    settings.searchTimeSec,
+    settings.multiPv,
+    settings.hashMb,
+    settings.threads,
+  ])
 
   /**
    * The board's arrows, taken from the very lines being listed.

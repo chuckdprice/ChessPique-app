@@ -415,6 +415,20 @@ export function buildGameAnalysis(
 export const REVIEW_DEPTH = 20
 export const REVIEW_MOVETIME_CAP_MS = 2500
 
+/**
+ * Search threads for the review, and a constant rather than a setting.
+ *
+ * Threads change the evaluations — measured over 195 moves, ten of them move
+ * about nine points of classification agreement against a deep reference — and
+ * the evaluations are what `PLAYED_LIKE_A/B` were fitted against. A thread
+ * count the reader could drag would be a rating estimate the reader could drag.
+ *
+ * It stays at 1 until the curve has been re-fitted at whatever number replaces
+ * it, which is the whole of slice 4 in BUILD-PLAN-v3.1.md. Raising it before
+ * then buys accuracy against the engine and loses it against the calibration.
+ */
+export const REVIEW_THREADS = 1
+
 /** What the review learned about one position, and all it needs to keep. */
 export interface ReviewedPosition {
   score: Score
@@ -468,7 +482,7 @@ export async function analyzeGame(
   } = options
   const engine = new Engine()
   try {
-    await engine.init({ hashMb: 64, multiPv: 1 })
+    await engine.init({ hashMb: 64, multiPv: 1, threads: REVIEW_THREADS })
     const evals: Score[] = []
     const evalDepths: number[] = []
     const bestMoves: Array<{ uci: string | null; san: string | null; line: string[] }> = []

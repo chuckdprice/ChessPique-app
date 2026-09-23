@@ -10,6 +10,7 @@ import {
   loadAppearance,
   loadEngineSettings,
   loadExplorerSettings,
+  maxThreads,
   saveAppearance,
   withRecentPlayer,
 } from './settings'
@@ -145,6 +146,88 @@ describe('engine settings', () => {
     const e = loadEngineSettings()
     expect(e.maiaArrowEvals).toBe(true)
     expect(e.multiPv).toBe(4)
+  })
+
+  it('starts single-threaded, rather than commandeering every core', () => {
+    expect(loadEngineSettings().threads).toBe(1)
+  })
+})
+
+/** `crossOriginIsolated` and `hardwareConcurrency` do not exist in node. */
+function setEnvironment(isolated: boolean | undefined, cores: number | undefined) {
+  const g = globalThis as Record<string, unknown>
+  if (isolated === undefined) delete g.crossOriginIsolated
+  else Object.defineProperty(g, 'crossOriginIsolated', { value: isolated, configurable: true })
+  if (cores === undefined) delete g.navigator
+  else Object.defineProperty(g, 'navigator', { value: { hardwareConcurrency: cores }, configurable: true })
+}
+
+describe('maxThreads', () => {
+  afterEach(() => setEnvironment(undefined, undefined))
+
+  it('is this machine\'s cores on an isolated page', () => {
+    setEnvironment(true, 14)
+    expect(maxThreads()).toBe(14)
+  })
+
+  it('is 1 without isolation, however many cores there are', () => {
+    // No SharedArrayBuffer means no threads at all, so the core count is not
+    // the number this page can use — offering it would be a slider that lies.
+    setEnvironment(false, 14)
+    expect(maxThreads()).toBe(1)
+  })
+
+  it('is 1 where the property does not exist, which includes node', () => {
+    setEnvironment(undefined, 14)
+    expect(maxThreads()).toBe(1)
+  })
+
+  it('reads a zero core count as one', () => {
+    // A backgrounded browser pane reports 0, and so does an older browser with
+    // no hardwareConcurrency. Neither means "no cores".
+    setEnvironment(true, 0)
+    expect(maxThreads()).toBe(1)
+  })
+
+  it('caps at 32, because the engine will not use more usefully', () => {
+    setEnvironment(true, 256)
+    expect(maxThreads()).toBe(32)
+  })
+})
+
+describe('the stored thread count', () => {
+  beforeEach(() => {
+    globalThis.localStorage = fakeStorage()
+  })
+  afterEach(() => {
+    localStorage.clear()
+    setEnvironment(undefined, undefined)
+  })
+
+  it('is clamped to what this machine can actually run', () => {
+    // Carried over from a bigger machine, or from a browser that could thread
+    // when this one cannot. Corrected on read rather than sent to the engine.
+    setEnvironment(true, 4)
+    localStorage.setItem('chesspique.engine', JSON.stringify({ threads: 16 }))
+    expect(loadEngineSettings().threads).toBe(4)
+  })
+
+  it('collapses to 1 on a page that is not isolated', () => {
+    setEnvironment(false, 16)
+    localStorage.setItem('chesspique.engine', JSON.stringify({ threads: 8 }))
+    expect(loadEngineSettings().threads).toBe(1)
+  })
+
+  it('keeps a value the machine can honour', () => {
+    setEnvironment(true, 14)
+    localStorage.setItem('chesspique.engine', JSON.stringify({ threads: 10 }))
+    expect(loadEngineSettings().threads).toBe(10)
+  })
+
+  it('refuses a nonsense value rather than passing it to the engine', () => {
+    setEnvironment(true, 14)
+    localStorage.setItem('chesspique.engine', JSON.stringify({ threads: -3 }))
+    expect(loadEngineSettings().threads).toBe(1)
   })
 })
 

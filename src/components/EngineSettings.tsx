@@ -1,4 +1,5 @@
 import type { RefObject } from 'react'
+import { maxThreads } from '../lib/settings'
 import type { EngineSettings } from '../lib/settings'
 import { MODEL_BYTES } from '../lib/maia/session'
 import SettingsPopover from './SettingsPopover'
@@ -117,6 +118,11 @@ export default function EngineSettingsPanel({
   onClose,
   anchor,
 }: EngineSettingsPanelProps) {
+  // Read on every render rather than captured: `crossOriginIsolated` is fixed
+  // for the document's life, but `hardwareConcurrency` reads 0 in a backgrounded
+  // browser pane, and maxThreads turns that into 1 rather than into no slider.
+  const cores = maxThreads()
+
   return (
     <SettingsPopover anchor={anchor} title="Engine Settings" onClose={onClose}>
       <SliderRow
@@ -139,13 +145,18 @@ export default function EngineSettingsPanel({
       />
       <SliderRow
         label="Threads"
-        display={`1 / ${typeof navigator !== 'undefined' ? navigator.hardwareConcurrency || 1 : 1}`}
+        display={`${value.threads} / ${cores}`}
         min={1}
-        max={1}
+        max={Math.max(cores, 1)}
         step={1}
-        value={1}
-        disabled
-        caption="Single-threaded in browser WASM"
+        value={Math.min(value.threads, cores)}
+        disabled={cores <= 1}
+        caption={
+          cores > 1
+            ? "More threads make the live search stronger, not faster — and they do not touch the game review, which is fixed so its rating estimate stays comparable."
+            : "Needs a cross-origin isolated page; this one is not."
+        }
+        onChange={(v) => onChange({ ...value, threads: v })}
       />
       <SliderRow
         label="Memory"

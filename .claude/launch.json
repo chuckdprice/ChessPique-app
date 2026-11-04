@@ -9,8 +9,8 @@
     },
     {
       "name": "prod",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "preview"],
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "npm run build && npm run preview"],
       "port": 4173
     }
   ]

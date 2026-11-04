@@ -208,6 +208,34 @@ the harness's drag tool (mouse events) cannot move a piece. Drive it with a
   top-level await". A hand-written worker beside the engine avoids all three —
   and it is also faster, because the dep-optimised module measured 225k nps
   against 1.16M for the same engine in a worker.
+- **A header added to a site does not reach a file browsers already hold.**
+  Vercel's `304` carries `ETag` and `Cache-Control` but not the custom headers
+  from `vercel.json`, and a `304` only updates what it mentions. So a static file
+  cached before a header existed, and unchanged since, keeps the old header set
+  on every revalidation, indefinitely. For COEP that is fatal: an isolated page
+  refuses a worker script without the header, and `worker.onerror` fires with no
+  message. It broke Maia for anyone who had used it before v3.1, and went
+  unnoticed from 23 September to 4 November 2026 because **a clean browser cannot
+  see it** — a first visit gets a `200` with the header. Every check made then was
+  from a clean cache, and a check from one came back fine even with the bug live.
+  The fix is a new URL, `?v=2` on `WORKER_PATH`, which has no stored copy to
+  revalidate; a stored copy that has the header keeps it through later `304`s, so
+  this only has to happen once per file. Reproduced with a small server copying
+  Vercel's responses: first visit without the headers, second with them. When a
+  change alters response headers, ask which unchanged files a returning browser
+  already has. `sf-worker.js` postdates the headers and is safe.
+  `stockfish-19-lite-single.js` predates them by a day, so on an isolated page it
+  can fail the same way — that only matters if the threaded engine has already
+  failed and this is the fallback, and it has not been fixed. It builds its wasm
+  path from `location.origin` and `pathname` and reads `location.hash`, so check
+  that before giving it a query.
+- **The model's Content-Length cannot be used for progress.** Vercel
+  brotli-compresses it and sends no length at all, and a length on a compressed
+  response would be the compressed size against a count of decompressed bytes.
+  That left "Downloading… N%" on 0% for the whole first download, though it
+  counted properly when confirmed in August. `MODEL_BYTES` is the denominator now
+  and a test holds it to the file's size. `vite preview` does send a length and
+  does not compress, so **this cannot be reproduced locally**.
 - **Never time the first run, and never share the machine.** Whichever engine
   configuration runs first is slowest while wasm tiers up, so every timed sweep
   needs a throwaway pass ahead of it. Separately, an agreement run with the

@@ -238,6 +238,48 @@ the harness's drag tool (mouse events) cannot move a piece. Drive it with a
   shows the opposite**, a `Content-Length` and no compression, because it sends no
   `Accept-Encoding`; that misled this note once. Send the browser's header when
   checking what a browser receives.
+- **`origin` is what makes a save destructive, so every way into a game has to
+  decide it.** It names the chapter `Update this chapter` overwrites, and the API
+  offers no version to check against. New Analysis used to leave it set, so the
+  button stayed on offer over an empty board: one press sent `*` as the chapter's
+  moves, set the players to `?` and sent `ChapterName` and `ChapterURL` empty,
+  which deletes them. That was live until 4 November 2026. The rules now: a study
+  chapter sets it, a file, a paste or a shared link clears it through
+  `handleConvert`, `startNewGame` clears it itself because it does not go through
+  `handleConvert`, and re-reading the Original PGN tab keeps it, because that is
+  the same game being edited. Each door also has to set the source text and file
+  name; a door that skips them leaves the previous game's text in the tab. A new
+  door needs all three decided.
+- **Keeping `origin` through a re-read is why `Update` can ask first.**
+  `sourceChangedChapterMoves` is set when a re-read leaves the mainline different
+  from `origin.loadedKey`, and `requestSave` asks while it is set. It is a
+  deliberate gap that tags and moves played on the board do not set it: Chuck asked
+  for the question over a different game pasted in, and asking on every rename or
+  added move would train the reader to dismiss it. Do not widen it without asking
+  him. It only compares against what the chapter holds, so changing the moves and
+  changing them back does not ask, and a successful save resets it.
+- **`convertPgn` accepts any word as a move.** Ordinary prose reads as six moves
+  and no error; `parseMoveTree` then skips every token and returns an empty tree.
+  So `convertPgn` not throwing does not mean there is a game, which is why
+  `rereadSource` also requires a playable move. An illegal move partway through is
+  different and deliberate: the game loads up to that point with a warning banner,
+  and the moves after it drop out until the text is fixed.
+- **Original PGN edits are read on leaving the tab, not as they are typed.** The
+  other tabs cannot be on screen while typing there, and half-typed PGN would keep
+  replacing the board and restarting the review. Every re-read has to bump
+  `gameEpoch`, because `handleConvert` clears the analysis while the review only
+  restarts on a changed `mainlineKey`: without it a tag edit removed every eval
+  from the converted PGN for good. A re-read also replaces moves added on the
+  board, and that is accepted, not overlooked.
+- **The Lichess write paths can be tested without signing in.** Replace
+  `window.fetch` in the dev page, handle `lichess.org` URLs there, and record every
+  POST, with a throwaway session under `chesspique.lichess` in the pane's storage.
+  That is how the New Analysis bug was reproduced, and it shows exactly what would
+  be sent. Study and chapter ids must be **exactly 8 characters**: with a longer
+  one `chapterIdOf` returns null, the game has no origin, and `Update` never
+  appears, which looks like the bug being absent. Clear the fake session, the
+  recents and `chesspique.library` afterwards. A stub cannot show what Lichess does
+  with a write, so it does not replace a real save.
 - **Never time the first run, and never share the machine.** Whichever engine
   configuration runs first is slowest while wasm tiers up, so every timed sweep
   needs a throwaway pass ahead of it. Separately, an agreement run with the

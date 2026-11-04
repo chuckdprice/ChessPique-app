@@ -11,10 +11,8 @@ const srcDir = join(root, 'node_modules', 'onnxruntime-web', 'dist')
 const destDir = join(root, 'public', 'ort')
 
 // The same three files Maia's own site serves. The build is named "threaded"
-// but runs single-threaded when SharedArrayBuffer is missing, which it is here:
-// the app sets no COOP/COEP headers, for the same reason the Stockfish build
-// is the single-threaded one. The worker pins numThreads to 1 so it does not
-// try. Anything else in dist/ is a variant we do not serve.
+// but the worker pins numThreads to 1, so it runs on one even on an isolated
+// page. Anything else in dist/ is a variant we do not serve.
 const files = ['ort.wasm.min.js', 'ort-wasm-simd-threaded.mjs', 'ort-wasm-simd-threaded.wasm']
 
 if (!existsSync(srcDir)) {

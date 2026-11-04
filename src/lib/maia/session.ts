@@ -14,6 +14,18 @@ export const MODEL_PATH = '/maia3/maia3_simplified.onnx'
 export const MODEL_VERSION = 'maia3-simplified-1'
 /** What the download costs, for the UI to say so before starting it. */
 export const MODEL_BYTES = 45_683_686
+/**
+ * The query is the fix for a bug, and removing it brings the bug back.
+ *
+ * An isolated page refuses a worker script without a COEP header, and anyone who
+ * used Maia before v3.1 has this file cached from before the header existed. It
+ * had not changed since, so the browser revalidated, Vercel answered 304 — which
+ * does not carry the header — and the stored copy stayed header-less for good:
+ * "Maia worker failed to start", with no message and no way to recover. A new URL
+ * has no stored copy to revalidate. Reproduced in a browser against a server
+ * behaving the same way; the old URL failed every time, a new one at once worked.
+ */
+export const WORKER_PATH = '/maia3/maia-worker.js?v=2'
 
 export type MaiaStatus =
   | 'idle'
@@ -50,7 +62,7 @@ export class MaiaSession implements ModelRunner {
   }
 
   private start() {
-    this.worker = new Worker('/maia3/maia-worker.js')
+    this.worker = new Worker(WORKER_PATH)
     this.worker.onmessage = (event: MessageEvent) => {
       const message = event.data
       switch (message.type) {

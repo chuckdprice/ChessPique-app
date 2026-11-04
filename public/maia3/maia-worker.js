@@ -23,8 +23,9 @@ importScripts('/ort/ort.wasm.min.js')
 // eslint-disable-next-line no-undef
 const ORT = ort
 ORT.env.wasm.wasmPaths = '/ort/'
-// The app sets no COOP/COEP headers, so there is no SharedArrayBuffer to thread
-// with. Saying so up front beats letting the runtime discover it.
+// The page is cross-origin isolated since v3.1, so threads are available here;
+// one is what this has always run on. A forward pass is about 65ms, so there is
+// nothing to win by taking cores from the search it sits beside.
 ORT.env.wasm.numThreads = 1
 
 const DB_NAME = 'chessnoter.maia'

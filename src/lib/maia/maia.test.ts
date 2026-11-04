@@ -6,6 +6,7 @@ import { encodePosition, mirrorFen, mirrorMove, TOKEN_LENGTH } from './encode'
 import { decodePolicy, decodeValue } from './decode'
 import { predictMoves, nearestRating, MAIA_RATINGS } from './model'
 import type { ModelRunner } from './model'
+import { WORKER_PATH } from './session'
 import {
   firstMoves,
   movesToSearch,
@@ -18,6 +19,16 @@ const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 const AFTER_E4 = 'rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1'
 
 const moveTable = table as Record<string, number>
+
+describe('the worker URL', () => {
+  it('is not the one browsers hold a header-less copy of', () => {
+    // A tidy-up that drops the query looks harmless and passes everything else:
+    // the bug only exists in a browser that used Maia before v3.1. See
+    // WORKER_PATH for why that browser can never recover on the bare URL.
+    expect(WORKER_PATH).not.toBe('/maia3/maia-worker.js')
+    expect(new URL(WORKER_PATH, 'https://x').pathname).toBe('/maia3/maia-worker.js')
+  })
+})
 
 describe('policy move space', () => {
   // The point of the fixture: Maia's own table, entry for entry, against the

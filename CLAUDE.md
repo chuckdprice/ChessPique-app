@@ -234,8 +234,11 @@ the harness's drag tool (mouse events) cannot move a piece. Drive it with a
   response would be the compressed size against a count of decompressed bytes.
   That left "Downloading… N%" on 0% for the whole first download, though it
   counted properly when confirmed in August. `MODEL_BYTES` is the denominator now
-  and a test holds it to the file's size. `vite preview` does send a length and
-  does not compress, so **this cannot be reproduced locally**.
+  and a test holds it to the file's size. `vite preview` behaves the same way for
+  a browser, gzip and no length, so this can be tested locally. **A bare `curl`
+  shows the opposite**, a `Content-Length` and no compression, because it sends no
+  `Accept-Encoding`; that misled this note once. Send the browser's header when
+  checking what a browser receives.
 - **Never time the first run, and never share the machine.** Whichever engine
   configuration runs first is slowest while wasm tiers up, so every timed sweep
   needs a throwaway pass ahead of it. Separately, an agreement run with the

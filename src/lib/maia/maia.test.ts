@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest'
+import { statSync } from 'node:fs'
+import { afterEach, describe, it, expect, vi } from 'vitest'
 import { Chess } from 'chess.js'
 import table from '../__fixtures__/all_moves_maia3.json'
 import { POLICY_SIZE, moveIndex, uciFromIndex, squareIndex } from './moves'
@@ -6,7 +7,7 @@ import { encodePosition, mirrorFen, mirrorMove, TOKEN_LENGTH } from './encode'
 import { decodePolicy, decodeValue } from './decode'
 import { predictMoves, nearestRating, MAIA_RATINGS } from './model'
 import type { ModelRunner } from './model'
-import { WORKER_PATH } from './session'
+import { MaiaSession, MODEL_BYTES, WORKER_PATH } from './session'
 import {
   firstMoves,
   movesToSearch,
@@ -27,6 +28,38 @@ describe('the worker URL', () => {
     // WORKER_PATH for why that browser can never recover on the bare URL.
     expect(WORKER_PATH).not.toBe('/maia3/maia-worker.js')
     expect(new URL(WORKER_PATH, 'https://x').pathname).toBe('/maia3/maia-worker.js')
+  })
+})
+
+describe('download progress', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('knows the exact size of the model it serves', () => {
+    // This is the denominator of the progress ring now, so a new model file
+    // with the old constant would show a wrong percentage and nothing else.
+    expect(MODEL_BYTES).toBe(statSync('public/maia3/maia3_simplified.onnx').size)
+  })
+
+  it('reports against the known size, whatever the response said', () => {
+    let worker: { onmessage: (event: { data: unknown }) => void } | undefined
+    vi.stubGlobal(
+      'Worker',
+      class {
+        onmessage = () => {}
+        postMessage() {}
+        terminate() {}
+        constructor() {
+          worker = this
+        }
+      },
+    )
+    const seen: [number, number][] = []
+    const session = new MaiaSession({ onProgress: (loaded, total) => seen.push([loaded, total]) })
+    void session.ensureReady()
+
+    worker!.onmessage({ data: { type: 'progress', loaded: 1000 } })
+    expect(seen).toEqual([[1000, MODEL_BYTES]])
+    session.destroy()
   })
 })
 

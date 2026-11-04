@@ -466,7 +466,7 @@ export default function EnginePanel({
     // and the panel is on for most of a session with Maia off.
     const session = (maiaRef.current ??= new MaiaSession({
       onStatus: setMaiaStatus,
-      onProgress: (loaded, total) => setMaiaProgress(total > 0 ? loaded / total : 0),
+      onProgress: (loaded, total) => setMaiaProgress(loaded / total),
     }))
     predictMoves(session, fen, maiaRating)
       .then(({ moves }) => {

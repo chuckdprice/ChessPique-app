@@ -79,7 +79,12 @@ export class MaiaSession implements ModelRunner {
           }
           break
         case 'progress':
-          this.options.onProgress?.(message.loaded, message.total)
+          // The known size rather than the response's Content-Length. Vercel
+          // brotli-compresses this file and sends no length at all, which left
+          // the ring on 0% for the whole download — and a length on a compressed
+          // response would be the compressed size, against a count of bytes
+          // after decompression.
+          this.options.onProgress?.(message.loaded, MODEL_BYTES)
           break
         case 'result': {
           const pending = this.pending.get(message.id)

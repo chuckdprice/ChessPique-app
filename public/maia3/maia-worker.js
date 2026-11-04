@@ -9,7 +9,7 @@
  *               { type: 'download' }
  *               { type: 'infer', id, tokens, eloSelf, eloOppo }
  * Messages out: { type: 'status', status: 'cached'|'absent'|'ready' }
- *               { type: 'progress', loaded, total }
+ *               { type: 'progress', loaded }
  *               { type: 'result', id, policy, value }
  *               { type: 'error', id?, message }
  *
@@ -82,7 +82,6 @@ async function writeCache(bytes) {
 async function fetchModel() {
   const response = await fetch(modelUrl)
   if (!response.ok) throw new Error(`Model fetch failed (${response.status})`)
-  const total = Number(response.headers.get('Content-Length')) || 0
 
   if (!response.body?.getReader) return new Uint8Array(await response.arrayBuffer())
 
@@ -94,7 +93,7 @@ async function fetchModel() {
     if (done) break
     chunks.push(value)
     loaded += value.length
-    postMessage({ type: 'progress', loaded, total })
+    postMessage({ type: 'progress', loaded })
   }
   const bytes = new Uint8Array(loaded)
   let at = 0

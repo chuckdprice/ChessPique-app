@@ -106,12 +106,12 @@ async function boot() {
 }
 
 boot().catch((error) => {
-  // Loud rather than silent. `Engine.init` is waiting on `uciok` and will time
-  // out, and the app falls back to the single-threaded build — but a console
-  // line naming the real cause is the difference between a diagnosable failure
-  // and a mysterious thirty-second pause.
+  // Loud rather than silent, and told to `Engine.start` directly: this is inside
+  // a promise, so `worker.onerror` never hears it, and without the line the app
+  // sat out the whole 45s timeout before falling back to the single-threaded
+  // build. The prefix is BOOT_FAILED_PREFIX in uci.ts.
   console.error('sf-worker: could not start Stockfish', error)
-  postMessage(`info string error ${error?.message ?? error}`)
+  postMessage(`sf-worker: boot failed: ${error?.message ?? error}`)
 })
 
 onmessage = (event) => {

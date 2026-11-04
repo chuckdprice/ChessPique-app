@@ -1,7 +1,9 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  BOOT_FAILED_PREFIX,
   canUseThreads,
   defaultWorkerPath,
+  Engine,
   ENGINE_WORKER_PATH,
   ISOLATED_WORKER_PATH,
 } from './uci'
@@ -86,6 +88,101 @@ describe('the two paths', () => {
     // git tracks; everything else there is copied out of node_modules by
     // postinstall. Renaming it means updating .gitignore's negation too.
     expect(ISOLATED_WORKER_PATH).toBe('/stockfish/sf-worker.js')
+  })
+})
+
+describe('falling back when the threaded build will not start', () => {
+  /**
+   * A worker that answers the protocol, unless told how this path should fail.
+   * Answers arrive as microtasks, so a test on fake timers that never advances
+   * them can only pass if nothing along the way needed a timer to fire.
+   */
+  interface Threaded {
+    onerror: ((e: { message: string }) => void) | null
+    say: (line: string) => void
+  }
+  const stubWorkers = (threaded: (worker: Threaded) => void) => {
+    const started: string[] = []
+    class FakeWorker {
+      onmessage: ((e: { data: string }) => void) | null = null
+      onerror: ((e: { message: string }) => void) | null = null
+      constructor(private path: string) {
+        started.push(path)
+      }
+      say(line: string) {
+        queueMicrotask(() => this.onmessage?.({ data: line }))
+      }
+      postMessage(command: string) {
+        if (this.path === ISOLATED_WORKER_PATH && command === 'uci') return threaded(this)
+        if (command === 'uci') this.say('uciok')
+        if (command === 'isready') this.say('readyok')
+      }
+      terminate() {}
+    }
+    vi.stubGlobal('Worker', FakeWorker)
+    return started
+  }
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  it('does not wait when the worker script fails to load', async () => {
+    vi.useFakeTimers()
+    const started = stubWorkers((w) => queueMicrotask(() => w.onerror?.({ message: '' })))
+    const engine = new Engine(ISOLATED_WORKER_PATH)
+    await engine.init()
+    expect(started).toEqual([ISOLATED_WORKER_PATH, ENGINE_WORKER_PATH])
+    expect(engine.activeWorkerPath).toBe(ENGINE_WORKER_PATH)
+  })
+
+  it('does not wait when the engine inside the worker says it failed', async () => {
+    // The commoner case, and one `onerror` cannot hear: the engine and its net
+    // load inside a promise, so the worker script itself ran without a fault.
+    vi.useFakeTimers()
+    stubWorkers((w) => w.say(`${BOOT_FAILED_PREFIX}: net nn-x failed (404)`))
+    const engine = new Engine(ISOLATED_WORKER_PATH)
+    await engine.init()
+    expect(engine.activeWorkerPath).toBe(ENGINE_WORKER_PATH)
+  })
+
+  it('does not take an ordinary engine error for a failure to start', async () => {
+    vi.useFakeTimers()
+    stubWorkers((w) => {
+      w.say('info string error something survivable')
+      w.say('uciok')
+    })
+    const engine = new Engine(ISOLATED_WORKER_PATH)
+    await engine.init()
+    expect(engine.activeWorkerPath).toBe(ISOLATED_WORKER_PATH)
+  })
+
+  it('still gives a worker that goes quiet the whole timeout', async () => {
+    // A cold start can legitimately spend a while downloading its net, so
+    // silence alone is not a failure until the time is up.
+    vi.useFakeTimers()
+    const started = stubWorkers(() => {})
+    const engine = new Engine(ISOLATED_WORKER_PATH)
+    const init = engine.init()
+    await vi.advanceTimersByTimeAsync(44_000)
+    expect(started).toEqual([ISOLATED_WORKER_PATH])
+    await vi.advanceTimersByTimeAsync(1_000)
+    await init
+    expect(engine.activeWorkerPath).toBe(ENGINE_WORKER_PATH)
+  })
+
+  it('reports a failure when the fallback will not start either', async () => {
+    vi.useFakeTimers()
+    class Broken {
+      onerror: ((e: { message: string }) => void) | null = null
+      postMessage() {
+        queueMicrotask(() => this.onerror?.({ message: 'no engine' }))
+      }
+      terminate() {}
+    }
+    vi.stubGlobal('Worker', Broken)
+    await expect(new Engine(ISOLATED_WORKER_PATH).init()).rejects.toThrow('no engine')
   })
 })
 

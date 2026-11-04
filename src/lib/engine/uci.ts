@@ -25,6 +25,15 @@ export const ENGINE_WORKER_PATH = '/stockfish/stockfish-19-lite-single.js?v=2'
  * thread the two should agree — a large disagreement means something is wrong
  * rather than something has improved.
  */
+/**
+ * What sf-worker.js says when the engine inside it could not start. Spelled out
+ * there too, because that file is served as it is and cannot import this.
+ *
+ * Its own line rather than a reading of `info string error`, which the running
+ * engine also uses for errors it carries on after.
+ */
+export const BOOT_FAILED_PREFIX = 'sf-worker: boot failed'
+
 export const ISOLATED_WORKER_PATH = '/stockfish/sf-worker.js'
 
 export const ENGINE_NAME = 'SF19'
@@ -192,16 +201,32 @@ export class Engine {
   /** Bring up one worker and wait for it to answer `uci`. */
   private async start(path: string): Promise<void> {
     this.worker?.terminate()
-    this.worker = new Worker(path, path.endsWith('sf-worker.js') ? { type: 'module' } : undefined)
-    this.worker.onmessage = (e: MessageEvent) => {
+    const worker = new Worker(path, path.endsWith('sf-worker.js') ? { type: 'module' } : undefined)
+    this.worker = worker
+    worker.onmessage = (e: MessageEvent) => {
       const text = typeof e.data === 'string' ? e.data : ''
       for (const handler of this.lineHandlers) handler(text)
     }
     // Longer than the default: this one may be downloading a 1.1 MB net on a
-    // cold cache before it can answer at all.
+    // cold cache before it can answer at all. So the timeout is only for a worker
+    // that goes quiet; one that says it failed is not waited for. There are two
+    // ways of saying so, because `onerror` only hears the script failing to load,
+    // and the engine and its net load inside a promise it never sees.
     const uciok = this.waitFor((l) => l === 'uciok', 45000)
+    let stopListening = () => {}
+    const failed = new Promise<never>((_, reject) => {
+      worker.onerror = (e) => reject(new Error(e.message || `Could not load ${path}`))
+      stopListening = this.onLine((line) => {
+        if (line.startsWith(BOOT_FAILED_PREFIX)) reject(new Error(line))
+      })
+    })
     this.send('uci')
-    await uciok
+    try {
+      await Promise.race([uciok, failed])
+    } finally {
+      stopListening()
+      worker.onerror = null
+    }
   }
 
   /** Which build is actually running, for the UI and for the tests. */

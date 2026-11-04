@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { copyText } from '../lib/clipboard'
 import { loadSession, openSignInWindow, saveSession, signIn } from '../lib/lichess/oauth'
 import { fetchAccount } from '../lib/lichess/studies'
-import type { ConvertOptions } from '../lib/convert'
 import type { GameAnalysis, RefinedEval } from '../lib/engine/analysis'
 import type { MoveTree } from '../lib/moveTree'
 import type { Opening } from '../lib/openings'
@@ -152,7 +151,8 @@ interface GameTabsProps {
   onSourceTextChange: (text: string) => void
   sourceFileName: string | null
   onSourceFileNameChange: (name: string | null) => void
-  onConvert: (text: string, options: ConvertOptions) => void
+  /** Read the source text into the game; false means it would not read. */
+  onReread: (force: boolean) => boolean
   convertError: string | null
 
   convertedPgn: string | null
@@ -199,7 +199,7 @@ export default function GameTabs({
   onSourceTextChange,
   sourceFileName,
   onSourceFileNameChange,
-  onConvert,
+  onReread,
   convertError,
   convertedPgn,
   downloadName,
@@ -239,8 +239,22 @@ export default function GameTabs({
     return () => clearTimeout(timer)
   }, [longLink])
 
+  /**
+   * Leaving the Original PGN tab is what reads an edit in.
+   *
+   * On leaving rather than on each keystroke: the other tabs cannot be on screen
+   * while typing here, and text halfway through an edit is mostly not a game, so
+   * reading it live would replace the board and restart the review over nothing.
+   * If it will not read, the reader stays with the error, because moving on would
+   * show a Converted PGN that does not contain what they just typed.
+   */
+  const chooseTab = (next: Tab) => {
+    if (tab === 'source' && next !== 'source' && !onReread(false)) return
+    setTab(next)
+  }
+
   return (
-    <TabPane tabs={TABS} label="Game" tab={tab} onTab={setTab}>
+    <TabPane tabs={TABS} label="Game" tab={tab} onTab={chooseTab}>
       {tab === 'moves' && (
         <MoveTable
           tree={tree}
@@ -331,7 +345,7 @@ export default function GameTabs({
                 beginning. */}
             <button
               type="button"
-              onClick={() => onConvert(sourceText, {})}
+              onClick={() => onReread(true)}
               disabled={sourceText.trim() === ''}
               title="Convert the clocks and review this PGN again, replacing the game on the board"
               className={ACTION}

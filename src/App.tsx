@@ -267,6 +267,14 @@ export default function App() {
   // analysis for the start page and coming back does not lose it.
   const [sourceText, setSourceText] = useState('')
   const [sourceFileName, setSourceFileName] = useState<string | null>(null)
+  /** Typed into the Original PGN tab since the game was last read from it. */
+  const sourceEdited = useRef(false)
+  /**
+   * What the game on the board was converted with. Reading the source again has
+   * to use the same options, or a game that needed the start page's clock
+   * override comes out with different clocks, or fails outright.
+   */
+  const lastOptions = useRef<ConvertOptions>({})
   const [error, setError] = useState<string | null>(null)
   const [helpOpen, setHelpOpen] = useState(false)
   const [licensesOpen, setLicensesOpen] = useState(false)
@@ -403,8 +411,14 @@ export default function App() {
    *   can write back to. Anything else — a file, a paste, a new game — passes
    *   nothing and clears the origin, because a save then has nowhere it could
    *   safely overwrite.
+   * @param atPly The mainline move to land on, where one should survive the read.
    */
-  const handleConvert = (text: string, options: ConvertOptions, from: GameOrigin | null = null) => {
+  const handleConvert = (
+    text: string,
+    options: ConvertOptions,
+    from: GameOrigin | null = null,
+    atPly = 0,
+  ) => {
     try {
       const result = convertPgn(text, options)
       // The conversion works the clocks out along one line, because a running
@@ -422,6 +436,13 @@ export default function App() {
       setAnalysisError(null)
       setLiveScore(null)
       setEngineMoves([])
+      // Same moves means the same mainlineKey, so without this the review stays
+      // cleared for good: edit a tag, read it again, and every eval is gone from
+      // the converted PGN with nothing coming to replace them. The FEN cache
+      // makes the rerun cheap when nothing it searched has changed.
+      setGameEpoch((n) => n + 1)
+      lastOptions.current = options
+      sourceEdited.current = false
       // The parser's warnings lead: a dropped line is lost work, where a
       // reused clock is only an approximation the file did not give.
       setGame({
@@ -430,7 +451,7 @@ export default function App() {
       })
       setWarningsDismissed(false)
       setHeaders(result.headers)
-      setCurrentId(tree.root)
+      setCurrentId(nodeAtMainlinePly(tree, atPly)?.id ?? tree.root)
       setError(null)
       setOrigin(from)
       setSaveState(null)
@@ -871,6 +892,33 @@ export default function App() {
         : [],
     [game, opening],
   )
+
+  /**
+   * Read the Original PGN tab's text into the game.
+   *
+   * Tested first rather than left to handleConvert, whose failure path clears the
+   * game and goes to the start page. That is right for a file that would not load
+   * and wrong here, where it costs the game on the board over a typo.
+   *
+   * @param force Read it even if nothing was typed, which is what the button asks.
+   * @returns Whether the reader can move on; false means the error is on screen.
+   */
+  const rereadSource = (force: boolean): boolean => {
+    if (sourceText.trim() === '' || (!force && !sourceEdited.current)) return true
+    try {
+      convertPgn(sourceText, lastOptions.current)
+      // convertPgn takes any word for a move, so ordinary prose gets past it and
+      // only this parser rejects it, by skipping every token. Read that way it
+      // would swap the game on the board for an empty one.
+      const { tree } = parseMoveTree(splitHeadersAndMovetext(sourceText).movetext)
+      if (mainline(tree).length === 0) throw new Error('No playable moves in this text.')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+      return false
+    }
+    handleConvert(sourceText, lastOptions.current, null, currentPly)
+    return true
+  }
 
   const convertedPgn = useMemo(() => {
     if (!game) return null
@@ -1532,10 +1580,14 @@ export default function App() {
               onHeaderRemove={handleHeaderRemove}
               generatedHeaders={generatedHeaders}
               sourceText={sourceText}
-              onSourceTextChange={setSourceText}
+              onSourceTextChange={(text) => {
+                sourceEdited.current = true
+                setSourceText(text)
+                setError(null)
+              }}
               sourceFileName={sourceFileName}
               onSourceFileNameChange={setSourceFileName}
-              onConvert={handleConvert}
+              onReread={rereadSource}
               convertError={error}
               convertedPgn={convertedPgn}
               downloadName={downloadName}

@@ -466,9 +466,12 @@ book position it reached. The data is ~420 kB, so it loads on demand rather than
 ## The PGN boxes
 
 *Original PGN* and *Converted PGN* are two tabs of the pane beside the board, and each box takes
-the height left in that pane. **Analyze PGN** on the first reads the box again and replaces the
-game on the board — the same door the start page uses, reached from beside the board so that an
-edited tag or a corrected clock does not cost a trip back to the beginning.
+the height left in that pane. An edit to the first is read in when you leave its tab, or when you
+press **Analyze PGN**, and replaces the game on the board — the same door the start page uses,
+reached from beside the board so that an edited tag or a corrected clock does not cost a trip back
+to the beginning. It keeps the clock override the game was converted with and the move you were on,
+and restarts the review, which is quick when the moves have not changed. Text that will not read
+keeps you on the tab with the error, and the game stays as it was.
 
 ## Appearance
 

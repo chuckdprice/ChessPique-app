@@ -8,7 +8,6 @@ import type { ChartRow } from '../lib/gameModel'
 import { capturedMaterial, clockAtPly } from '../lib/gameModel'
 import type { MoveTree } from '../lib/moveTree'
 import type { Opening } from '../lib/openings'
-import type { ConvertOptions } from '../lib/convert'
 import type { PgnExtras } from './PgnExtrasSwitches'
 import AnalysisTabs from './AnalysisTabs'
 import BoardBoundary from './BoardBoundary'
@@ -95,7 +94,7 @@ interface AnalysisPageProps {
   onSourceTextChange: (text: string) => void
   sourceFileName: string | null
   onSourceFileNameChange: (name: string | null) => void
-  onConvert: (text: string, options: ConvertOptions) => void
+  onReread: (force: boolean) => boolean
   convertError: string | null
   convertedPgn: string | null
   downloadName: string
@@ -170,7 +169,7 @@ export default function AnalysisPage({
   onSourceTextChange,
   sourceFileName,
   onSourceFileNameChange,
-  onConvert,
+  onReread,
   convertError,
   convertedPgn,
   downloadName,
@@ -305,7 +304,7 @@ export default function AnalysisPage({
             onSourceTextChange={onSourceTextChange}
             sourceFileName={sourceFileName}
             onSourceFileNameChange={onSourceFileNameChange}
-            onConvert={onConvert}
+            onReread={onReread}
             convertError={convertError}
             convertedPgn={convertedPgn}
             downloadName={downloadName}

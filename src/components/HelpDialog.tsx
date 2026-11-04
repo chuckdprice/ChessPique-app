@@ -177,8 +177,10 @@ export default function HelpDialog({ onClose, onLicenses }: HelpDialogProps) {
             </p>
             <p>
               <Ui>Original PGN</Ui> — the text the game was read from, still editable, with its
-              file name at the top.{' '}
-              <Ui>Analyze PGN</Ui> reads it again and replaces the game on the board. If the clock
+              file name at the top. Your changes are read in when you leave this tab, or when you
+              press <Ui>Analyze PGN</Ui>, and they replace the game on the board, including any
+              moves you added there. Text that will not read keeps you here with the error. If the
+              clock
               times come out wrong, or you see an error about the starting clock, set the starting
               time and any delay or increment under <Ui>Time control override</Ui> on the start
               page and convert again — normally the PGN's own TimeControl tag is used and you can

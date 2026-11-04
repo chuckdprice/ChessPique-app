@@ -471,7 +471,10 @@ press **Analyze PGN**, and replaces the game on the board — the same door the 
 reached from beside the board so that an edited tag or a corrected clock does not cost a trip back
 to the beginning. It keeps the clock override the game was converted with and the move you were on,
 and restarts the review, which is quick when the moves have not changed. Text that will not read
-keeps you on the tab with the error, and the game stays as it was.
+keeps you on the tab with the error, and the game stays as it was. A game opened from a study shows
+its chapter's PGN here and stays linked to that chapter through an edit, so **Update this chapter**
+still writes back to it. If an edit here changed the moves, Update asks before overwriting the
+chapter; a changed tag does not ask. **New Analysis** breaks that link and clears the box.
 
 ## Appearance
 

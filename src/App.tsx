@@ -275,6 +275,19 @@ export default function App() {
    * override comes out with different clocks, or fails outright.
    */
   const lastOptions = useRef<ConvertOptions>({})
+  /**
+   * The Original PGN tab has changed this game's moves away from its chapter's.
+   *
+   * Tags do not count, or renaming a player would ask every time and the question
+   * would stop being read. Moves added on the board do not count either: that is
+   * the ordinary way of working on a chapter, where pasting over the text can be
+   * a different game altogether, and a save is a blind overwrite.
+   */
+  const sourceChangedChapterMoves = useRef(false)
+  const [confirmOverwrite, setConfirmOverwrite] = useState<{
+    studyId: string
+    studyName: string
+  } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [helpOpen, setHelpOpen] = useState(false)
   const [licensesOpen, setLicensesOpen] = useState(false)
@@ -361,7 +374,10 @@ export default function App() {
     let live = true
     decodeGame(payload)
       .then((pgn) => {
-        if (live) handleConvert(pgn, {})
+        if (!live) return
+        setSourceText(pgn)
+        setSourceFileName(null)
+        handleConvert(pgn, {})
       })
       .catch(() => {
         if (!live) return
@@ -408,9 +424,10 @@ export default function App() {
    * Load a PGN, converting its clocks on the way in.
    *
    * @param from Where it came from, when it came from a study chapter the user
-   *   can write back to. Anything else — a file, a paste, a new game — passes
-   *   nothing and clears the origin, because a save then has nowhere it could
-   *   safely overwrite.
+   *   can write back to. A file or a paste passes nothing and clears the origin,
+   *   because a save then has nowhere it could safely overwrite. Reading the
+   *   Original PGN tab again passes the origin it already has: it is the same game
+   *   being edited, like a move added on the board.
    * @param atPly The mainline move to land on, where one should survive the read.
    */
   const handleConvert = (
@@ -443,6 +460,7 @@ export default function App() {
       setGameEpoch((n) => n + 1)
       lastOptions.current = options
       sourceEdited.current = false
+      sourceChangedChapterMoves.current = false
       // The parser's warnings lead: a dropped line is lost work, where a
       // reused clock is only an approximation the file did not give.
       setGame({
@@ -613,6 +631,17 @@ export default function App() {
     setLiveScore(null)
     setEngineMoves([])
     setGameEpoch((n) => n + 1)
+    // Everything that says where the last game came from goes with it. Left
+    // alone, the origin kept "Update this chapter" on offer with this empty game
+    // behind it: one press replaced the chapter's moves with `*` and blanked its
+    // tags. The source text would be read over this game if it were edited.
+    setOrigin(null)
+    setSaveState(null)
+    setSourceText('')
+    setSourceFileName(null)
+    sourceEdited.current = false
+    sourceChangedChapterMoves.current = false
+    lastOptions.current = {}
     setGame({ result: NO_CONVERSION, tree })
     setWarningsDismissed(false)
     setHeaders(newGameHeaders())
@@ -905,6 +934,7 @@ export default function App() {
    */
   const rereadSource = (force: boolean): boolean => {
     if (sourceText.trim() === '' || (!force && !sourceEdited.current)) return true
+    let readMoves: string
     try {
       convertPgn(sourceText, lastOptions.current)
       // convertPgn takes any word for a move, so ordinary prose gets past it and
@@ -912,11 +942,13 @@ export default function App() {
       // would swap the game on the board for an empty one.
       const { tree } = parseMoveTree(splitHeadersAndMovetext(sourceText).movetext)
       if (mainline(tree).length === 0) throw new Error('No playable moves in this text.')
+      readMoves = mainlineUcis(tree).join(' ')
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
       return false
     }
-    handleConvert(sourceText, lastOptions.current, null, currentPly)
+    handleConvert(sourceText, lastOptions.current, origin, currentPly)
+    sourceChangedChapterMoves.current = !!origin && readMoves !== origin.loadedKey
     return true
   }
 
@@ -992,6 +1024,10 @@ export default function App() {
     (chapter: LibraryGame, studyId: string, studyName: string) => {
       clearShareHash()
       const { movetext } = splitHeadersAndMovetext(chapter.pgn)
+      // Without these the Original PGN tab goes on showing whatever came before
+      // this game, and an edit there would read that over the chapter.
+      setSourceText(chapter.pgn)
+      setSourceFileName(chapter.chapterName)
       handleConvert(
         chapter.pgn,
         {},
@@ -999,6 +1035,7 @@ export default function App() {
           ? {
               studyId,
               chapterId: chapter.chapterId,
+              chapterName: chapter.chapterName,
               loadedKey: mainlineUcis(parseMoveTree(movetext).tree).join(' '),
               loadedTags: [...tagsOf(chapter.pgn)].map(([name, value]) => ({ name, value })),
             }
@@ -1146,10 +1183,14 @@ export default function App() {
           setOrigin({
             studyId,
             chapterId: chapter.id,
+            chapterName: chapter.name,
             loadedKey: mainlineUcis(game.tree).join(' '),
             loadedTags: withExtraTags(headers, generatedHeaders),
           })
         }
+        // Whatever the chapter holds now, it is this game, so it is what later
+        // edits get compared with.
+        sourceChangedChapterMoves.current = false
         setSaveState({ kind: 'saved', at: Date.now() })
       } catch (e) {
         if (e instanceof LichessApiError && e.unauthorized) clearSession()
@@ -1158,6 +1199,14 @@ export default function App() {
     },
     [libraryPgn, game, origin, headers, generatedHeaders],
   )
+
+  const requestSave = (mode: 'update' | 'new', studyId: string, studyName: string) => {
+    if (mode === 'update' && sourceChangedChapterMoves.current) {
+      setConfirmOverwrite({ studyId, studyName })
+      return
+    }
+    void handleSaveToLibrary(mode, studyId, studyName)
+  }
 
   const downloadName = useMemo(() => {
     // "?" is how PGN spells an unfilled tag, and a game started here begins
@@ -1504,7 +1553,7 @@ export default function App() {
             onOpen={handleOpenFromLibrary}
             gameName={game ? `${whiteName} – ${blackName}` : null}
             canUpdate={!!origin}
-            onSave={handleSaveToLibrary}
+            onSave={requestSave}
             saveState={saveState}
           />
         )}
@@ -1586,7 +1635,11 @@ export default function App() {
                 setError(null)
               }}
               sourceFileName={sourceFileName}
-              onSourceFileNameChange={setSourceFileName}
+              // An edit stops text being the file it came from, but a chapter
+              // stays that chapter: it is still where a save goes.
+              onSourceFileNameChange={(name) => {
+                if (!origin) setSourceFileName(name)
+              }}
               onReread={rereadSource}
               convertError={error}
               convertedPgn={convertedPgn}
@@ -1647,9 +1700,9 @@ export default function App() {
           body={
             <>
               The game on the board will be replaced, along with any variations and notes you
-              have added to it. If it came from a PGN, that text is still in the{' '}
-              <span className="font-medium text-ink">Orig PGN</span> tab and can be converted
-              again — anything built here by hand cannot.
+              have added to it, and the <span className="font-medium text-ink">Original PGN</span>{' '}
+              tab will be cleared. A game from a file or a study can be opened again, without any
+              changes you have not saved — anything built here by hand cannot.
             </>
           }
           confirmLabel="Start new game"
@@ -1658,6 +1711,32 @@ export default function App() {
             startNewGame()
           }}
           onCancel={() => setConfirmNew(false)}
+        />
+      )}
+
+      {confirmOverwrite && (
+        <ConfirmDialog
+          title="Overwrite this chapter?"
+          body={
+            <>
+              The moves you changed in the{' '}
+              <span className="font-medium text-ink">Original PGN</span> tab are not the ones{' '}
+              <span className="font-medium text-ink">{origin?.chapterName ?? 'this chapter'}</span>{' '}
+              holds. Updating replaces that chapter's moves and tags on Lichess with{' '}
+              <span className="font-medium text-ink">
+                {whiteName} – {blackName}
+              </span>
+              , and what it holds now cannot be brought back from here. To keep both, cancel and
+              add this game to a study as a new chapter instead.
+            </>
+          }
+          confirmLabel="Overwrite chapter"
+          onConfirm={() => {
+            const { studyId, studyName } = confirmOverwrite
+            setConfirmOverwrite(null)
+            void handleSaveToLibrary('update', studyId, studyName)
+          }}
+          onCancel={() => setConfirmOverwrite(null)}
         />
       )}
 

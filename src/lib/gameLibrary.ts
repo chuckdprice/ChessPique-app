@@ -69,6 +69,8 @@ export interface CachedStudy {
 export interface GameOrigin {
   studyId: string
   chapterId: string
+  /** What to call it when asking before overwriting it. */
+  chapterName: string | null
   /**
    * The mainline as loaded, so a later version of this can ask Lichess whether
    * the chapter still holds what we started from before overwriting it.

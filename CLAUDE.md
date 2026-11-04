@@ -224,11 +224,10 @@ the harness's drag tool (mouse events) cannot move a piece. Drive it with a
   Vercel's responses: first visit without the headers, second with them. When a
   change alters response headers, ask which unchanged files a returning browser
   already has. `sf-worker.js` postdates the headers and is safe.
-  `stockfish-19-lite-single.js` predates them by a day, so on an isolated page it
-  can fail the same way — that only matters if the threaded engine has already
-  failed and this is the fallback, and it has not been fixed. It builds its wasm
-  path from `location.origin` and `pathname` and reads `location.hash`, so check
-  that before giving it a query.
+  `stockfish-19-lite-single.js` predates them by a day and only runs on an isolated
+  page as the fallback, so it got the same `?v=2`. It builds its own paths from
+  `location.origin`, `pathname` and `hash`, never the query, and it was run from
+  the new URL to a best move before this was written.
 - **The model's Content-Length cannot be used for progress.** Vercel
   brotli-compresses it and sends no length at all, and a length on a compressed
   response would be the compressed size against a count of decompressed bytes.
@@ -617,6 +616,10 @@ against his own account on 6 August 2026, after the pop-up handoff was changed
 to identify the return by `state` rather than by a URL marker. Treat that path
 as working, and suspect a regression rather than a never-worked bug if it
 breaks.
+
+Saving to a Lichess study works too: Chuck confirmed it on 4 November 2026. Those
+write paths had only ever run against a stub until then, so treat them as working,
+and suspect a regression rather than a never-worked bug if they break.
 
 The piece sets under `public/piece` are lichess's files, and only sets under a
 permissive or attribution licence are here — several of the nicest ones on

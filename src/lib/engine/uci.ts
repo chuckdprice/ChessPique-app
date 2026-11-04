@@ -10,8 +10,14 @@ import { Chess } from 'chess.js'
 /**
  * The single-threaded build, which needs nothing of the page and runs anywhere
  * — including Node, where the tests and the calibration scripts drive it.
+ *
+ * The query keeps a stale copy from breaking the fallback, for the reason spelled
+ * out on Maia's WORKER_PATH: this file predates the isolation headers, a browser
+ * that cached it then keeps a header-less copy through every 304, and an isolated
+ * page refuses that. The engine reads only `pathname` and `hash` from its own URL,
+ * so a query does not change where it looks for its wasm.
  */
-export const ENGINE_WORKER_PATH = '/stockfish/stockfish-19-lite-single.js'
+export const ENGINE_WORKER_PATH = '/stockfish/stockfish-19-lite-single.js?v=2'
 
 /**
  * The threaded build, behind our own worker. Same Stockfish 19 and the same net

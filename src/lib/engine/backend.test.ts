@@ -68,8 +68,17 @@ describe('the two paths', () => {
   it('are different files, and both under /stockfish', () => {
     expect(ISOLATED_WORKER_PATH).not.toBe(ENGINE_WORKER_PATH)
     for (const path of [ISOLATED_WORKER_PATH, ENGINE_WORKER_PATH]) {
-      expect(path).toMatch(/^\/stockfish\/[\w.-]+\.js$/)
+      expect(path).toMatch(/^\/stockfish\/[\w.-]+\.js(\?v=\d+)?$/)
     }
+  })
+
+  it('does not load the fallback from the URL browsers hold a header-less copy of', () => {
+    // Only reachable on a browser that ran the app before v3.1 and whose threaded
+    // build then failed, so nothing else here would ever notice it going back.
+    expect(ENGINE_WORKER_PATH).not.toBe('/stockfish/stockfish-19-lite-single.js')
+    expect(new URL(ENGINE_WORKER_PATH, 'https://x').pathname).toBe(
+      '/stockfish/stockfish-19-lite-single.js',
+    )
   })
 
   it('names the worker the copy script leaves in place, not a copied build', () => {

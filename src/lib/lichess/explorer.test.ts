@@ -230,13 +230,22 @@ describe('being a good citizen', () => {
   })
 
   it('stops sending for a minute after a 429', async () => {
-    const { fn, calls } = stubFetch([() => new Response('slow down', { status: 429 })])
+    // Slower than any scheduling hiccup on purpose. This test used to take the
+    // time before the request and fail whenever the 429 landed a couple of
+    // milliseconds later, which a busy machine does; the delay keeps it honest.
+    const { fn, calls } = stubFetch([
+      async () => {
+        await new Promise((resolve) => setTimeout(resolve, 5))
+        return new Response('slow down', { status: 429 })
+      },
+    ])
     const client = new ExplorerClient(fn)
-    const before = Date.now()
 
     await expect(client.lookup({ db: 'lichess', fen: 'a' }, 'tok')).rejects.toBeInstanceOf(
       ExplorerRateLimitError,
     )
+    // Read after the 429, so the cooldown can only have started at or before this.
+    const after = Date.now()
     expect(client.cooldownRemaining()).toBeGreaterThan(RATE_LIMIT_COOLDOWN_MS - 1000)
 
     // The next position fails without touching the network at all — the point
@@ -246,7 +255,7 @@ describe('being a good citizen', () => {
       ExplorerRateLimitError,
     )
     expect(calls).toHaveLength(1)
-    expect(client.cooldownRemaining(before + RATE_LIMIT_COOLDOWN_MS + 1)).toBe(0)
+    expect(client.cooldownRemaining(after + RATE_LIMIT_COOLDOWN_MS + 1)).toBe(0)
   })
 
   it('waits longer when Retry-After asks for longer', async () => {
